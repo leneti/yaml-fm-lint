@@ -1,19 +1,18 @@
-class DomainError extends Error {
+class YAMLException extends Error {
   /**
-   *
    * @param {string} message - error message
    */
   constructor(message) {
     super(message);
     // Ensure the name of this error is the same as the class name
-    this.name = this.constructor.name;
+    this.name = `YAMLException-${this.constructor.name}`;
     // This clips the constructor invocation from the stack trace.
     // It's not absolutely essential, but it does make the stack trace a little nicer.
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
-class FrontMatterNotFound extends DomainError {
+class FrontMatterNotFound extends YAMLException {
   /**
    *
    * @param {string} filePath - file path
@@ -26,24 +25,21 @@ class FrontMatterNotFound extends DomainError {
   }
 }
 
-class RedundandQuotes extends DomainError {
+class RedundantQuotes extends YAMLException {
   /**
-   *
    * @param {string} filePath - file path
-   * @param {string} fm - front matter
-   * @param {[{row: number, col: number}]} quotePos - array of redundant quotes
+   * @param {[{row: number, col: number, snippet: string}]} quotePos - array of redundant quotes
    */
-  constructor(filePath, fm, quotePos) {
+  constructor(filePath, quotePos) {
     const redundantQuotes = quotePos.reduce((acc, curr) => {
-      return `${acc}\n  at ${__dirname}\\${filePath}:${curr.row}:${curr.col}.`;
+      return `${acc}\n  at ${__dirname}\\${filePath}:${curr.row}:${curr.col}.\n\n${curr.snippet}\n`;
     }, "");
 
     super(redundantQuotes);
-    this.parsedString = fm;
   }
 }
 
 module.exports = {
   FrontMatterNotFoundError: FrontMatterNotFound,
-  RedundandQuoteError: RedundandQuotes,
+  RedundantQuoteError: RedundantQuotes,
 };
