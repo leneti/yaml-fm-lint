@@ -4,7 +4,8 @@
   "description": "nodejs linter for yaml front matter",
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "yaml-lint": "node index.js"
   },
   "keywords": [
     "yaml",
@@ -15,12 +16,11 @@
   "author": "leneti",
   "license": "MIT",
   "dependencies": {
-    "shelljs": "^0.8.5"
+    "front-matter": "github:leneti/front-matter"
   },
   "bin": {
-    "yaml-lint": "bin/commit.js"
+    "yaml-lint": "index.js"
   },
-  "devDependencies": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/leneti/yaml-fm-lint.git"
