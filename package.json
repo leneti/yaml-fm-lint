@@ -1,0 +1,33 @@
+{
+  "name": "@leneti/yaml-lint",
+  "version": "1.0.0",
+  "description": "nodejs linter for yaml front matter",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "yaml-lint": "bin/commit.js"
+  },
+  "keywords": [
+    "yaml",
+    "lint",
+    "nodejs",
+    "frontmatter"
+  ],
+  "author": "leneti",
+  "license": "ISC",
+  "dependencies": {
+    "shelljs": "^0.8.5"
+  },
+  "bin": {
+    "yaml-lint": "bin/commit.js"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leneti/yaml-fm-lint.git"
+  },
+  "bugs": {
+    "url": "https://github.com/leneti/yaml-fm-lint/issues"
+  },
+  "homepage": "https://github.com/leneti/yaml-fm-lint#readme"
+}
