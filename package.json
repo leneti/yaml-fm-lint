@@ -4,8 +4,7 @@
   "description": "nodejs linter for yaml front matter",
   "main": "index.js",
   "scripts": {
-    "test": "jest",
-    "yaml-lint": "bin/commit.js"
+    "test": "jest"
   },
   "keywords": [
     "yaml",
