@@ -9,6 +9,7 @@
     "yaml-lint": "node index.js"
   },
   "dependencies": {
+    "config": "^3.3.7",
     "front-matter": "github:leneti/front-matter",
     "yaml-lint": "^1.7.0"
   },

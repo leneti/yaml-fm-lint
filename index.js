@@ -2,9 +2,20 @@
 const fs = require("fs");
 const fm = require("front-matter");
 const yamlLint = require("yaml-lint");
-const { FrontMatterNotFoundError, RedundantQuoteError } = require("./errors");
+const config = require('config');
 
 const filePath = process.argv[2];
+
+/**
+ * Checks if the front matter exists.
+ * @param {string} fm - front matter string
+ */
+function checkFrontMatterExists(fm) {
+  if (!fm) {
+    console.log(`YAMLException: Front matter not found in ${__dirname}\\${filePath}. Make sure front matter is at the beginning of the file.`);
+    process.exit(1)
+  }
+}
 
 /**
  * Checks if there are any quotes in the front matter and warns against using them.
@@ -37,7 +48,25 @@ function checkQuotes(str) {
     const quotes = redundantQuotes.reduce((acc, curr) => {
       return `${acc}\n  at ${__dirname}\\${filePath}:${curr.row}:${curr.col}.\n\n${curr.snippet}\n`;
     }, "");
-    console.log(`Redundant quotes found in ${filePath}:\n${quotes}`);
+    console.log(`YAMLException: Redundant quotes found in ${filePath}:\n${quotes}`);
+    process.exitCode = 1;
+  }
+}
+
+/**
+ * Checks if all required attributes are present in the front matter.
+ * @param {Object} attributes front matter attributes
+ */
+function checkAttributes(attributes) {
+  const requiredAttributes = config.get("requiredAttributes");
+  const missingAttributes = requiredAttributes.filter(
+    (attribute) => !attributes.hasOwnProperty(attribute)
+  );
+
+  if (missingAttributes.length > 0) {
+    console.log(
+      `YAMLException: Missing attributes in ${__dirname}\\${filePath}: ${missingAttributes.join(", ")}\n`
+    );
     process.exitCode = 1;
   }
 }
@@ -47,13 +76,12 @@ fs.readFile(filePath, "utf8", function (err, data) {
 
   const content = fm(data);
 
-  if (!content.frontmatter) {
-    throw new FrontMatterNotFoundError(filePath);
-  }
+  checkFrontMatterExists(content.frontmatter)
 
   yamlLint
     .lint(content.frontmatter)
     .then(() => {
+      checkAttributes(content.attributes);
       checkQuotes(content.frontmatter)
     })
     .catch(console.error);
