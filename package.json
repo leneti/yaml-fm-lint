@@ -1,12 +1,12 @@
 {
   "author": "leneti",
-  "name": "md-yaml-fm-lint",
+  "name": "yaml-fm-lint",
   "description": "nodejs linter for yaml front matter in markdown files",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "license": "MIT",
   "main": "index.js",
   "scripts": {
-    "yaml-lint": "node index.js"
+    "yaml-fm-lint": "node index.js"
   },
   "dependencies": {
     "front-matter": "github:leneti/front-matter",

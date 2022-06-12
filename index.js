@@ -74,7 +74,7 @@ function getArguments() {
 function checkFrontMatterExists(fm, filePath) {
   if (!fm) {
     console.log(
-      `YAMLException: Front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.`
+      `YAMLException: front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.`
     );
     process.exitCode = 1;
   }
@@ -92,7 +92,7 @@ function checkAttributes(attributes, filePath) {
 
   if (missingAttributes.length > 0) {
     console.log(
-      `YAMLException: Missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
+      `YAMLException: missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
         ", "
       )}\n`
     );
@@ -135,7 +135,7 @@ function checkQuotes(fm, filePath) {
       }.\n\n${curr.snippet}\n`;
     }, "");
     console.log(
-      `YAMLException: There should be no redundant quotes.\n${quotes}`
+      `YAMLException: there should be no redundant quotes.\n${quotes}`
     );
     process.exitCode = 1;
   }
@@ -175,7 +175,7 @@ function checkNoSpacesBeforeColon(fm, filePath) {
       }.\n\n${curr.snippet}\n`;
     }, "");
     console.log(
-      `YAMLException: There should be no spaces before colons.\n${spaces}`
+      `YAMLException: there should be no spaces before colons.\n${spaces}`
     );
     process.exitCode = 1;
   }
