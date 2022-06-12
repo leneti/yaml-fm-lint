@@ -18,16 +18,6 @@ try {
 } catch (_) {}
 const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
 
-(() => {
-  console.time("Linting took");
-  if (!args.recursive && !args.r) {
-    lintNonRecursively(args.path);
-  } else {
-    lintRecursively(args.path);
-  }
-  console.timeEnd("Linting took");
-})();
-
 /**
  * Retrieves arguments from the command line
  * @returns {Object} - arguments object
@@ -239,4 +229,14 @@ function lintFile(filePath) {
       })
       .catch(console.error);
   });
+}
+
+exports.lintFM = () => {
+  console.time("Linting took");
+  if (!args.recursive && !args.r) {
+    lintNonRecursively(args.path);
+  } else {
+    lintRecursively(args.path);
+  }
+  console.timeEnd("Linting took");
 }
