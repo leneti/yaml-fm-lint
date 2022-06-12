@@ -5,7 +5,12 @@
   "version": "1.0.0",
   "license": "MIT",
   "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "yaml-fm-lint": "node ."
+  },
   "dependencies": {
+    "chalk": "^5.0.1",
     "front-matter": "github:leneti/front-matter",
     "yaml-lint": "^1.7.0"
   },

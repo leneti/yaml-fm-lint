@@ -1,22 +1,49 @@
 #! /usr/bin/env node
-const fs = require("fs");
-const fm = require("front-matter");
-const yamlLint = require("yaml-lint");
+import path from "path";
+import { fileURLToPath } from "url";
+import { readFileSync, lstatSync, readdir, readFile, readdirSync } from "fs";
+import { promisify } from "util";
+import fm from "front-matter";
+import { lint } from "yaml-lint";
+import chalk from "chalk";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const readdirPromise = promisify(readdir);
+const readFilePromise = promisify(readFile);
 
 const args = getArguments();
 const defaultConfig = JSON.parse(
-  fs.readFileSync(`${__dirname}\\config\\default.json`)
+  readFileSync(`${__dirname}\\config\\default.json`)
 );
 let config = args.config
-  ? { ...defaultConfig, ...JSON.parse(fs.readFileSync(args.config)) }
+  ? { ...defaultConfig, ...JSON.parse(readFileSync(args.config)) }
   : { ...defaultConfig };
 try {
   const mConfig = JSON.parse(
-    fs.readFileSync(`${process.cwd()}\\.yaml-fm-lint.json`)
+    readFileSync(`${process.cwd()}\\.yaml-fm-lint.json`)
   );
   config = { ...config, ...mConfig };
 } catch (_) {}
 const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
+
+(() => {
+  console.time("Linting took");
+  (!args.recursive && !args.r
+    ? lintNonRecursively(args.path)
+    : lintRecursively(args.path)
+  )
+    .catch(console.log)
+    .finally(endOfProcess);
+})();
+
+function endOfProcess() {
+  if (process.exitCode === 0) {
+    console.log(
+      `${chalk.green("All files in the directory have valid front matter.")}`
+    );
+  }
+  console.timeEnd("Linting took");
+}
 
 /**
  * Retrieves arguments from the command line
@@ -35,8 +62,10 @@ function getArguments() {
         key = "path";
         pathRead = true;
       } else {
-        console.error(
-          `Invalid argument: \"${curr}\". Only one path argument is allowed.`
+        console.log(
+          `${chalk.red("Invalid argument:")} ${chalk.yellow(
+            `\"${curr}\"`
+          )}. Only one path argument is allowed.`
         );
         process.exit(1);
       }
@@ -48,8 +77,10 @@ function getArguments() {
   }, {});
 
   if (!pathRead) {
-    console.error(
-      `Invalid arguments: No path argument found. Please specify a path.`
+    console.log(
+      `${chalk.red(
+        "Invalid arguments:"
+      )} No path argument found. Please specify a path.`
     );
     process.exit(1);
   }
@@ -64,10 +95,14 @@ function getArguments() {
 function checkFrontMatterExists(fm, filePath) {
   if (!fm) {
     console.log(
-      `YAMLException: front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.`
+      `${chalk.red(
+        "YAMLException:"
+      )} front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.\n`
     );
     process.exitCode = 1;
+    return false;
   }
+  return true;
 }
 
 /**
@@ -82,7 +117,9 @@ function checkAttributes(attributes, filePath) {
 
   if (missingAttributes.length > 0) {
     console.log(
-      `YAMLException: missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
+      `${chalk.red(
+        "YAMLException:"
+      )} missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
         ", "
       )}\n`
     );
@@ -125,7 +162,9 @@ function checkQuotes(fm, filePath) {
       }.\n\n${curr.snippet}\n`;
     }, "");
     console.log(
-      `YAMLException: there should be no redundant quotes.\n${quotes}`
+      `${chalk.red(
+        "YAMLException:"
+      )} there should be no redundant quotes.\n${quotes}`
     );
     process.exitCode = 1;
   }
@@ -165,78 +204,99 @@ function checkNoSpacesBeforeColon(fm, filePath) {
       }.\n\n${curr.snippet}\n`;
     }, "");
     console.log(
-      `YAMLException: there should be no spaces before colons.\n${spaces}`
+      `${chalk.red(
+        "YAMLException:"
+      )} there should be no spaces before colons.\n${spaces}`
     );
     process.exitCode = 1;
   }
 }
 
-function lintNonRecursively(path) {
-  if (fs.lstatSync(path).isDirectory()) {
-    fs.readdir(path, "utf8", function (err, files) {
-      if (err) throw err;
-      files.forEach((file) => {
-        if (file.endsWith(".md"))
-          lintFile(`${path === "." ? "" : `${path}\\`}${file}`);
-      });
-    });
-  } else {
-    if (path.endsWith(".md")) lintFile(path);
-  }
-}
-
 /**
- * Lints all files in the given directory
+ * Lints the front matter of all files in a directory non-recursively.
  * @param {string} path - path to file or directory
+ * @returns {Promise<string?>} - null if everything is ok, otherwise error message
  */
-function lintRecursively(path) {
-  if (fs.lstatSync(path).isDirectory()) {
-    if (
-      allExcludedDirs.some((ignoredDirectory) =>
-        path.includes(ignoredDirectory)
-      ) &&
-      !config.includeDirs.some((includedDirectory) =>
-        path.includes(includedDirectory)
-      )
-    )
-      return;
+function lintNonRecursively(path) {
+  return new Promise((resolve, reject) => {
+    if (lstatSync(path).isDirectory()) {
+      const files = readdirSync(path, "utf8");
 
-    fs.readdir(path, "utf8", function (err, files) {
-      if (err) throw err;
-      files.forEach((file) => {
-        lintRecursively(`${path === "." ? "" : `${path}\\`}${file}`);
-      });
-    });
-  } else {
-    if (path.endsWith(".md")) lintFile(path);
-  }
-}
+      const promiseArr = [];
+      for (const file of files) {
+        if (file.endsWith(".md")) {
+          promiseArr.push(
+            lintFile(`${path === "." ? "" : `${path}\\`}${file}`)
+          );
+        }
+      }
 
-function lintFile(filePath) {
-  fs.readFile(filePath, "utf8", function (err, data) {
-    if (err) throw err;
+      if (!promiseArr.length) {
+        console.log(`No markdown files found in ${process.cwd()}\\${path}.`);
+        resolve();
+      }
 
-    const content = fm(data);
-
-    checkFrontMatterExists(content.frontmatter, filePath);
-
-    yamlLint
-      .lint(content.frontmatter)
-      .then(() => {
-        checkAttributes(content.attributes, filePath);
-        checkQuotes(content.frontmatter, filePath);
-        checkNoSpacesBeforeColon(content.frontmatter, filePath);
-      })
-      .catch(console.error);
+      Promise.all(promiseArr).then(resolve).catch(reject);
+    } else if (path.endsWith(".md")) {
+      lintFile(path).then(resolve).catch(reject);
+    } else {
+      reject(`${chalk.red("YAMLException:")} ${path} is not a markdown file.`);
+    }
   });
 }
 
-exports.lintFM = () => {
-  console.time("Linting took");
-  if (!args.recursive && !args.r) {
-    lintNonRecursively(args.path);
-  } else {
-    lintRecursively(args.path);
-  }
-  console.timeEnd("Linting took");
+/**
+ * Lints the front matter of all files in a directory recursively.
+ * @param {string} path - path to file or directory
+ */
+function lintRecursively(path) {
+  return new Promise((resolve, reject) => {
+    if (lstatSync(path).isDirectory()) {
+      if (
+        allExcludedDirs.some((ignoredDirectory) =>
+          path.includes(ignoredDirectory)
+        ) &&
+        !config.includeDirs.some((includedDirectory) =>
+          path.includes(includedDirectory)
+        )
+      )
+        resolve();
+
+      readdirPromise(path, "utf8")
+        .then((files) => {
+          const promiseArr = [];
+          for (const file of files) {
+            promiseArr.push(
+              lintRecursively(`${path === "." ? "" : `${path}\\`}${file}`)
+            );
+          }
+
+          Promise.all(promiseArr).then(resolve).catch(reject);
+        })
+        .catch(reject);
+    } else if (path.endsWith(".md")) {
+      lintFile(path).then(resolve).catch(reject);
+    } else resolve();
+  });
+}
+
+function lintFile(filePath) {
+  return new Promise((resolve, reject) => {
+    readFilePromise(filePath, "utf8")
+      .then((data) => {
+        const content = fm(data);
+
+        if (!checkFrontMatterExists(content.frontmatter, filePath)) resolve();
+
+        lint(content.frontmatter)
+          .then(() => {
+            checkAttributes(content.attributes, filePath);
+            checkQuotes(content.frontmatter, filePath);
+            checkNoSpacesBeforeColon(content.frontmatter, filePath);
+            resolve();
+          })
+          .catch(reject);
+      })
+      .catch(reject);
+  });
 }
