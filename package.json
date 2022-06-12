@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "main": "index.js",
+  "bin": "./index.js",
   "type": "module",
   "scripts": {
     "yaml-fm-lint": "node ."
