@@ -11,7 +11,7 @@
   <p>
 
 ![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)
-![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint)
+![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size)
 ![Dependencies](https://img.shields.io/depfu/dependencies/github/leneti/yaml-fm-lint)
 ![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)
 ![Version](https://img.shields.io/github/package-json/v/leneti/yaml-fm-lint?color=%23f88)
@@ -77,8 +77,9 @@ You can provide additional arguments:
 
 [Default config file](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json)
 
-Valid properties are:
-- `excludeDirs`: An array of directories to exclude from linting (You should not overwrite this in your config unless you know what you are doing).
-- `extraExcludeDirs`: An additional array of directories to exclude from linting.
-- `includeDirs`: An array of directories to include in linting.
-- `requiredAttributes`: An array of attributes that must be present in the yaml front matter.
+| Property name      | default | description                                                                                                                       |
+|--------------------|---------|-----------------------------------------------------------------------------------------------------------------------------------|
+| excludeDirs        | [See default config](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json)   | An array of directories to exclude from linting (🛑You should not overwrite this in your config unless you know what you are doing) |
+| extraExcludeDirs   | []      | An additional array of directories to exclude from linting.                                                                       |
+| includeDirs        | []      | An array of directories to include in linting.                                                                                    |
+| requiredAttributes | []      | An array of attributes that must be present in the yaml front matter.                                                             |
