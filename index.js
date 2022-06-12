@@ -37,9 +37,9 @@ const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
 })();
 
 function endOfProcess() {
-  if (process.exitCode === 0) {
+  if (!process.exitCode) {
     console.log(
-      `${chalk.green("All files in the directory have valid front matter.")}`
+      `${chalk.green("All parsed files have valid front matter.")}`
     );
   }
   console.timeEnd("Linting took");
