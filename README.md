@@ -54,7 +54,6 @@ Include the script in your `package.json` file:
 
 ```json
 "scripts": {
-  ...
   "fmlint": "yaml-fm-lint"
 }
 ```
