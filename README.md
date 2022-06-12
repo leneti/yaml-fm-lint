@@ -41,11 +41,16 @@ A CLI NodeJS script which extracts yaml front matter from markdown files and lin
 
 ## Install 🐙
 
+You can either install the package as a dependency with
 ```sh
 npm i --save yaml-fm-lint
 ```
 ```sh
 yarn add yaml-fm-lint
+```
+or use it directly with 
+```sh
+npx yaml-fm-lint <path>
 ```
 
 ## Usage 💡
