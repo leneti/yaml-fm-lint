@@ -1,3 +1,27 @@
 {
-  "requiredAttributes": ["keywords", "tags", "sidebar_label"]
+  "excludeDirs": [
+    "__mocks__",
+    "__tests__",
+    ".DS_Store",
+    ".eslintcache",
+    ".expo",
+    ".expo-shared",
+    ".git",
+    ".idea",
+    ".node_repl_history",
+    ".npm",
+    ".tgz",
+    ".vscode",
+    ".yarn-integrity",
+    "build",
+    "coverage",
+    "dist",
+    "jspm_packages",
+    "logs",
+    "node_modules",
+    "typings"
+  ],
+  "extraExcludeDirs": [],
+  "includeDirs": [],
+  "requiredAttributes": []
 }

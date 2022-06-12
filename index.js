@@ -4,24 +4,25 @@ const fm = require("front-matter");
 const yamlLint = require("yaml-lint");
 
 const args = getArguments();
-const config = JSON.parse(
-  fs.readFileSync(args.config ?? "config/default.json")
+const defaultConfig = JSON.parse(
+  fs.readFileSync(`${__dirname}\\config\\default.json`)
 );
-const ignoredDirectories = [
-  "node_modules",
-  ".git",
-  ".idea",
-  ".vscode",
-  ".expo",
-  ".expo-shared",
-];
+let config = args.config
+  ? { ...defaultConfig, ...JSON.parse(fs.readFileSync(args.config)) }
+  : { ...defaultConfig };
+try {
+  const mConfig = JSON.parse(
+    fs.readFileSync(`${process.cwd()}\\.yaml-fm-lint.json`)
+  );
+  config = { ...config, ...mConfig };
+} catch (_) {}
+const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
 
 (() => {
-  console.time("Linting took")
+  console.time("Linting took");
   lintRecursively(args.path);
-  console.timeEnd("Linting took")
-})()
-
+  console.timeEnd("Linting took");
+})();
 
 // console.log("arguments:", args);
 
@@ -31,11 +32,20 @@ const ignoredDirectories = [
  */
 function getArguments() {
   const args = process.argv.slice(2);
+  let pathRead = false;
   const argv = args.reduce((acc, curr) => {
     let [key, value] = curr.split("=");
     if (!key.startsWith("--")) {
-      value = key;
-      key = "path";
+      if (!pathRead) {
+        value = key;
+        key = "path";
+        pathRead = true;
+      } else {
+        console.error(
+          `Invalid argument: \"${curr}\". Only one path argument is allowed.`
+        );
+        process.exit(1);
+      }
     } else {
       key = key.replace(/^--/, "");
     }
@@ -53,7 +63,7 @@ function getArguments() {
 function checkFrontMatterExists(fm, filePath) {
   if (!fm) {
     console.log(
-      `YAMLException: Front matter not found in ${__dirname}\\${filePath}. Make sure front matter is at the beginning of the file.`
+      `YAMLException: Front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.`
     );
     process.exitCode = 1;
   }
@@ -90,10 +100,12 @@ function checkQuotes(fm, filePath) {
 
   if (redundantQuotes.length > 0) {
     const quotes = redundantQuotes.reduce((acc, curr) => {
-      return `${acc}\n  at ${__dirname}\\${filePath}:${curr.row}:${curr.col}.\n\n${curr.snippet}\n`;
+      return `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${
+        curr.col
+      }.\n\n${curr.snippet}\n`;
     }, "");
     console.log(
-      `YAMLException: Redundant quotes found in ${__dirname}\\${filePath}:\n${quotes}`
+      `YAMLException: Redundant quotes found in ${process.cwd()}\\${filePath}:\n${quotes}`
     );
     process.exitCode = 1;
   }
@@ -111,7 +123,7 @@ function checkAttributes(attributes, filePath) {
 
   if (missingAttributes.length > 0) {
     console.log(
-      `YAMLException: Missing attributes in ${__dirname}\\${filePath}: ${missingAttributes.join(
+      `YAMLException: Missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
         ", "
       )}\n`
     );
@@ -123,11 +135,14 @@ function checkAttributes(attributes, filePath) {
  * Lints all files in the given directory
  * @param {string} path - path to file or directory
  */
- function lintRecursively(path) {
+function lintRecursively(path) {
   if (fs.lstatSync(path).isDirectory()) {
     if (
-      ignoredDirectories.some((ignoredDirectory) =>
+      allExcludedDirs.some((ignoredDirectory) =>
         path.includes(ignoredDirectory)
+      ) &&
+      !config.includeDirs.some((includedDirectory) =>
+        path.includes(includedDirectory)
       )
     )
       return;
@@ -137,7 +152,7 @@ function checkAttributes(attributes, filePath) {
       files.forEach((file) => {
         lintRecursively(`${path === "." ? "" : `${path}\\`}${file}`);
       });
-    })
+    });
   } else {
     if (path.endsWith(".md")) lintFile(path);
   }
