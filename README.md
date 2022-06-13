@@ -27,6 +27,7 @@
 - [Install](##install)
 - [Usage](##usage)
 - [Configuration](##configuration)
+- [Dependencies](##dependencies)
 
 ## What is this
 
