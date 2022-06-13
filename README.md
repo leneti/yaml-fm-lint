@@ -22,12 +22,12 @@
 
 **Content**
 
-- [What is this?](##what%20is%20this)
-- [Features](##features)
-- [Install](##install)
-- [Usage](##usage)
-- [Configuration](##configuration)
-- [Dependencies](##dependencies)
+- [What is this?](#what%20is%20this)
+- [Features](#features)
+- [Install](#install)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Dependencies](#dependencies)
 
 ## What is this
 
