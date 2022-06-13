@@ -22,7 +22,7 @@
 
 **Content**
 
-- [What is this?](#what%20is%20this)
+- [What is this?](#what-is-this)
 - [Features](#features)
 - [Install](#install)
 - [Usage](#usage)
@@ -33,13 +33,13 @@
 
 A CLI NodeJS script which extracts yaml front matter from markdown files and lints the extracted data based on a config file.
 
-## Features ✨
+## Features
 
 - Speed - Only has two dependencies and lints directories asyncronously.
 - Configurable - Lints the extracted data based on a config file.
 - Tiny - Barely takes up space in your project.
 
-## Install 🐙
+## Install
 
 You can either install the package as a dependency with
 ```sh
@@ -53,7 +53,7 @@ or use it directly with
 npx yaml-fm-lint <path>
 ```
 
-## Usage 💡
+## Usage
 
 Include the script in your `package.json` file:
 
@@ -76,7 +76,7 @@ You can provide additional arguments:
 - `--config`: Path to the config file if not in root dir of project.
 - `-r, --recursive`: Recursively lint all files in the given directory.
 
-## Configuration 🖍
+## Configuration
 
 ### `.yaml-fm-lint.json`
 
