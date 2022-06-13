@@ -35,7 +35,7 @@ A CLI NodeJS script which extracts yaml front matter from markdown files and lin
 
 ## Features
 
-- Speed - Only has two dependencies and lints directories asyncronously.
+- Speed - Only has three light-weight dependencies and lints directories asyncronously.
 - Configurable - Lints the extracted data based on a config file.
 - Tiny - Barely takes up space in your project.
 
