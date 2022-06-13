@@ -2,7 +2,7 @@
   "author": "leneti",
   "name": "yaml-fm-lint",
   "description": "nodejs linter for yaml front matter in markdown files",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "license": "MIT",
   "main": "index.js",
   "bin": "./index.js",
