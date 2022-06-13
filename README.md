@@ -11,7 +11,7 @@
   <p>
 
 ![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)
-![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size)
+<!-- ![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size) -->
 ![Dependencies](https://img.shields.io/depfu/dependencies/github/leneti/yaml-fm-lint)
 ![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)
 ![Version](https://img.shields.io/github/package-json/v/leneti/yaml-fm-lint?color=%23f88)
@@ -88,3 +88,6 @@ You can provide additional arguments:
 | extraExcludeDirs   | []      | An additional array of directories to exclude from linting.                                                                       |
 | includeDirs        | []      | An array of directories to include in linting.                                                                                    |
 | requiredAttributes | []      | An array of attributes that must be present in the yaml front matter.                                                             |
+
+## Dependencies
+Because [front matter](https://github.com/jxson/front-matter) is no longer maintained this package uses a locally updated version of it - see [COPYING](https://github.com/leneti/yaml-fm-lint/blob/main/COPYING) for license information.

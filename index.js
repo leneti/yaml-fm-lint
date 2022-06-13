@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { readFileSync, lstatSync, readdir, readFile, readdirSync } from "fs";
 import { promisify } from "util";
-import fm from "front-matter";
+import fm from "./front-matter/index.js";
 import { lint } from "yaml-lint";
 import chalk from "chalk";
 
@@ -25,6 +25,7 @@ try {
   config = { ...config, ...mConfig };
 } catch (_) {}
 const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
+let errorNumber = 0;
 
 (() => {
   console.time("Linting took");
@@ -32,14 +33,22 @@ const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
     ? lintNonRecursively(args.path)
     : lintRecursively(args.path)
   )
-    .catch(console.log)
+    .catch((err) => {
+      console.log(err);
+      process.exitCode = 1;
+      errorNumber++;
+    })
     .finally(endOfProcess);
 })();
 
 function endOfProcess() {
   if (!process.exitCode) {
+    console.log(chalk.green("✔ All parsed files have valid front matter."));
+  } else {
     console.log(
-      `${chalk.green("All parsed files have valid front matter.")}`
+      chalk.red(
+        `✘ ${errorNumber} error(s) found. Please fix the errors and try again.`
+      )
     );
   }
   console.timeEnd("Linting took");
@@ -100,6 +109,7 @@ function checkFrontMatterExists(fm, filePath) {
       )} front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.\n`
     );
     process.exitCode = 1;
+    errorNumber++;
     return false;
   }
   return true;
@@ -124,6 +134,7 @@ function checkAttributes(attributes, filePath) {
       )}\n`
     );
     process.exitCode = 1;
+    errorNumber++;
   }
 }
 
@@ -157,6 +168,7 @@ function checkQuotes(fm, filePath) {
 
   if (redundantQuotes.length > 0) {
     const quotes = redundantQuotes.reduce((acc, curr) => {
+      errorNumber++;
       return `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${
         curr.col
       }.\n\n${curr.snippet}\n`;
@@ -199,6 +211,7 @@ function checkNoSpacesBeforeColon(fm, filePath) {
 
   if (spacesBeforeColon.length > 0) {
     const spaces = spacesBeforeColon.reduce((acc, curr) => {
+      errorNumber++;
       return `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${
         curr.col
       }.\n\n${curr.snippet}\n`;
@@ -233,7 +246,7 @@ function lintNonRecursively(path) {
 
       if (!promiseArr.length) {
         console.log(`No markdown files found in ${process.cwd()}\\${path}.`);
-        resolve();
+        return resolve();
       }
 
       Promise.all(promiseArr).then(resolve).catch(reject);
@@ -254,13 +267,13 @@ function lintRecursively(path) {
     if (lstatSync(path).isDirectory()) {
       if (
         allExcludedDirs.some((ignoredDirectory) =>
-          path.includes(ignoredDirectory)
+          path.endsWith(ignoredDirectory)
         ) &&
         !config.includeDirs.some((includedDirectory) =>
-          path.includes(includedDirectory)
+          path.endsWith(includedDirectory)
         )
       )
-        resolve();
+        return resolve();
 
       readdirPromise(path, "utf8")
         .then((files) => {
@@ -276,7 +289,7 @@ function lintRecursively(path) {
         .catch(reject);
     } else if (path.endsWith(".md")) {
       lintFile(path).then(resolve).catch(reject);
-    } else resolve();
+    } else return resolve();
   });
 }
 
@@ -286,14 +299,15 @@ function lintFile(filePath) {
       .then((data) => {
         const content = fm(data);
 
-        if (!checkFrontMatterExists(content.frontmatter, filePath)) resolve();
+        if (!checkFrontMatterExists(content.frontmatter, filePath))
+          return resolve();
 
         lint(content.frontmatter)
           .then(() => {
             checkAttributes(content.attributes, filePath);
             checkQuotes(content.frontmatter, filePath);
             checkNoSpacesBeforeColon(content.frontmatter, filePath);
-            resolve();
+            return resolve();
           })
           .catch(reject);
       })
