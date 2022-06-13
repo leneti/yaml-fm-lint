@@ -10,11 +10,10 @@
   </p>
   <p>
 
-![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)
 <!-- ![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size) -->
 ![Dependencies](https://img.shields.io/depfu/dependencies/github/leneti/yaml-fm-lint)
 ![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)
-![Version](https://img.shields.io/github/package-json/v/leneti/yaml-fm-lint?color=%23f88)
+![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)
 
   </p>
 </div>
