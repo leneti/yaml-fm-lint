@@ -27,7 +27,6 @@
 - [Install](#install)
 - [Usage](#usage)
 - [Configuration](#configuration)
-- [Dependencies](#dependencies)
 
 ## What is this
 
@@ -35,9 +34,9 @@ A CLI NodeJS script which extracts yaml front matter from markdown files and lin
 
 ## Features
 
-- Speed - Only has three light-weight dependencies and lints directories asyncronously.
-- Configurable - Lints the extracted data based on a config file.
-- Tiny - Barely takes up space in your project.
+- **Quick** - Only has two light-weight dependencies and lints directories asyncronously.
+- **Configurable** - Lints the extracted data based on a config file.
+- **Tiny** - Barely takes up space in your project.
 
 ## Install
 
@@ -89,6 +88,3 @@ You can provide additional arguments:
 | extensions         | [".md"] | Array of extensions of files to parse.                                                                              |
 | includeDirs        | []      | Array of directories to include in linting.                                                                                    |
 | requiredAttributes | []      | Array of attributes that must be present in the yaml front matter.                                                             |
-
-## Dependencies
-Because [front matter](https://github.com/jxson/front-matter) is no longer maintained this package uses a locally updated version of it - see [COPYING](https://github.com/leneti/yaml-fm-lint/blob/main/COPYING) for license information.

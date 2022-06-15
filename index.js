@@ -5,7 +5,6 @@ import { readFileSync, lstatSync, readdir, readFile, readdirSync } from "fs";
 import { promisify } from "util";
 import { lint } from "yaml-lint";
 import chalk from "chalk";
-import fm from "./front-matter/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const readdirPromise = promisify(readdir);
@@ -318,9 +317,6 @@ function lintFile(filePath) {
   return new Promise((resolve, reject) => {
     readFilePromise(filePath, "utf8")
       .then((data) => {
-        const content = fm(data);
-        if (!content.frontmatter) return resolve();
-
         const lines = data.replace(/\r/g, "").split("\n");
         lines.unshift("");
         const fmClosingTagIndex = lines.indexOf("---", 2);
