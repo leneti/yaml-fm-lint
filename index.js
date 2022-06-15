@@ -5,6 +5,17 @@ import { readFileSync, lstatSync, readdir, readFile, readdirSync } from "fs";
 import { promisify } from "util";
 import { lint } from "yaml-lint";
 import chalk from "chalk";
+import {
+  checkAttributes,
+  indentationError,
+  spaceBeforeColonError,
+  blankLinesError,
+  quotesError,
+  trailingSpacesError,
+  bracketsError,
+  curlyBracesError,
+  repeatingSpacesError,
+} from "./errors.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const readdirPromise = promisify(readdir);
@@ -37,7 +48,8 @@ if (!!args.m || !!args.mandatory) {
   config = { ...config, mandatory };
 }
 const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
-let errorNumber = 0;
+let errorNumber = 0,
+  warningNumber = 0;
 
 (() => {
   console.time("Linting took");
@@ -54,12 +66,23 @@ let errorNumber = 0;
 })();
 
 function endOfProcess() {
+  if (warningNumber) {
+    console.log(
+      chalk.yellow(
+        `⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`
+      )
+    );
+  }
   if (!process.exitCode) {
     console.log(chalk.green("✔ All parsed files have valid front matter."));
   } else {
     console.log(
       chalk.red(
-        `✘ ${errorNumber} error(s) found. Please fix the errors and try again.`
+        `✘ ${errorNumber} error${
+          errorNumber > 1 ? "s" : ""
+        } found. Please fix the error${
+          errorNumber > 1 ? "s" : ""
+        } and try again.`
       )
     );
   }
@@ -118,139 +141,6 @@ function getSnippet(lines, col, i) {
   }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(i)), "-")}\n${
     i + 1 < lines.length ? `${i + 1} | ${lines[i + 1]}\n` : ""
   }`;
-}
-
-/**
- * Checks whether there are any missing attributes in the front-matter.
- * @param {string[]} attributes - list of attributes to check for
- * @param {string} filePath - path to file to check
- */
-function checkAttributes(attributes, filePath) {
-  const requiredAttributes = config.requiredAttributes;
-  const missingAttributes = requiredAttributes.filter(
-    (attr) => !attributes.includes(attr)
-  );
-
-  if (missingAttributes.length > 0) {
-    console.log(
-      `${chalk.red(
-        "YAMLException:"
-      )} missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
-        ", "
-      )}\n`
-    );
-    process.exitCode = 1;
-    errorNumber++;
-  }
-}
-
-function indentationError(indentation, filePath) {
-  const indents = indentation.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} lines cannot be indented more than 2 spaces from the previous line.\n${indents}`
-  );
-  process.exitCode = 1;
-}
-
-function spaceBeforeColonError(spacesBeforeColon, filePath) {
-  const spaces = spacesBeforeColon.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no whitespace before colons.\n${spaces}`
-  );
-  process.exitCode = 1;
-}
-
-function blankLinesError(blankLines, filePath) {
-  const blankLinesStr = blankLines.reduce(
-    (acc, curr) => `${acc}\n  at ${process.cwd()}\\${filePath}:${curr}.\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no empty lines.\n${blankLinesStr}`
-  );
-  process.exitCode = 1;
-}
-
-function quotesError(quotes, filePath) {
-  const quotesStr = quotes.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no quotes in the front matter.\n${quotesStr}`
-  );
-  process.exitCode = 1;
-}
-
-function trailingSpacesError(trailingSpaces, filePath) {
-  const trailingSpacesStr = trailingSpaces.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no trailing spaces.\n${trailingSpacesStr}`
-  );
-  process.exitCode = 1;
-}
-
-function bracketsError(brackets, filePath) {
-  const bracketsStr = brackets.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no brackets. Please use hyphen "-" symbols followed by a space to list items on separate lines.\n${bracketsStr}`
-  );
-  process.exitCode = 1;
-}
-
-function curlyBracesError(curlyBraces, filePath) {
-  const curlyBracesStr = curlyBraces.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no curly braces. Please list key-value pairs on separate lines indented with 2 spaces.\n${curlyBracesStr}`
-  );
-  process.exitCode = 1;
 }
 
 /**
@@ -343,6 +233,8 @@ function lintFile(filePath) {
           if (config.mandatory) {
             process.exitCode = 1;
             errorNumber++;
+          } else {
+            warningNumber++;
           }
           return resolve();
         }
@@ -372,6 +264,7 @@ function lintLineByLine(fm, filePath) {
   const brackets = [];
   const curlyBraces = [];
   const indentation = [];
+  const repeatingSpaces = [];
   let match;
 
   for (let i = 1; i < fm.length - 1; i++) {
@@ -473,9 +366,23 @@ function lintLineByLine(fm, filePath) {
         });
       }
     }
+
+    // no-repeating-spaces
+    const repeatingSpaceRegex = /\w\s{2,}\w/g;
+    while ((match = repeatingSpaceRegex.exec(line)) !== null) {
+      repeatingSpaceRegex.lastIndex = match.index + 1;
+      warningNumber++;
+      const row = i;
+      const col = match.index + match[0].search(/\s\w/g) + 2;
+      repeatingSpaces.push({
+        row,
+        col,
+        snippet: getSnippet(fm, col, i),
+      });
+    }
   }
 
-  checkAttributes(attributes, filePath);
+  checkAttributes(attributes, config.requiredAttributes, filePath);
   if (blankLines.length > 0) blankLinesError(blankLines, filePath);
   if (trailingSpaces.length > 0) trailingSpacesError(trailingSpaces, filePath);
   if (spacesBeforeColon.length > 0)
@@ -484,4 +391,6 @@ function lintLineByLine(fm, filePath) {
   if (brackets.length > 0) bracketsError(brackets, filePath);
   if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath);
   if (indentation.length > 0) indentationError(indentation, filePath);
+  if (repeatingSpaces.length > 0)
+    repeatingSpacesError(repeatingSpaces, filePath);
 }

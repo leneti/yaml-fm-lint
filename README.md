@@ -72,8 +72,8 @@ yarn run fmlint -- path/to/your/markdown/files
 ```
 
 You can provide additional arguments:
-- `--config`: Path to the config file if not in root dir of project.
-- `-r, --recursive`: Recursively lint all files in the given directory.
+- `--config`: Path to the config file if not in root directory of project.
+- `-r, --recursive`: *(default: `false`)* Recursively lint all files in the given directory.
 - `-m, --mandatory`: *(default: `true`)* If set to false will show warning instead of error if no front matter is found.
 
 ## Configuration

@@ -1,12 +1,12 @@
 ---
 
-title : This is a title!
+title : This is  a title!
 
-"name": Derek Worthen    
+"name": Derek   Worthen    
 age     : "young"
 contact:
 email: email@domain.com
-address: some location
+address: some  location
 pets:
   - cat
   - dog
