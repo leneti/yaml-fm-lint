@@ -1,3 +1,4 @@
-node_modules/
+examples/
+assets/
 package-lock.json
 .yaml-fm-lint.json

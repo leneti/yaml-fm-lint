@@ -85,9 +85,10 @@ You can provide additional arguments:
 | Property name      | default | description                                                                                                                       |
 |--------------------|---------|-----------------------------------------------------------------------------------------------------------------------------------|
 | excludeDirs        | [See default config](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json)   | An array of directories to exclude from linting (🛑You should not overwrite this in your config unless you know what you are doing) |
-| extraExcludeDirs   | []      | An additional array of directories to exclude from linting.                                                                       |
-| includeDirs        | []      | An array of directories to include in linting.                                                                                    |
-| requiredAttributes | []      | An array of attributes that must be present in the yaml front matter.                                                             |
+| extraExcludeDirs   | []      | Additional array of directories to exclude from linting.                                                                       |
+| extensions         | [".md"] | Array of extensions of files to parse.                                                                              |
+| includeDirs        | []      | Array of directories to include in linting.                                                                                    |
+| requiredAttributes | []      | Array of attributes that must be present in the yaml front matter.                                                             |
 
 ## Dependencies
 Because [front matter](https://github.com/jxson/front-matter) is no longer maintained this package uses a locally updated version of it - see [COPYING](https://github.com/leneti/yaml-fm-lint/blob/main/COPYING) for license information.

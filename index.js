@@ -3,9 +3,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { readFileSync, lstatSync, readdir, readFile, readdirSync } from "fs";
 import { promisify } from "util";
-import fm from "./front-matter/index.js";
 import { lint } from "yaml-lint";
 import chalk from "chalk";
+import fm from "./front-matter/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const readdirPromise = promisify(readdir);
@@ -26,6 +26,253 @@ try {
 } catch (_) {}
 const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
 let errorNumber = 0;
+
+function getSnippet2(lines, col, i) {
+  return `${i - 1 > 0 ? `${i - 1} | ${lines[i - 1]}\n` : ""}${i} | ${
+    lines[i]
+  }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(i)), "-")}\n${
+    i + 1 < lines.length ? `${i + 1} | ${lines[i + 1]}\n` : ""
+  }`;
+}
+
+/**
+ * Checks whether there are any missing attributes in the front-matter.
+ * @param {string[]} attributes - list of attributes to check for
+ * @param {string} filePath - path to file to check
+ */
+function checkAttributes2(attributes, filePath) {
+  const requiredAttributes = config.requiredAttributes;
+  const missingAttributes = requiredAttributes.filter(
+    (attr) => !attributes.includes(attr)
+  );
+
+  if (missingAttributes.length > 0) {
+    console.log(
+      `${chalk.red(
+        "YAMLException:"
+      )} missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
+        ", "
+      )}\n`
+    );
+    process.exitCode = 1;
+    errorNumber++;
+  }
+}
+
+/**
+ * Parses given string and returns an object with all front matter attributes and possible special characters surrounding them.
+ * @param {string} data - data to parse
+ * @param {string} filePath - path to the file
+ */
+function parseSpecialChars(data, filePath) {
+  const lines = data.replace(/\r/g, "").split("\n");
+  lines.unshift("");
+  const fmClosingTagIndex = lines.indexOf("---", 2);
+
+  if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
+    console.log(
+      `${chalk.red(
+        "YAMLException:"
+      )} front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.\n`
+    );
+    process.exitCode = 1;
+    errorNumber++;
+    return;
+  }
+
+  const fm = lines.slice(0, fmClosingTagIndex + 1);
+  const attributes = [];
+  const spacesBeforeColon = [];
+  const blankLines = [];
+  const quotes = [];
+  const trailingSpaces = [];
+  const brackets = [];
+  const curlyBraces = [];
+  let match;
+
+  for (let i = 1; i < fm.length - 1; i++) {
+    const line = fm[i];
+
+    if (line.match(/^"?\w+"?\s*:/g)) {
+      attributes.push(line.split(":")[0].trim());
+    }
+
+    // no-empty-lines
+    if (line.trim() === "") {
+      errorNumber++;
+      blankLines.push(i);
+      continue;
+    }
+
+    // no-whitespace-before-colon
+    const wsbcRegex = /\s+:/g;
+    while ((match = wsbcRegex.exec(line)) !== null) {
+      errorNumber++;
+      const row = i;
+      const col = match.index + match[0].search(/:/) + 1;
+      wsbcRegex.lastIndex = col - 1;
+      spacesBeforeColon.push({
+        row,
+        col,
+        snippet: getSnippet2(fm, col, i),
+      });
+    }
+
+    // no-quotes
+    const quoteRegex = /['"]/g;
+    while ((match = quoteRegex.exec(line)) !== null) {
+      quoteRegex.lastIndex = match.index + 1;
+      errorNumber++;
+      const row = i;
+      const col = match.index + match[0].search(quoteRegex) + 2;
+      quotes.push({
+        row,
+        col,
+        snippet: getSnippet2(fm, col, i),
+      });
+    }
+
+    // no-trailing-spaces
+    const trailingSpaceRegex = /\s+$/g;
+    if (line.search(trailingSpaceRegex) !== -1) {
+      errorNumber++;
+      const row = i;
+      const col = line.length + 1;
+      trailingSpaces.push({
+        row,
+        col,
+        snippet: getSnippet2(fm, col, i),
+      });
+    }
+
+    // no-brackets
+    const bracketsRegex = /[\[\]]/g;
+    while ((match = bracketsRegex.exec(line)) !== null) {
+      bracketsRegex.lastIndex = match.index + 1;
+      errorNumber++;
+      const row = i;
+      const col = match.index + match[0].search(bracketsRegex) + 2;
+      brackets.push({
+        row,
+        col,
+        snippet: getSnippet2(fm, col, i),
+      });
+    }
+
+    // no-curly-braces
+    const curlyBraceRegex = /[\{\}]/g;
+    while ((match = curlyBraceRegex.exec(line)) !== null) {
+      curlyBraceRegex.lastIndex = match.index + 1;
+      errorNumber++;
+      const row = i;
+      const col = match.index + match[0].search(curlyBraceRegex) + 2;
+      curlyBraces.push({
+        row,
+        col,
+        snippet: getSnippet2(fm, col, i),
+      });
+    }
+  }
+
+  checkAttributes2(attributes, filePath);
+  if (blankLines.length > 0) blankLinesError(blankLines, filePath);
+  if (trailingSpaces.length > 0) trailingSpacesError(trailingSpaces, filePath);
+  if (spacesBeforeColon.length > 0) spaceBeforeColonError(spacesBeforeColon, filePath);
+  if (quotes.length > 0) quotesError(quotes, filePath);
+  if (brackets.length > 0) bracketsError(brackets, filePath);
+  if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath);
+}
+
+function spaceBeforeColonError(spacesBeforeColon, filePath) {
+  const spaces = spacesBeforeColon.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no whitespace before colons.\n${spaces}`
+  );
+  process.exitCode = 1;
+}
+
+function blankLinesError(blankLines, filePath) {
+  const blankLinesStr = blankLines.reduce(
+    (acc, curr) => `${acc}\n  at ${process.cwd()}\\${filePath}:${curr}.\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no empty lines.\n${blankLinesStr}`
+  );
+  process.exitCode = 1;
+}
+
+function quotesError(quotes, filePath) {
+  const quotesStr = quotes.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red("YAMLException:")} there should be no quotes.\n${quotesStr}`
+  );
+  process.exitCode = 1;
+}
+
+function trailingSpacesError(trailingSpaces, filePath) {
+  const trailingSpacesStr = trailingSpaces.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no trailing spaces.\n${trailingSpacesStr}`
+  );
+  process.exitCode = 1;
+}
+
+function bracketsError(brackets, filePath) {
+  const bracketsStr = brackets.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no brackets.\n${bracketsStr}`
+  );
+  process.exitCode = 1;
+}
+
+function curlyBracesError(curlyBraces, filePath) {
+  const curlyBracesStr = curlyBraces.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no curly braces.\n${curlyBracesStr}`
+  );
+  process.exitCode = 1;
+}
 
 (() => {
   console.time("Linting took");
@@ -81,6 +328,9 @@ function getArguments() {
     } else {
       key = key.replace(/^--/, "");
     }
+    if (key === "path" && value.startsWith(process.cwd())) {
+      value = value.replace(process.cwd(), "");
+    }
     acc[key] = value ?? true;
     return acc;
   }, {});
@@ -95,134 +345,6 @@ function getArguments() {
   }
 
   return argv;
-}
-
-/**
- * Checks if the front matter exists.
- * @param {string} fm - front matter string
- */
-function checkFrontMatterExists(fm, filePath) {
-  if (!fm) {
-    console.log(
-      `${chalk.red(
-        "YAMLException:"
-      )} front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.\n`
-    );
-    process.exitCode = 1;
-    errorNumber++;
-    return false;
-  }
-  return true;
-}
-
-/**
- * Checks if all required attributes are present in the front matter.
- * @param {Object} attributes front matter attributes
- */
-function checkAttributes(attributes, filePath) {
-  const missingAttributes =
-    config.requiredAttributes?.filter(
-      (attribute) => !attributes.hasOwnProperty(attribute)
-    ) ?? [];
-
-  if (missingAttributes.length > 0) {
-    console.log(
-      `${chalk.red(
-        "YAMLException:"
-      )} missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
-        ", "
-      )}\n`
-    );
-    process.exitCode = 1;
-    errorNumber++;
-  }
-}
-
-/**
- * Checks if there are any quotes in the front matter and warns against using them.
- * @param {string} fm - (front matter) string to check
- */
-function checkQuotes(fm, filePath) {
-  const lines = fm.split("\n");
-  const redundantQuotes = [];
-  const quoteRegexp =
-    /(^[\"\'])|([\"\']\s*\r)|([\"\']\s*:)|(:\s+[\"\'])|([\"\']$)/g;
-
-  for (let i = 0; i < lines.length; i++) {
-    let match;
-    while ((match = quoteRegexp.exec(lines[i])) !== null) {
-      quoteRegexp.lastIndex = match.index + 1;
-      const row = i + 2;
-      const col = match.index + match[0].search(/[\"\']/) + 2;
-      redundantQuotes.push({
-        row,
-        col,
-        snippet: `${i > 0 ? `${i + 1} | ${lines[i - 1]}\n` : ""}${i + 2} | ${
-          lines[i]
-        }\n${"----^".padStart(col + 3, "-")}\n${
-          i + 1 < lines.length ? `${i + 3} | ${lines[i + 1]}\n` : ""
-        }`,
-      });
-    }
-  }
-
-  if (redundantQuotes.length > 0) {
-    const quotes = redundantQuotes.reduce((acc, curr) => {
-      errorNumber++;
-      return `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${
-        curr.col
-      }.\n\n${curr.snippet}\n`;
-    }, "");
-    console.log(
-      `${chalk.red(
-        "YAMLException:"
-      )} there should be no redundant quotes.\n${quotes}`
-    );
-    process.exitCode = 1;
-  }
-}
-
-/**
- * Checks if there are any incorrectly spaced colons in the front matter and shows a warning.
- * @param {string} fm - front matter string
- * @param {string} filePath - path to file
- */
-function checkNoSpacesBeforeColon(fm, filePath) {
-  const lines = fm.split("\n");
-  const spacesBeforeColon = [];
-  const spaceBeforeColonRegexp = /\s+:/g;
-
-  for (let i = 0; i < lines.length; i++) {
-    let match;
-    while ((match = spaceBeforeColonRegexp.exec(lines[i])) !== null) {
-      const row = i + 2;
-      const col = match.index + match[0].search(/\s+/) + 2;
-      spacesBeforeColon.push({
-        row,
-        col,
-        snippet: `${i > 0 ? `${i + 1} | ${lines[i - 1]}\n` : ""}${i + 2} | ${
-          lines[i]
-        }\n${"----^".padStart(col + 3, "-")}\n${
-          i + 1 < lines.length ? `${i + 3} | ${lines[i + 1]}\n` : ""
-        }`,
-      });
-    }
-  }
-
-  if (spacesBeforeColon.length > 0) {
-    const spaces = spacesBeforeColon.reduce((acc, curr) => {
-      errorNumber++;
-      return `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${
-        curr.col
-      }.\n\n${curr.snippet}\n`;
-    }, "");
-    console.log(
-      `${chalk.red(
-        "YAMLException:"
-      )} there should be no spaces before colons.\n${spaces}`
-    );
-    process.exitCode = 1;
-  }
 }
 
 /**
@@ -250,7 +372,7 @@ function lintNonRecursively(path) {
       }
 
       Promise.all(promiseArr).then(resolve).catch(reject);
-    } else if (path.endsWith(".md")) {
+    } else if (config.extensions.some((ext) => path.endsWith(ext))) {
       lintFile(path).then(resolve).catch(reject);
     } else {
       reject(`${chalk.red("YAMLException:")} ${path} is not a markdown file.`);
@@ -287,7 +409,7 @@ function lintRecursively(path) {
           Promise.all(promiseArr).then(resolve).catch(reject);
         })
         .catch(reject);
-    } else if (path.endsWith(".md")) {
+    } else if (config.extensions.some((ext) => path.endsWith(ext))) {
       lintFile(path).then(resolve).catch(reject);
     } else return resolve();
   });
@@ -298,15 +420,11 @@ function lintFile(filePath) {
     readFilePromise(filePath, "utf8")
       .then((data) => {
         const content = fm(data);
-
-        if (!checkFrontMatterExists(content.frontmatter, filePath))
-          return resolve();
+        if (!content.frontmatter) return resolve();
 
         lint(content.frontmatter)
           .then(() => {
-            checkAttributes(content.attributes, filePath);
-            checkQuotes(content.frontmatter, filePath);
-            checkNoSpacesBeforeColon(content.frontmatter, filePath);
+            parseSpecialChars(data, filePath);
             return resolve();
           })
           .catch(reject);
