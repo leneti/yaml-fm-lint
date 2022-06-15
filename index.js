@@ -116,8 +116,11 @@ function getArguments() {
     } else {
       key = key.replace(/^--/, "");
     }
-    if (key === "path" && value.startsWith(process.cwd())) {
-      value = value.replace(process.cwd(), "");
+    if (key === "path") {
+      if (value.startsWith(process.cwd())) {
+        value = value.replace(process.cwd(), "");
+      }
+      value = value.replace(/\//g, "\\");
     }
     acc[key] = value ?? true;
     return acc;
