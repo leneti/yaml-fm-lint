@@ -24,5 +24,6 @@
   "extraExcludeDirs": [],
   "extensions": [".md"],
   "includeDirs": [],
+  "mandatory": true,
   "requiredAttributes": []
 }

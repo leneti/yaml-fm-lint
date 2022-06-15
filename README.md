@@ -74,6 +74,7 @@ yarn run fmlint -- path/to/your/markdown/files
 You can provide additional arguments:
 - `--config`: Path to the config file if not in root dir of project.
 - `-r, --recursive`: Recursively lint all files in the given directory.
+- `-m, --mandatory`: *(default: `true`)* If set to false will show warning instead of error if no front matter is found.
 
 ## Configuration
 
@@ -84,7 +85,8 @@ You can provide additional arguments:
 | Property name      | default | description                                                                                                                       |
 |--------------------|---------|-----------------------------------------------------------------------------------------------------------------------------------|
 | excludeDirs        | [See default config](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json)   | An array of directories to exclude from linting (🛑You should not overwrite this in your config unless you know what you are doing) |
-| extraExcludeDirs   | []      | Additional array of directories to exclude from linting.                                                                       |
-| extensions         | [".md"] | Array of extensions of files to parse.                                                                              |
-| includeDirs        | []      | Array of directories to include in linting.                                                                                    |
-| requiredAttributes | []      | Array of attributes that must be present in the yaml front matter.                                                             |
+| extraExcludeDirs   | `[]`      | Additional array of directories to exclude from linting.                                                                       |
+| extensions         | `[".md"]` | Array of extensions of files to parse.                                                                              |
+| includeDirs        | `[]`      | Array of directories to include in linting.                                                                                    |
+| requiredAttributes | `[]`      | Array of attributes that must be present in the yaml front matter.                                                             |
+| mandatory          | `true`    | If set to false will show warning instead of error if no front matter is found.                                                 |

@@ -23,6 +23,19 @@ try {
   );
   config = { ...config, ...mConfig };
 } catch (_) {}
+if (!!args.m || !!args.mandatory) {
+  const mandatory =
+    args.m === "true"
+      ? true
+      : args.m === "false"
+      ? false
+      : args.mandatory === "true"
+      ? true
+      : args.mandatory === "false"
+      ? false
+      : config.mandatory;
+  config = { ...config, mandatory };
+}
 const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
 let errorNumber = 0;
 
@@ -323,12 +336,14 @@ function lintFile(filePath) {
 
         if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
           console.log(
-            `${chalk.red(
+            `${(config.mandatory ? chalk.red : chalk.yellow)(
               "YAMLException:"
             )} front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.\n`
           );
-          process.exitCode = 1;
-          errorNumber++;
+          if (config.mandatory) {
+            process.exitCode = 1;
+            errorNumber++;
+          }
           return resolve();
         }
 
