@@ -27,253 +27,6 @@ try {
 const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
 let errorNumber = 0;
 
-function getSnippet2(lines, col, i) {
-  return `${i - 1 > 0 ? `${i - 1} | ${lines[i - 1]}\n` : ""}${i} | ${
-    lines[i]
-  }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(i)), "-")}\n${
-    i + 1 < lines.length ? `${i + 1} | ${lines[i + 1]}\n` : ""
-  }`;
-}
-
-/**
- * Checks whether there are any missing attributes in the front-matter.
- * @param {string[]} attributes - list of attributes to check for
- * @param {string} filePath - path to file to check
- */
-function checkAttributes2(attributes, filePath) {
-  const requiredAttributes = config.requiredAttributes;
-  const missingAttributes = requiredAttributes.filter(
-    (attr) => !attributes.includes(attr)
-  );
-
-  if (missingAttributes.length > 0) {
-    console.log(
-      `${chalk.red(
-        "YAMLException:"
-      )} missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
-        ", "
-      )}\n`
-    );
-    process.exitCode = 1;
-    errorNumber++;
-  }
-}
-
-/**
- * Parses given string and returns an object with all front matter attributes and possible special characters surrounding them.
- * @param {string} data - data to parse
- * @param {string} filePath - path to the file
- */
-function parseSpecialChars(data, filePath) {
-  const lines = data.replace(/\r/g, "").split("\n");
-  lines.unshift("");
-  const fmClosingTagIndex = lines.indexOf("---", 2);
-
-  if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
-    console.log(
-      `${chalk.red(
-        "YAMLException:"
-      )} front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.\n`
-    );
-    process.exitCode = 1;
-    errorNumber++;
-    return;
-  }
-
-  const fm = lines.slice(0, fmClosingTagIndex + 1);
-  const attributes = [];
-  const spacesBeforeColon = [];
-  const blankLines = [];
-  const quotes = [];
-  const trailingSpaces = [];
-  const brackets = [];
-  const curlyBraces = [];
-  let match;
-
-  for (let i = 1; i < fm.length - 1; i++) {
-    const line = fm[i];
-
-    if (line.match(/^"?\w+"?\s*:/g)) {
-      attributes.push(line.split(":")[0].trim());
-    }
-
-    // no-empty-lines
-    if (line.trim() === "") {
-      errorNumber++;
-      blankLines.push(i);
-      continue;
-    }
-
-    // no-whitespace-before-colon
-    const wsbcRegex = /\s+:/g;
-    while ((match = wsbcRegex.exec(line)) !== null) {
-      errorNumber++;
-      const row = i;
-      const col = match.index + match[0].search(/:/) + 1;
-      wsbcRegex.lastIndex = col - 1;
-      spacesBeforeColon.push({
-        row,
-        col,
-        snippet: getSnippet2(fm, col, i),
-      });
-    }
-
-    // no-quotes
-    const quoteRegex = /['"]/g;
-    while ((match = quoteRegex.exec(line)) !== null) {
-      quoteRegex.lastIndex = match.index + 1;
-      errorNumber++;
-      const row = i;
-      const col = match.index + match[0].search(quoteRegex) + 2;
-      quotes.push({
-        row,
-        col,
-        snippet: getSnippet2(fm, col, i),
-      });
-    }
-
-    // no-trailing-spaces
-    const trailingSpaceRegex = /\s+$/g;
-    if (line.search(trailingSpaceRegex) !== -1) {
-      errorNumber++;
-      const row = i;
-      const col = line.length + 1;
-      trailingSpaces.push({
-        row,
-        col,
-        snippet: getSnippet2(fm, col, i),
-      });
-    }
-
-    // no-brackets
-    const bracketsRegex = /[\[\]]/g;
-    while ((match = bracketsRegex.exec(line)) !== null) {
-      bracketsRegex.lastIndex = match.index + 1;
-      errorNumber++;
-      const row = i;
-      const col = match.index + match[0].search(bracketsRegex) + 2;
-      brackets.push({
-        row,
-        col,
-        snippet: getSnippet2(fm, col, i),
-      });
-    }
-
-    // no-curly-braces
-    const curlyBraceRegex = /[\{\}]/g;
-    while ((match = curlyBraceRegex.exec(line)) !== null) {
-      curlyBraceRegex.lastIndex = match.index + 1;
-      errorNumber++;
-      const row = i;
-      const col = match.index + match[0].search(curlyBraceRegex) + 2;
-      curlyBraces.push({
-        row,
-        col,
-        snippet: getSnippet2(fm, col, i),
-      });
-    }
-  }
-
-  checkAttributes2(attributes, filePath);
-  if (blankLines.length > 0) blankLinesError(blankLines, filePath);
-  if (trailingSpaces.length > 0) trailingSpacesError(trailingSpaces, filePath);
-  if (spacesBeforeColon.length > 0) spaceBeforeColonError(spacesBeforeColon, filePath);
-  if (quotes.length > 0) quotesError(quotes, filePath);
-  if (brackets.length > 0) bracketsError(brackets, filePath);
-  if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath);
-}
-
-function spaceBeforeColonError(spacesBeforeColon, filePath) {
-  const spaces = spacesBeforeColon.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no whitespace before colons.\n${spaces}`
-  );
-  process.exitCode = 1;
-}
-
-function blankLinesError(blankLines, filePath) {
-  const blankLinesStr = blankLines.reduce(
-    (acc, curr) => `${acc}\n  at ${process.cwd()}\\${filePath}:${curr}.\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no empty lines.\n${blankLinesStr}`
-  );
-  process.exitCode = 1;
-}
-
-function quotesError(quotes, filePath) {
-  const quotesStr = quotes.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red("YAMLException:")} there should be no quotes.\n${quotesStr}`
-  );
-  process.exitCode = 1;
-}
-
-function trailingSpacesError(trailingSpaces, filePath) {
-  const trailingSpacesStr = trailingSpaces.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no trailing spaces.\n${trailingSpacesStr}`
-  );
-  process.exitCode = 1;
-}
-
-function bracketsError(brackets, filePath) {
-  const bracketsStr = brackets.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no brackets.\n${bracketsStr}`
-  );
-  process.exitCode = 1;
-}
-
-function curlyBracesError(curlyBraces, filePath) {
-  const curlyBracesStr = curlyBraces.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no curly braces.\n${curlyBracesStr}`
-  );
-  process.exitCode = 1;
-}
-
 (() => {
   console.time("Linting took");
   (!args.recursive && !args.r
@@ -347,6 +100,147 @@ function getArguments() {
   return argv;
 }
 
+function getSnippet(lines, col, i) {
+  return `${i - 1 > 0 ? `${i - 1} | ${lines[i - 1]}\n` : ""}${i} | ${
+    lines[i]
+  }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(i)), "-")}\n${
+    i + 1 < lines.length ? `${i + 1} | ${lines[i + 1]}\n` : ""
+  }`;
+}
+
+/**
+ * Checks whether there are any missing attributes in the front-matter.
+ * @param {string[]} attributes - list of attributes to check for
+ * @param {string} filePath - path to file to check
+ */
+function checkAttributes(attributes, filePath) {
+  const requiredAttributes = config.requiredAttributes;
+  const missingAttributes = requiredAttributes.filter(
+    (attr) => !attributes.includes(attr)
+  );
+
+  if (missingAttributes.length > 0) {
+    console.log(
+      `${chalk.red(
+        "YAMLException:"
+      )} missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
+        ", "
+      )}\n`
+    );
+    process.exitCode = 1;
+    errorNumber++;
+  }
+}
+
+function indentationError(indentation, filePath) {
+  const indents = indentation.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} lines cannot be indented more than 2 spaces from the previous line.\n${indents}`
+  );
+  process.exitCode = 1;
+}
+
+function spaceBeforeColonError(spacesBeforeColon, filePath) {
+  const spaces = spacesBeforeColon.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no whitespace before colons.\n${spaces}`
+  );
+  process.exitCode = 1;
+}
+
+function blankLinesError(blankLines, filePath) {
+  const blankLinesStr = blankLines.reduce(
+    (acc, curr) => `${acc}\n  at ${process.cwd()}\\${filePath}:${curr}.\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no empty lines.\n${blankLinesStr}`
+  );
+  process.exitCode = 1;
+}
+
+function quotesError(quotes, filePath) {
+  const quotesStr = quotes.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no quotes in the front matter.\n${quotesStr}`
+  );
+  process.exitCode = 1;
+}
+
+function trailingSpacesError(trailingSpaces, filePath) {
+  const trailingSpacesStr = trailingSpaces.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no trailing spaces.\n${trailingSpacesStr}`
+  );
+  process.exitCode = 1;
+}
+
+function bracketsError(brackets, filePath) {
+  const bracketsStr = brackets.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no brackets. Please use hyphen "-" symbols followed by a space to list items on separate lines.\n${bracketsStr}`
+  );
+  process.exitCode = 1;
+}
+
+function curlyBracesError(curlyBraces, filePath) {
+  const curlyBracesStr = curlyBraces.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no curly braces. Please list key-value pairs on separate lines indented with 2 spaces.\n${curlyBracesStr}`
+  );
+  process.exitCode = 1;
+}
+
 /**
  * Lints the front matter of all files in a directory non-recursively.
  * @param {string} path - path to file or directory
@@ -415,6 +309,11 @@ function lintRecursively(path) {
   });
 }
 
+/**
+ * Lints the file's YAML front matter.
+ * @param {string} filePath - path to file
+ * @returns null if everything is ok, otherwise error message
+ */
 function lintFile(filePath) {
   return new Promise((resolve, reject) => {
     readFilePromise(filePath, "utf8")
@@ -422,13 +321,156 @@ function lintFile(filePath) {
         const content = fm(data);
         if (!content.frontmatter) return resolve();
 
-        lint(content.frontmatter)
-          .then(() => {
-            parseSpecialChars(data, filePath);
-            return resolve();
-          })
+        const lines = data.replace(/\r/g, "").split("\n");
+        lines.unshift("");
+        const fmClosingTagIndex = lines.indexOf("---", 2);
+
+        if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
+          console.log(
+            `${chalk.red(
+              "YAMLException:"
+            )} front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.\n`
+          );
+          process.exitCode = 1;
+          errorNumber++;
+          return resolve();
+        }
+
+        const frontMatter = lines.slice(0, fmClosingTagIndex + 1);
+
+        lint(frontMatter.join("\n"))
+          .then(() => lintLineByLine(frontMatter, filePath))
+          .then(resolve)
           .catch(reject);
       })
       .catch(reject);
   });
+}
+
+/**
+ * Parses given string and logs errors if any.
+ * @param {string} data - data to parse
+ * @param {string} filePath - path to the file
+ */
+function lintLineByLine(fm, filePath) {
+  const attributes = [];
+  const spacesBeforeColon = [];
+  const blankLines = [];
+  const quotes = [];
+  const trailingSpaces = [];
+  const brackets = [];
+  const curlyBraces = [];
+  const indentation = [];
+  let match;
+
+  for (let i = 1; i < fm.length - 1; i++) {
+    const line = fm[i];
+
+    if (line.match(/^"?\w+"?\s*:/g)) {
+      attributes.push(line.split(":")[0].trim());
+    }
+
+    // no-empty-lines
+    if (line.trim() === "") {
+      errorNumber++;
+      blankLines.push(i);
+      continue;
+    }
+
+    // no-whitespace-before-colon
+    const wsbcRegex = /\s+:/g;
+    while ((match = wsbcRegex.exec(line)) !== null) {
+      errorNumber++;
+      const row = i;
+      const col = match.index + match[0].search(/:/) + 1;
+      wsbcRegex.lastIndex = col - 1;
+      spacesBeforeColon.push({
+        row,
+        col,
+        snippet: getSnippet(fm, col, i),
+      });
+    }
+
+    // no-quotes
+    const quoteRegex = /['"]/g;
+    while ((match = quoteRegex.exec(line)) !== null) {
+      quoteRegex.lastIndex = match.index + 1;
+      errorNumber++;
+      const row = i;
+      const col = match.index + match[0].search(quoteRegex) + 2;
+      quotes.push({
+        row,
+        col,
+        snippet: getSnippet(fm, col, i),
+      });
+    }
+
+    // no-trailing-spaces
+    const trailingSpaceRegex = /\s+$/g;
+    if (line.search(trailingSpaceRegex) !== -1) {
+      errorNumber++;
+      const row = i;
+      const col = line.length + 1;
+      trailingSpaces.push({
+        row,
+        col,
+        snippet: getSnippet(fm, col, i),
+      });
+    }
+
+    // no-brackets
+    const bracketsRegex = /[\[\]]/g;
+    while ((match = bracketsRegex.exec(line)) !== null) {
+      bracketsRegex.lastIndex = match.index + 1;
+      errorNumber++;
+      const row = i;
+      const col = match.index + match[0].search(bracketsRegex) + 2;
+      brackets.push({
+        row,
+        col,
+        snippet: getSnippet(fm, col, i),
+      });
+    }
+
+    // no-curly-braces
+    const curlyBraceRegex = /[\{\}]/g;
+    while ((match = curlyBraceRegex.exec(line)) !== null) {
+      curlyBraceRegex.lastIndex = match.index + 1;
+      errorNumber++;
+      const row = i;
+      const col = match.index + match[0].search(curlyBraceRegex) + 2;
+      curlyBraces.push({
+        row,
+        col,
+        snippet: getSnippet(fm, col, i),
+      });
+    }
+
+    // incorrect-indentation
+    const indentationCurr = line.search(/\S/g);
+    if (indentationCurr > 0) {
+      let indentationPrev = fm[i - 1].search(/\S/g);
+      indentationPrev = indentationPrev === -1 ? 0 : indentationPrev;
+      if (indentationCurr - indentationPrev > 2) {
+        errorNumber++;
+        const row = i;
+        const col = indentationCurr + 1;
+        indentation.push({
+          row,
+          col,
+          snippet: getSnippet(fm, col, i),
+        });
+      }
+    }
+  }
+
+  checkAttributes(attributes, filePath);
+  if (blankLines.length > 0) blankLinesError(blankLines, filePath);
+  if (trailingSpaces.length > 0) trailingSpacesError(trailingSpaces, filePath);
+  if (spacesBeforeColon.length > 0)
+    spaceBeforeColonError(spacesBeforeColon, filePath);
+  if (quotes.length > 0) quotesError(quotes, filePath);
+  if (brackets.length > 0) bracketsError(brackets, filePath);
+  if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath);
+  if (indentation.length > 0) indentationError(indentation, filePath);
 }
