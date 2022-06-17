@@ -9,7 +9,7 @@ export function checkAttributes(attributes, requiredAttributes, filePath) {
     console.log(
       `${chalk.red(
         "YAMLException:"
-      )} missing attributes in ${process.cwd()}\\${filePath}: ${missingAttributes.join(
+      )} missing attributes in ${process.cwd().replace(/\\/g, "/")}/${filePath}: ${missingAttributes.join(
         ", "
       )}\n`
     );
@@ -22,7 +22,7 @@ export function checkAttributes(attributes, requiredAttributes, filePath) {
 export function indentationError(indentation, filePath) {
   const indents = indentation.reduce(
     (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
         curr.snippet
       }\n`,
     ""
@@ -37,7 +37,7 @@ export function indentationError(indentation, filePath) {
 export function spaceBeforeColonError(spacesBeforeColon, filePath) {
   const spaces = spacesBeforeColon.reduce(
     (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
         curr.snippet
       }\n`,
     ""
@@ -51,7 +51,7 @@ export function spaceBeforeColonError(spacesBeforeColon, filePath) {
 
 export function blankLinesError(blankLines, filePath) {
   const blankLinesStr = blankLines.reduce(
-    (acc, curr) => `${acc}\n  at ${process.cwd()}\\${filePath}:${curr}.\n`,
+    (acc, curr) => `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr}.\n`,
     ""
   );
   console.log(
@@ -64,7 +64,7 @@ export function blankLinesError(blankLines, filePath) {
 export function quotesError(quotes, filePath) {
   const quotesStr = quotes.reduce(
     (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
         curr.snippet
       }\n`,
     ""
@@ -79,7 +79,7 @@ export function quotesError(quotes, filePath) {
 export function trailingSpacesError(trailingSpaces, filePath) {
   const trailingSpacesStr = trailingSpaces.reduce(
     (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
         curr.snippet
       }\n`,
     ""
@@ -94,7 +94,7 @@ export function trailingSpacesError(trailingSpaces, filePath) {
 export function bracketsError(brackets, filePath) {
   const bracketsStr = brackets.reduce(
     (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
         curr.snippet
       }\n`,
     ""
@@ -109,7 +109,7 @@ export function bracketsError(brackets, filePath) {
 export function curlyBracesError(curlyBraces, filePath) {
   const curlyBracesStr = curlyBraces.reduce(
     (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
         curr.snippet
       }\n`,
     ""
@@ -124,7 +124,7 @@ export function curlyBracesError(curlyBraces, filePath) {
 export function repeatingSpacesError(repeatingSpaces, filePath) {
   const repeatingSpacesStr = repeatingSpaces.reduce(
     (acc, curr) =>
-      `${acc}\n  at ${process.cwd()}\\${filePath}:${curr.row}:${curr.col}.\n\n${
+      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
         curr.snippet
       }\n`,
     ""

@@ -25,21 +25,21 @@ import {
   repeatingSpacesError,
 } from "./errors.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(fileURLToPath(import.meta.url)).replace(/\\/g, "/");
 const readdirPromise = promisify(readdir);
 const readFilePromise = promisify(readFile);
 const writeFilePromise = promisify(writeFile);
 
 const args = getArguments();
 const defaultConfig = JSON.parse(
-  readFileSync(`${__dirname}\\config\\default.json`)
+  readFileSync(`${__dirname}/config/default.json`)
 );
 let config = args.config
   ? { ...defaultConfig, ...JSON.parse(readFileSync(args.config)) }
   : { ...defaultConfig };
 try {
   const mConfig = JSON.parse(
-    readFileSync(`${process.cwd()}\\.yaml-fm-lint.json`)
+    readFileSync(`${process.cwd()}/.yaml-fm-lint.json`)
   );
   config = { ...config, ...mConfig };
 } catch (_) {}
@@ -127,7 +127,7 @@ function getArguments() {
       if (value.startsWith(process.cwd())) {
         value = value.replace(process.cwd(), "");
       }
-      value = value.replace(/\//g, "\\");
+      value = value.replace(/\\/g, "/");
     }
     acc[key] = value ?? true;
     return acc;
@@ -216,13 +216,13 @@ function lintNonRecursively(path) {
       for (const file of files) {
         if (file.endsWith(".md")) {
           promiseArr.push(
-            lintFile(`${path === "." ? "" : `${path}\\`}${file}`)
+            lintFile(`${path === "." ? "" : `${path}/`}${file}`)
           );
         }
       }
 
       if (!promiseArr.length) {
-        console.log(`No markdown files found in ${process.cwd()}\\${path}.`);
+        console.log(`No markdown files found in ${process.cwd()}/${path}.`);
         return resolve();
       }
 
@@ -257,7 +257,7 @@ function lintRecursively(path) {
           const promiseArr = [];
           for (const file of files) {
             promiseArr.push(
-              lintRecursively(`${path === "." ? "" : `${path}\\`}${file}`)
+              lintRecursively(`${path === "." ? "" : `${path}/`}${file}`)
             );
           }
 
@@ -287,7 +287,7 @@ function lintFile(filePath) {
           console.log(
             `${(config.mandatory ? chalk.red : chalk.yellow)(
               "YAMLException:"
-            )} front matter not found in ${process.cwd()}\\${filePath}. Make sure front matter is at the beginning of the file.\n`
+            )} front matter not found in ${process.cwd()}/${filePath}. Make sure front matter is at the beginning of the file.\n`
           );
           if (config.mandatory) {
             process.exitCode = 1;
