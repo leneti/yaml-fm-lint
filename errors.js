@@ -13,7 +13,7 @@ export function checkAttributes(attributes, requiredAttributes, filePath) {
         ", "
       )}\n`
     );
-    process.exitCode = 1;
+
     return 1;
   }
   return 0;
@@ -32,7 +32,6 @@ export function indentationError(indentation, filePath) {
       "YAMLException:"
     )} lines cannot be indented more than 2 spaces from the previous line.\n${indents}`
   );
-  process.exitCode = 1;
 }
 
 export function spaceBeforeColonError(spacesBeforeColon, filePath) {
@@ -48,7 +47,6 @@ export function spaceBeforeColonError(spacesBeforeColon, filePath) {
       "YAMLException:"
     )} there should be no whitespace before colons.\n${spaces}`
   );
-  process.exitCode = 1;
 }
 
 export function blankLinesError(blankLines, filePath) {
@@ -61,7 +59,6 @@ export function blankLinesError(blankLines, filePath) {
       "YAMLException:"
     )} there should be no empty lines.\n${blankLinesStr}`
   );
-  process.exitCode = 1;
 }
 
 export function quotesError(quotes, filePath) {
@@ -77,7 +74,6 @@ export function quotesError(quotes, filePath) {
       "YAMLException:"
     )} there should be no quotes in the front matter.\n${quotesStr}`
   );
-  process.exitCode = 1;
 }
 
 export function trailingSpacesError(trailingSpaces, filePath) {
@@ -93,7 +89,6 @@ export function trailingSpacesError(trailingSpaces, filePath) {
       "YAMLException:"
     )} there should be no trailing spaces.\n${trailingSpacesStr}`
   );
-  process.exitCode = 1;
 }
 
 export function bracketsError(brackets, filePath) {
@@ -109,7 +104,6 @@ export function bracketsError(brackets, filePath) {
       "YAMLException:"
     )} there should be no brackets. Please use hyphen "-" symbols followed by a space to list items on separate lines.\n${bracketsStr}`
   );
-  process.exitCode = 1;
 }
 
 export function curlyBracesError(curlyBraces, filePath) {
@@ -125,7 +119,6 @@ export function curlyBracesError(curlyBraces, filePath) {
       "YAMLException:"
     )} there should be no curly braces. Please list key-value pairs on separate lines indented with 2 spaces.\n${curlyBracesStr}`
   );
-  process.exitCode = 1;
 }
 
 export function repeatingSpacesError(repeatingSpaces, filePath) {

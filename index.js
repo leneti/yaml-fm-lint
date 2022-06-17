@@ -1,10 +1,18 @@
 #! /usr/bin/env node
 import path from "path";
 import { fileURLToPath } from "url";
-import { readFileSync, lstatSync, readdir, readFile, readdirSync } from "fs";
+import {
+  readFileSync,
+  lstatSync,
+  readdir,
+  readFile,
+  readdirSync,
+  writeFile,
+} from "fs";
 import { promisify } from "util";
 import { lint } from "yaml-lint";
 import chalk from "chalk";
+import { load } from "js-yaml";
 import {
   checkAttributes,
   indentationError,
@@ -20,6 +28,7 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const readdirPromise = promisify(readdir);
 const readFilePromise = promisify(readFile);
+const writeFilePromise = promisify(writeFile);
 
 const args = getArguments();
 const defaultConfig = JSON.parse(
@@ -73,16 +82,17 @@ function endOfProcess() {
       )
     );
   }
-  if (!process.exitCode) {
+  if (!errorNumber) {
     console.log(chalk.green("✔ All parsed files have valid front matter."));
   } else {
+    process.exitCode = 1;
     console.log(
       chalk.red(
         `✘ ${errorNumber} error${
           errorNumber > 1 ? "s" : ""
-        } found. Please fix the error${
+        } found. You can fix the error${
           errorNumber > 1 ? "s" : ""
-        } and try again.`
+        } with the \`--fix\` option.`
       )
     );
   }
@@ -99,23 +109,20 @@ function getArguments() {
   const argv = args.reduce((acc, curr) => {
     let [key, value] = curr.split("=");
     if (key.startsWith("-")) {
-      key = key.replace("-", "");
-    } else if (!key.startsWith("--")) {
-      if (!pathRead) {
-        value = key;
-        key = "path";
-        pathRead = true;
-      } else {
-        console.log(
-          `${chalk.red("Invalid argument:")} ${chalk.yellow(
-            `\"${curr}\"`
-          )}. Only one path argument is allowed.`
-        );
-        process.exit(1);
-      }
+      key = key.replace(/^-{1,2}/, "");
+    } else if (!pathRead) {
+      value = key;
+      key = "path";
+      pathRead = true;
     } else {
-      key = key.replace(/^--/, "");
+      console.log(
+        `${chalk.red("Invalid argument:")} ${chalk.yellow(
+          `\"${curr}\"`
+        )}. Only one path argument is allowed.`
+      );
+      process.exit(1);
     }
+
     if (key === "path") {
       if (value.startsWith(process.cwd())) {
         value = value.replace(process.cwd(), "");
@@ -144,6 +151,55 @@ function getSnippet(lines, col, i) {
   }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(i)), "-")}\n${
     i + 1 < lines.length ? `${i + 1} | ${lines[i + 1]}\n` : ""
   }`;
+}
+
+/**
+ * Recursively parses object keys-value pairs and forms a YAML string from them.
+ * @param {Object} obj - object to transform into YAML
+ * @param {number} nested - level of nesting of the object
+ * @param {boolean} arrayItem - is the object an item in an array
+ * @returns {string} YAML string
+ */
+function objectToYAML(obj, nested = 0, arrayItem = false) {
+  const lines = [];
+  let indent,
+    first = arrayItem;
+  for (const key in obj) {
+    const value = obj[key];
+    indent = first ? 0 : nested * 2;
+
+    switch (typeof value) {
+      case "object": {
+        if (value === null) {
+          lines.push(`${``.padStart(indent)}${key}:`);
+        } else if (Array.isArray(value)) {
+          indent = (nested + (arrayItem ? 1 : 0)) * 2;
+          lines.push(`${``.padStart(first ? 0 : indent)}${key}:`);
+          value.forEach((item) => {
+            lines.push(
+              `${"- ".padStart((nested + 1) * 2 + 2)}${
+                typeof item === "object"
+                  ? objectToYAML(item, nested + 1, true)
+                  : item
+              }`
+            );
+          });
+        } else {
+          lines.push(`${``.padStart(indent)}${key}:`);
+          lines.push(`${objectToYAML(value, nested + 1)}`);
+        }
+        break;
+      }
+      default: {
+        indent = (nested + (arrayItem ? 1 : 0)) * 2;
+        lines.push(`${``.padStart(first ? 0 : indent)}${key}: ${value}`);
+      }
+    }
+
+    first = false;
+  }
+
+  return lines.join("\n");
 }
 
 /**
@@ -243,9 +299,21 @@ function lintFile(filePath) {
         }
 
         const frontMatter = lines.slice(0, fmClosingTagIndex + 1);
+        const content = lines.slice(fmClosingTagIndex + 1).join("\n");
+        const attributes = load(
+          frontMatter.filter((l) => l !== "---").join("\n")
+        );
 
         lint(frontMatter.join("\n"))
-          .then(() => lintLineByLine(frontMatter, filePath))
+          .then(() => {
+            const fileErrors = lintLineByLine(frontMatter, filePath);
+            if (fileErrors && args.fix) {
+              return writeFilePromise(
+                filePath,
+                `---\n${objectToYAML(attributes)}\n---\n${content}`
+              );
+            } else errorNumber += fileErrors;
+          })
           .then(resolve)
           .catch(reject);
       })
@@ -259,6 +327,7 @@ function lintFile(filePath) {
  * @param {string} filePath - path to the file
  */
 function lintLineByLine(fm, filePath) {
+  let fileErrors = 0;
   const attributes = [];
   const spacesBeforeColon = [];
   const blankLines = [];
@@ -279,7 +348,7 @@ function lintLineByLine(fm, filePath) {
 
     // no-empty-lines
     if (line.trim() === "") {
-      errorNumber++;
+      fileErrors++;
       blankLines.push(i);
       continue;
     }
@@ -287,7 +356,7 @@ function lintLineByLine(fm, filePath) {
     // no-whitespace-before-colon
     const wsbcRegex = /\s+:/g;
     while ((match = wsbcRegex.exec(line)) !== null) {
-      errorNumber++;
+      fileErrors++;
       const row = i;
       const col = match.index + match[0].search(/:/) + 1;
       wsbcRegex.lastIndex = col - 1;
@@ -302,7 +371,7 @@ function lintLineByLine(fm, filePath) {
     const quoteRegex = /['"]/g;
     while ((match = quoteRegex.exec(line)) !== null) {
       quoteRegex.lastIndex = match.index + 1;
-      errorNumber++;
+      fileErrors++;
       const row = i;
       const col = match.index + match[0].search(quoteRegex) + 2;
       quotes.push({
@@ -315,7 +384,7 @@ function lintLineByLine(fm, filePath) {
     // no-trailing-spaces
     const trailingSpaceRegex = /\s+$/g;
     if (line.search(trailingSpaceRegex) !== -1) {
-      errorNumber++;
+      fileErrors++;
       const row = i;
       const col = line.length + 1;
       trailingSpaces.push({
@@ -329,7 +398,7 @@ function lintLineByLine(fm, filePath) {
     const bracketsRegex = /[\[\]]/g;
     while ((match = bracketsRegex.exec(line)) !== null) {
       bracketsRegex.lastIndex = match.index + 1;
-      errorNumber++;
+      fileErrors++;
       const row = i;
       const col = match.index + match[0].search(bracketsRegex) + 2;
       brackets.push({
@@ -343,7 +412,7 @@ function lintLineByLine(fm, filePath) {
     const curlyBraceRegex = /[\{\}]/g;
     while ((match = curlyBraceRegex.exec(line)) !== null) {
       curlyBraceRegex.lastIndex = match.index + 1;
-      errorNumber++;
+      fileErrors++;
       const row = i;
       const col = match.index + match[0].search(curlyBraceRegex) + 2;
       curlyBraces.push({
@@ -359,7 +428,7 @@ function lintLineByLine(fm, filePath) {
       let indentationPrev = fm[i - 1].search(/\S/g);
       indentationPrev = indentationPrev === -1 ? 0 : indentationPrev;
       if (indentationCurr - indentationPrev > 2) {
-        errorNumber++;
+        fileErrors++;
         const row = i;
         const col = indentationCurr + 1;
         indentation.push({
@@ -385,15 +454,24 @@ function lintLineByLine(fm, filePath) {
     }
   }
 
+  if (args.q || args.quiet) return fileErrors;
+
   checkAttributes(attributes, config.requiredAttributes, filePath);
-  if (blankLines.length > 0) blankLinesError(blankLines, filePath);
-  if (trailingSpaces.length > 0) trailingSpacesError(trailingSpaces, filePath);
-  if (spacesBeforeColon.length > 0)
-    spaceBeforeColonError(spacesBeforeColon, filePath);
-  if (quotes.length > 0) quotesError(quotes, filePath);
-  if (brackets.length > 0) bracketsError(brackets, filePath);
-  if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath);
-  if (indentation.length > 0) indentationError(indentation, filePath);
+
+  if (!args.fix) {
+    if (blankLines.length > 0) blankLinesError(blankLines, filePath);
+    if (trailingSpaces.length > 0)
+      trailingSpacesError(trailingSpaces, filePath);
+    if (spacesBeforeColon.length > 0)
+      spaceBeforeColonError(spacesBeforeColon, filePath);
+    if (quotes.length > 0) quotesError(quotes, filePath);
+    if (brackets.length > 0) bracketsError(brackets, filePath);
+    if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath);
+    if (indentation.length > 0) indentationError(indentation, filePath);
+  }
+
   if (repeatingSpaces.length > 0)
     repeatingSpacesError(repeatingSpaces, filePath);
+
+  return fileErrors;
 }

@@ -34,18 +34,18 @@ A CLI NodeJS script which extracts yaml front matter from markdown files and lin
 
 ## Features
 
-- **Quick** - Only has two light-weight dependencies and lints directories asyncronously.
+- **Quick** - Only has three light-weight dependencies and lints directories asyncronously.
 - **Configurable** - Lints the extracted data based on a config file.
 - **Tiny** - Barely takes up space in your project.
 
 ## Install
 
-You can either install the package as a dependency with
+You can either install the package as a devDependency with
 ```sh
-npm i --save yaml-fm-lint
+npm i -D yaml-fm-lint
 ```
 ```sh
-yarn add yaml-fm-lint
+yarn add yaml-fm-lint -D
 ```
 or use it directly with 
 ```sh
@@ -72,9 +72,11 @@ yarn run fmlint -- path/to/your/markdown/files
 ```
 
 You can provide additional arguments:
+- `--fix`: Automatically fix the errors.
 - `--config`: Path to the config file if not in root directory of project.
 - `-r, --recursive`: *(default: `false`)* Recursively lint all files in the given directory.
-- `-m, --mandatory`: *(default: `true`)* If set to false will show warning instead of error if no front matter is found.
+- `-m, --mandatory`: *(default: `true`)* If set to false will show warnings instead of errors if no front matter is found.
+- `-q, --quiet`: *(default: `false`)* If set to true will not show erroneous code snippets.
 
 ## Configuration
 

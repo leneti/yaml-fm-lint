@@ -7,6 +7,7 @@ age     : "young"
 contact:
 email: email@domain.com
 address: some  location
+boo: true
 pets:
   - cat
   - dog
@@ -26,8 +27,10 @@ references:
 one:
   - id: 1
     name: franc
+    age: "old"
   - id: 11
     name: Tom
+    age: "young"
 two:
   - three:
       - id: 1
@@ -39,9 +42,24 @@ two:
           name: franc
         - id: 11
           name: Tom
+        - id: 111
+          name: John
+          likes: 
+            - cats: true
+            - dogs: true
+            - fish : false
+ten:
+  - eleven:
+    - 
 five:
   id: 1
   name: franc
+six:
+  - id: 1
+    name: 
+    - first: franc
+      last: worthen
+seven: { id: 1, pos: "center", name: { first: "tom", last: "wall", pos: {center: false, right: false, left: true, other: {hello: "world", how: "are", you: "doing"}} } }
 
 
 ---
