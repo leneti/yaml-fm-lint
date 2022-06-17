@@ -22,10 +22,14 @@ import {
   trailingSpacesError,
   bracketsError,
   curlyBracesError,
-  repeatingSpacesError,
+  repeatingSpacesWarning,
+  trailingCommasError,
+  warnCommasWarning,
 } from "./errors.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url)).replace(/\\/g, "/");
+const __dirname = path
+  .dirname(fileURLToPath(import.meta.url))
+  .replace(/\\/g, "/");
 const readdirPromise = promisify(readdir);
 const readFilePromise = promisify(readFile);
 const writeFilePromise = promisify(writeFile);
@@ -180,6 +184,8 @@ function objectToYAML(obj, nested = 0, arrayItem = false) {
               `${"- ".padStart((nested + 1) * 2 + 2)}${
                 typeof item === "object"
                   ? objectToYAML(item, nested + 1, true)
+                  : typeof item === "string"
+                  ? item.replace(/\s*,$/g, "")
                   : item
               }`
             );
@@ -192,7 +198,11 @@ function objectToYAML(obj, nested = 0, arrayItem = false) {
       }
       default: {
         indent = (nested + (arrayItem ? 1 : 0)) * 2;
-        lines.push(`${``.padStart(first ? 0 : indent)}${key}: ${value}`);
+        lines.push(
+          `${``.padStart(first ? 0 : indent)}${key}: ${
+            typeof value === "string" ? value.replace(/\s*,$/g, "") : value
+          }`
+        );
       }
     }
 
@@ -215,9 +225,7 @@ function lintNonRecursively(path) {
       const promiseArr = [];
       for (const file of files) {
         if (file.endsWith(".md")) {
-          promiseArr.push(
-            lintFile(`${path === "." ? "" : `${path}/`}${file}`)
-          );
+          promiseArr.push(lintFile(`${path === "." ? "" : `${path}/`}${file}`));
         }
       }
 
@@ -337,6 +345,8 @@ function lintLineByLine(fm, filePath) {
   const curlyBraces = [];
   const indentation = [];
   const repeatingSpaces = [];
+  const warnCommas = [];
+  const trailingCommas = [];
   let match;
 
   for (let i = 1; i < fm.length - 1; i++) {
@@ -452,6 +462,33 @@ function lintLineByLine(fm, filePath) {
         snippet: getSnippet(fm, col, i),
       });
     }
+
+    // no-trailing-commas
+    const trailingCommaRegex = /,\s*$/g;
+    if (line.search(trailingCommaRegex) !== -1) {
+      fileErrors++;
+      const row = i;
+      const col = line.length + 1;
+      trailingCommas.push({
+        row,
+        col,
+        snippet: getSnippet(fm, col, i),
+      });
+    }
+
+    // warn-commas-in-front-matter
+    const commaInFrontMatterRegex = /,./g;
+    while ((match = commaInFrontMatterRegex.exec(line)) !== null) {
+      commaInFrontMatterRegex.lastIndex = match.index + 1;
+      warningNumber++;
+      const row = i;
+      const col = match.index + 2;
+      warnCommas.push({
+        row,
+        col,
+        snippet: getSnippet(fm, col, i),
+      });
+    }
   }
 
   if (args.q || args.quiet) return fileErrors;
@@ -468,10 +505,13 @@ function lintLineByLine(fm, filePath) {
     if (brackets.length > 0) bracketsError(brackets, filePath);
     if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath);
     if (indentation.length > 0) indentationError(indentation, filePath);
+    if (trailingCommas.length > 0)
+      trailingCommasError(trailingCommas, filePath);
   }
 
+  if (warnCommas.length > 0) warnCommasWarning(warnCommas, filePath);
   if (repeatingSpaces.length > 0)
-    repeatingSpacesError(repeatingSpaces, filePath);
+    repeatingSpacesWarning(repeatingSpaces, filePath);
 
   return fileErrors;
 }

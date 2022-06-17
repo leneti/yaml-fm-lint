@@ -121,7 +121,7 @@ export function curlyBracesError(curlyBraces, filePath) {
   );
 }
 
-export function repeatingSpacesError(repeatingSpaces, filePath) {
+export function repeatingSpacesWarning(repeatingSpaces, filePath) {
   const repeatingSpacesStr = repeatingSpaces.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -133,5 +133,35 @@ export function repeatingSpacesError(repeatingSpaces, filePath) {
     `${chalk.yellow(
       "YAMLException:"
     )} found possibly unintended whitespace.\n${repeatingSpacesStr}`
+  );
+}
+
+export function warnCommasWarning(warnCommas, filePath) {
+  const warnCommasStr = warnCommas.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.yellow(
+      "YAMLException:"
+    )} found possibly unintended commas.\n${warnCommasStr}`
+  );
+}
+
+export function trailingCommasError(trailingCommas, filePath) {
+  const trailingCommasStr = trailingCommas.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
+        curr.snippet
+      }\n`,
+    ""
+  );
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} there should be no trailing commas.\n${trailingCommasStr}`
   );
 }

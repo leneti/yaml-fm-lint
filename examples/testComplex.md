@@ -9,8 +9,8 @@ email: email@domain.com
 address: some  location
 boo: true
 pets:
-  - cat
-  - dog
+  - cat  ,
+  - dog,
   - bat
 oldTags: ["tag1", "tag2", "tag3"]
 tags:
@@ -23,10 +23,10 @@ tags:
   ]
 references:
              - { title : "Branching Strategies", url: "/" }
-             - { title: "Code Reviews with Pull Requests", url: "/" }
+             - { title: "Code Reviews, with Pull Requests", url: "/" }
 one:
-  - id: 1
-    name: franc
+  - id: 1,
+    name: franc,
     age: "old"
   - id: 11
     name: Tom
