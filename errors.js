@@ -1,6 +1,6 @@
-import chalk from "chalk";
+const chalk = require("chalk");
 
-export function checkAttributes(attributes, requiredAttributes, filePath) {
+function checkAttributes(attributes, requiredAttributes, filePath) {
   const missingAttributes = requiredAttributes.filter(
     (attr) => !attributes.includes(attr)
   );
@@ -19,7 +19,7 @@ export function checkAttributes(attributes, requiredAttributes, filePath) {
   return 0;
 }
 
-export function indentationError(indentation, filePath) {
+function indentationError(indentation, filePath) {
   const indents = indentation.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -34,7 +34,7 @@ export function indentationError(indentation, filePath) {
   );
 }
 
-export function spaceBeforeColonError(spacesBeforeColon, filePath) {
+function spaceBeforeColonError(spacesBeforeColon, filePath) {
   const spaces = spacesBeforeColon.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -49,7 +49,7 @@ export function spaceBeforeColonError(spacesBeforeColon, filePath) {
   );
 }
 
-export function blankLinesError(blankLines, filePath) {
+function blankLinesError(blankLines, filePath) {
   const blankLinesStr = blankLines.reduce(
     (acc, curr) => `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr}.\n`,
     ""
@@ -61,7 +61,7 @@ export function blankLinesError(blankLines, filePath) {
   );
 }
 
-export function quotesError(quotes, filePath) {
+function quotesError(quotes, filePath) {
   const quotesStr = quotes.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -76,7 +76,7 @@ export function quotesError(quotes, filePath) {
   );
 }
 
-export function trailingSpacesError(trailingSpaces, filePath) {
+function trailingSpacesError(trailingSpaces, filePath) {
   const trailingSpacesStr = trailingSpaces.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -91,7 +91,7 @@ export function trailingSpacesError(trailingSpaces, filePath) {
   );
 }
 
-export function bracketsError(brackets, filePath) {
+function bracketsError(brackets, filePath) {
   const bracketsStr = brackets.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -106,7 +106,7 @@ export function bracketsError(brackets, filePath) {
   );
 }
 
-export function curlyBracesError(curlyBraces, filePath) {
+function curlyBracesError(curlyBraces, filePath) {
   const curlyBracesStr = curlyBraces.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -121,7 +121,7 @@ export function curlyBracesError(curlyBraces, filePath) {
   );
 }
 
-export function repeatingSpacesWarning(repeatingSpaces, filePath) {
+function repeatingSpacesWarning(repeatingSpaces, filePath) {
   const repeatingSpacesStr = repeatingSpaces.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -136,7 +136,7 @@ export function repeatingSpacesWarning(repeatingSpaces, filePath) {
   );
 }
 
-export function warnCommasWarning(warnCommas, filePath) {
+function warnCommasWarning(warnCommas, filePath) {
   const warnCommasStr = warnCommas.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -151,7 +151,7 @@ export function warnCommasWarning(warnCommas, filePath) {
   );
 }
 
-export function trailingCommasError(trailingCommas, filePath) {
+function trailingCommasError(trailingCommas, filePath) {
   const trailingCommasStr = trailingCommas.reduce(
     (acc, curr) =>
       `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
@@ -164,4 +164,18 @@ export function trailingCommasError(trailingCommas, filePath) {
       "YAMLException:"
     )} there should be no trailing commas.\n${trailingCommasStr}`
   );
+}
+
+module.exports = {
+  checkAttributes,
+  indentationError,
+  spaceBeforeColonError,
+  blankLinesError,
+  quotesError,
+  trailingSpacesError,
+  bracketsError,
+  curlyBracesError,
+  repeatingSpacesWarning,
+  warnCommasWarning,
+  trailingCommasError,
 }

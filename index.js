@@ -1,19 +1,17 @@
 #! /usr/bin/env node
-import path from "path";
-import { fileURLToPath } from "url";
-import {
+const {
   readFileSync,
   lstatSync,
   readdir,
   readFile,
   readdirSync,
   writeFile,
-} from "fs";
-import { promisify } from "util";
-import { lint } from "yaml-lint";
-import chalk from "chalk";
-import { load } from "js-yaml";
-import {
+} = require("fs");
+const { promisify } = require("util");
+const { lint } = require("yaml-lint");
+const chalk = require("chalk");
+const { load } = require("js-yaml");
+const {
   checkAttributes,
   indentationError,
   spaceBeforeColonError,
@@ -25,83 +23,17 @@ import {
   repeatingSpacesWarning,
   trailingCommasError,
   warnCommasWarning,
-} from "./errors.js";
+} = require("./errors.js");
 
-const __dirname = path
-  .dirname(fileURLToPath(import.meta.url))
-  .replace(/\\/g, "/");
 const readdirPromise = promisify(readdir);
 const readFilePromise = promisify(readFile);
 const writeFilePromise = promisify(writeFile);
 
-const args = getArguments();
-const defaultConfig = JSON.parse(
-  readFileSync(`${__dirname}/config/default.json`)
-);
-let config = args.config
-  ? { ...defaultConfig, ...JSON.parse(readFileSync(args.config)) }
-  : { ...defaultConfig };
-try {
-  const mConfig = JSON.parse(
-    readFileSync(`${process.cwd()}/.yaml-fm-lint.json`)
-  );
-  config = { ...config, ...mConfig };
-} catch (_) {}
-if (!!args.m || !!args.mandatory) {
-  const mandatory =
-    args.m === "true"
-      ? true
-      : args.m === "false"
-      ? false
-      : args.mandatory === "true"
-      ? true
-      : args.mandatory === "false"
-      ? false
-      : config.mandatory;
-  config = { ...config, mandatory };
-}
-const allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
-let errorNumber = 0,
-  warningNumber = 0;
-
-(() => {
-  console.time("Linting took");
-  (!args.recursive && !args.r
-    ? lintNonRecursively(args.path)
-    : lintRecursively(args.path)
-  )
-    .catch((err) => {
-      console.log(err);
-      process.exitCode = 1;
-      errorNumber++;
-    })
-    .finally(endOfProcess);
-})();
-
-function endOfProcess() {
-  if (warningNumber) {
-    console.log(
-      chalk.yellow(
-        `⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`
-      )
-    );
-  }
-  if (!errorNumber) {
-    console.log(chalk.green("✔ All parsed files have valid front matter."));
-  } else {
-    process.exitCode = 1;
-    console.log(
-      chalk.red(
-        `✘ ${errorNumber} error${
-          errorNumber > 1 ? "s" : ""
-        } found. You can fix the error${
-          errorNumber > 1 ? "s" : ""
-        } with the \`--fix\` option.`
-      )
-    );
-  }
-  console.timeEnd("Linting took");
-}
+let args;
+let config;
+let errorNumber = 0;
+let warningNumber = 0;
+let allExcludedDirs = [];
 
 /**
  * Retrieves arguments from the command line
@@ -124,16 +56,17 @@ function getArguments() {
           `\"${curr}\"`
         )}. Only one path argument is allowed.`
       );
-      process.exit(1);
+      process.exit(9);
     }
 
     if (key === "path") {
-      if (value.startsWith(process.cwd())) {
-        value = value.replace(process.cwd(), "");
+      if (value.startsWith(process.cwd().replace(/\\/g, "/"))) {
+        value = value.replace(process.cwd().replace(/\\/g, "/"), "");
       }
       value = value.replace(/\\/g, "/");
     }
-    acc[key] = value ?? true;
+
+    acc[key] = value === "false" ? false : value ?? true;
     return acc;
   }, {});
 
@@ -143,7 +76,7 @@ function getArguments() {
         "Invalid arguments:"
       )} No path argument found. Please specify a path.`
     );
-    process.exit(1);
+    process.exit(9);
   }
 
   return argv;
@@ -230,7 +163,11 @@ function lintNonRecursively(path) {
       }
 
       if (!promiseArr.length) {
-        console.log(`No markdown files found in ${process.cwd()}/${path}.`);
+        console.log(
+          `No markdown files found in ${process
+            .cwd()
+            .replace(/\\/g, "/")}/${path}.`
+        );
         return resolve();
       }
 
@@ -295,7 +232,12 @@ function lintFile(filePath) {
           console.log(
             `${(config.mandatory ? chalk.red : chalk.yellow)(
               "YAMLException:"
-            )} front matter not found in ${process.cwd()}/${filePath}. Make sure front matter is at the beginning of the file.\n`
+            )} front matter not found in ${process
+              .cwd()
+              .replace(
+                /\\/g,
+                "/"
+              )}/${filePath}. Make sure front matter is at the beginning of the file.\n`
           );
           if (config.mandatory) {
             process.exitCode = 1;
@@ -515,3 +457,78 @@ function lintLineByLine(fm, filePath) {
 
   return fileErrors;
 }
+
+function getConfig() {
+  let config = {
+    ...JSON.parse(readFileSync(`./config/default.json`)),
+    ...(args.config ? JSON.parse(readFileSync(args.config)) : {}),
+  };
+  readFilePromise(`${process.cwd().replace(/\\/g, "/")}/.yaml-fm-lint.json`)
+    .then(JSON.parse)
+    .then((localConfig) => (config = { ...config, ...localConfig }));
+
+  config.mandatory =
+    args.m !== undefined
+      ? args.m
+      : args.mandatory !== undefined
+      ? args.mandatory
+      : config.mandatory;
+
+  return config;
+}
+
+function main(a, c) {
+  return new Promise((resolve) => {
+    args = { ...a };
+    config = { ...c };
+    allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
+
+    (!args.recursive && !args.r
+      ? lintNonRecursively(args.path)
+      : lintRecursively(args.path)
+    )
+      .catch((err) => {
+        console.log(err);
+        process.exitCode = 1;
+        errorNumber++;
+      })
+      .finally(resolve);
+  });
+}
+
+function run() {
+  console.time("Linting took");
+
+  main(getArguments(), getConfig()).then(() => {
+    if (warningNumber) {
+      console.log(
+        chalk.yellow(
+          `⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`
+        )
+      );
+    }
+    if (!errorNumber) {
+      console.log(chalk.green("✔ All parsed files have valid front matter."));
+    } else {
+      process.exitCode = 1;
+      console.log(
+        chalk.red(
+          `✘ ${errorNumber} error${
+            errorNumber > 1 ? "s" : ""
+          } found. You can fix the error${
+            errorNumber > 1 ? "s" : ""
+          } with the \`--fix\` option.`
+        )
+      );
+    }
+    console.timeEnd("Linting took");
+  });
+}
+
+module.exports = {
+  run,
+  main
+};
+
+// Run if invoked as a CLI
+if (require.main === module) run()

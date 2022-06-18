@@ -4,14 +4,14 @@
   "description": "nodejs linter for yaml front matter in markdown files",
   "version": "1.2.0",
   "license": "MIT",
-  "main": "index.js",
+  "main": "./index.js",
   "bin": "./index.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
-    "yaml-fm-lint": "node ."
+    "fmlint": "node ."
   },
   "dependencies": {
-    "chalk": "^5.0.1",
+    "chalk": "^4.1.2",
     "js-yaml": "^4.1.0",
     "yaml-lint": "^1.7.0"
   },
