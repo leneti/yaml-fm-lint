@@ -150,7 +150,9 @@ function lintFile(filePath) {
         lint(frontMatter.join("\n"))
           .then(() => {
             if (args.fix) {
-              const fixedFm = dump(attributes).split("\n").map((line) => line.replace(/\s*,$/g, ""));
+              const fixedFm = dump(attributes)
+                .split("\n")
+                .map((line) => line.replace(/\s*,$/g, ""));
               fixedFm.unshift("", "---");
               fixedFm[fixedFm.length - 1] = "---";
 
@@ -159,7 +161,10 @@ function lintFile(filePath) {
               lintLineByLine(fixedFm, filePath);
               fixedFm.shift();
 
-              return writeFilePromise(filePath, `${fixedFm.join("\n")}\n${content}`);
+              return writeFilePromise(
+                filePath,
+                `${fixedFm.join("\n")}\n${content}`
+              );
             } else {
               errorNumber += lintLineByLine(frontMatter, filePath);
             }
