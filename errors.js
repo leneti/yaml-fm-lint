@@ -1,4 +1,22 @@
 const chalk = require("chalk");
+const cwd = process.cwd().replace(/\\/g, "/");
+
+function getSnippets(arr, filePath) {
+  return arr.reduce(
+    (acc, curr) =>
+      `${acc}\n  at ${cwd}/${filePath}:${curr.row}:${curr.col}.\n\n${curr.snippet}\n`,
+    ""
+  );
+}
+
+function showError(message, filePath, errors) {
+  const snippets = getSnippets(errors, filePath)
+  console.log(
+    `${chalk.red(
+      "YAMLException:"
+    )} ${message}.\n${snippets}`
+  );
+}
 
 function checkAttributes(attributes, requiredAttributes, filePath) {
   const missingAttributes = requiredAttributes.filter(
@@ -9,7 +27,7 @@ function checkAttributes(attributes, requiredAttributes, filePath) {
     console.log(
       `${chalk.red(
         "YAMLException:"
-      )} missing attributes in ${process.cwd().replace(/\\/g, "/")}/${filePath}: ${missingAttributes.join(
+      )} missing attributes in ${cwd}/${filePath}: ${missingAttributes.join(
         ", "
       )}\n`
     );
@@ -20,38 +38,18 @@ function checkAttributes(attributes, requiredAttributes, filePath) {
 }
 
 function indentationError(indentation, filePath) {
-  const indents = indentation.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} lines cannot be indented more than 2 spaces from the previous line.\n${indents}`
-  );
+  const message = "lines cannot be indented more than 2 spaces from the previous line";
+  showError(message, filePath, indentation);
 }
 
 function spaceBeforeColonError(spacesBeforeColon, filePath) {
-  const spaces = spacesBeforeColon.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no whitespace before colons.\n${spaces}`
-  );
+  const message = "there should be no whitespace before colons";
+  showError(message, filePath, spacesBeforeColon);
 }
 
 function blankLinesError(blankLines, filePath) {
   const blankLinesStr = blankLines.reduce(
-    (acc, curr) => `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr}.\n`,
+    (acc, curr) => `${acc}\n  at ${cwd}/${filePath}:${curr}.\n`,
     ""
   );
   console.log(
@@ -62,73 +60,27 @@ function blankLinesError(blankLines, filePath) {
 }
 
 function quotesError(quotes, filePath) {
-  const quotesStr = quotes.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no quotes in the front matter.\n${quotesStr}`
-  );
+  const message = "there should be no quotes in the front matter";
+  showError(message, filePath, quotes);
 }
 
 function trailingSpacesError(trailingSpaces, filePath) {
-  const trailingSpacesStr = trailingSpaces.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no trailing spaces.\n${trailingSpacesStr}`
-  );
+  const message = "there should be no trailing spaces";
+  showError(message, filePath, trailingSpaces);
 }
 
 function bracketsError(brackets, filePath) {
-  const bracketsStr = brackets.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no brackets. Please use hyphen "-" symbols followed by a space to list items on separate lines.\n${bracketsStr}`
-  );
+  const message = "there should be no brackets. Please use hyphen "-" symbols followed by a space to list items on separate lines";
+  showError(message, filePath, brackets);
 }
 
 function curlyBracesError(curlyBraces, filePath) {
-  const curlyBracesStr = curlyBraces.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no curly braces. Please list key-value pairs on separate lines indented with 2 spaces.\n${curlyBracesStr}`
-  );
+  const message = "there should be no curly braces. Please list key-value pairs on separate lines indented with 2 spaces";
+  showError(message, filePath, curlyBraces);
 }
 
 function repeatingSpacesWarning(repeatingSpaces, filePath) {
-  const repeatingSpacesStr = repeatingSpaces.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
+  const repeatingSpacesStr = getSnippets(repeatingSpaces, filePath);
   console.log(
     `${chalk.yellow(
       "YAMLException:"
@@ -137,13 +89,7 @@ function repeatingSpacesWarning(repeatingSpaces, filePath) {
 }
 
 function warnCommasWarning(warnCommas, filePath) {
-  const warnCommasStr = warnCommas.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
+  const warnCommasStr = getSnippets(warnCommas, filePath);
   console.log(
     `${chalk.yellow(
       "YAMLException:"
@@ -152,18 +98,8 @@ function warnCommasWarning(warnCommas, filePath) {
 }
 
 function trailingCommasError(trailingCommas, filePath) {
-  const trailingCommasStr = trailingCommas.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${process.cwd().replace(/\\/g, "/")}/${filePath}:${curr.row}:${curr.col}.\n\n${
-        curr.snippet
-      }\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no trailing commas.\n${trailingCommasStr}`
-  );
+  const message = "there should be no trailing commas";
+  showError(message, filePath, trailingCommas);
 }
 
 module.exports = {
@@ -178,4 +114,4 @@ module.exports = {
   repeatingSpacesWarning,
   warnCommasWarning,
   trailingCommasError,
-}
+};

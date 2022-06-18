@@ -408,7 +408,7 @@ function getArguments() {
       value = value.replace(/\\/g, "/");
     }
 
-    acc[key] = value === "false" ? false : value ?? true;
+    acc[key] = value === "false" ? false : value === undefined ? true : value;
     return acc;
   }, {});
 
