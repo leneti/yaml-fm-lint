@@ -426,7 +426,7 @@ function getArguments() {
 
 function getConfig(a) {
   let config = {
-    ...JSON.parse(readFileSync(`./config/default.json`)),
+    ...JSON.parse(readFileSync(`${__dirname.replace(/\\/g, "/")}/config/default.json`)),
     ...(a.config ? JSON.parse(readFileSync(a.config)) : {}),
   };
   try {
