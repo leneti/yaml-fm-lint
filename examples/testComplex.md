@@ -6,7 +6,7 @@ title : This is  a title!
 age     : "young"
 contact:
 email: email@domain.com
-address: some  location
+address: some  location, at yours
 boo: true
 pets:
   - cat  ,
@@ -59,7 +59,7 @@ six:
     name: 
     - first: franc
       last: worthen
-seven: { id: 1, pos: "center", name: { first: "tom", last: "wall", pos: {center: false, right: false, left: true, other: {hello: "world", how: "are", you: "doing"}} } }
+seven: { id: 1, pos: center, name: { first: "tom", last: "wall", pos: {center: false, right: false, left: true, other: {hello: "world", how: "are", you: "doing"}} } }
 
 
 ---

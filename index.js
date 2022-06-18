@@ -10,7 +10,7 @@ const {
 const { promisify } = require("util");
 const { lint } = require("yaml-lint");
 const chalk = require("chalk");
-const { load } = require("js-yaml");
+const { load, dump } = require("js-yaml");
 const {
   checkAttributes,
   indentationError,
@@ -28,6 +28,7 @@ const {
 const readdirPromise = promisify(readdir);
 const readFilePromise = promisify(readFile);
 const writeFilePromise = promisify(writeFile);
+const cwd = process.cwd().replace(/\\/g, "/");
 
 let args;
 let config;
@@ -35,114 +36,12 @@ let errorNumber = 0;
 let warningNumber = 0;
 let allExcludedDirs = [];
 
-/**
- * Retrieves arguments from the command line
- * @returns {Object} - arguments object
- */
-function getArguments() {
-  const args = process.argv.slice(2);
-  let pathRead = false;
-  const argv = args.reduce((acc, curr) => {
-    let [key, value] = curr.split("=");
-    if (key.startsWith("-")) {
-      key = key.replace(/^-{1,2}/, "");
-    } else if (!pathRead) {
-      value = key;
-      key = "path";
-      pathRead = true;
-    } else {
-      console.log(
-        `${chalk.red("Invalid argument:")} ${chalk.yellow(
-          `\"${curr}\"`
-        )}. Only one path argument is allowed.`
-      );
-      process.exit(9);
-    }
-
-    if (key === "path") {
-      if (value.startsWith(process.cwd().replace(/\\/g, "/"))) {
-        value = value.replace(process.cwd().replace(/\\/g, "/"), "");
-      }
-      value = value.replace(/\\/g, "/");
-    }
-
-    acc[key] = value === "false" ? false : value ?? true;
-    return acc;
-  }, {});
-
-  if (!pathRead) {
-    console.log(
-      `${chalk.red(
-        "Invalid arguments:"
-      )} No path argument found. Please specify a path.`
-    );
-    process.exit(9);
-  }
-
-  return argv;
-}
-
 function getSnippet(lines, col, i) {
   return `${i - 1 > 0 ? `${i - 1} | ${lines[i - 1]}\n` : ""}${i} | ${
     lines[i]
   }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(i)), "-")}\n${
     i + 1 < lines.length ? `${i + 1} | ${lines[i + 1]}\n` : ""
   }`;
-}
-
-/**
- * Recursively parses object keys-value pairs and forms a YAML string from them.
- * @param {Object} obj - object to transform into YAML
- * @param {number} nested - level of nesting of the object
- * @param {boolean} arrayItem - is the object an item in an array
- * @returns {string} YAML string
- */
-function objectToYAML(obj, nested = 0, arrayItem = false) {
-  const lines = [];
-  let indent,
-    first = arrayItem;
-  for (const key in obj) {
-    const value = obj[key];
-    indent = first ? 0 : nested * 2;
-
-    switch (typeof value) {
-      case "object": {
-        if (value === null) {
-          lines.push(`${``.padStart(indent)}${key}:`);
-        } else if (Array.isArray(value)) {
-          indent = (nested + (arrayItem ? 1 : 0)) * 2;
-          lines.push(`${``.padStart(first ? 0 : indent)}${key}:`);
-          value.forEach((item) => {
-            lines.push(
-              `${"- ".padStart((nested + 1) * 2 + 2)}${
-                typeof item === "object"
-                  ? objectToYAML(item, nested + 1, true)
-                  : typeof item === "string"
-                  ? item.replace(/\s*,$/g, "")
-                  : item
-              }`
-            );
-          });
-        } else {
-          lines.push(`${``.padStart(indent)}${key}:`);
-          lines.push(`${objectToYAML(value, nested + 1)}`);
-        }
-        break;
-      }
-      default: {
-        indent = (nested + (arrayItem ? 1 : 0)) * 2;
-        lines.push(
-          `${``.padStart(first ? 0 : indent)}${key}: ${
-            typeof value === "string" ? value.replace(/\s*,$/g, "") : value
-          }`
-        );
-      }
-    }
-
-    first = false;
-  }
-
-  return lines.join("\n");
 }
 
 /**
@@ -163,11 +62,7 @@ function lintNonRecursively(path) {
       }
 
       if (!promiseArr.length) {
-        console.log(
-          `No markdown files found in ${process
-            .cwd()
-            .replace(/\\/g, "/")}/${path}.`
-        );
+        console.log(`No markdown files found in ${cwd}/${path}.`);
         return resolve();
       }
 
@@ -175,7 +70,11 @@ function lintNonRecursively(path) {
     } else if (config.extensions.some((ext) => path.endsWith(ext))) {
       lintFile(path).then(resolve).catch(reject);
     } else {
-      reject(`${chalk.red("YAMLException:")} ${path} is not a markdown file.`);
+      reject(
+        `${chalk.red(
+          "YAMLException:"
+        )} ${path} does not have a valid extension.`
+      );
     }
   });
 }
@@ -232,12 +131,7 @@ function lintFile(filePath) {
           console.log(
             `${(config.mandatory ? chalk.red : chalk.yellow)(
               "YAMLException:"
-            )} front matter not found in ${process
-              .cwd()
-              .replace(
-                /\\/g,
-                "/"
-              )}/${filePath}. Make sure front matter is at the beginning of the file.\n`
+            )} front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
           );
           if (config.mandatory) {
             process.exitCode = 1;
@@ -249,20 +143,26 @@ function lintFile(filePath) {
         }
 
         const frontMatter = lines.slice(0, fmClosingTagIndex + 1);
-        const content = lines.slice(fmClosingTagIndex + 1).join("\n");
         const attributes = load(
           frontMatter.filter((l) => l !== "---").join("\n")
         );
 
         lint(frontMatter.join("\n"))
           .then(() => {
-            const fileErrors = lintLineByLine(frontMatter, filePath);
-            if (fileErrors && args.fix) {
-              return writeFilePromise(
-                filePath,
-                `---\n${objectToYAML(attributes)}\n---\n${content}`
-              );
-            } else errorNumber += fileErrors;
+            if (args.fix) {
+              const fixedFm = dump(attributes).split("\n").map((line) => line.replace(/\s*,$/g, ""));
+              fixedFm.unshift("", "---");
+              fixedFm[fixedFm.length - 1] = "---";
+
+              const content = lines.slice(fmClosingTagIndex + 1).join("\n");
+
+              lintLineByLine(fixedFm, filePath);
+              fixedFm.shift();
+
+              return writeFilePromise(filePath, `${fixedFm.join("\n")}\n${content}`);
+            } else {
+              errorNumber += lintLineByLine(frontMatter, filePath);
+            }
           })
           .then(resolve)
           .catch(reject);
@@ -299,7 +199,7 @@ function lintLineByLine(fm, filePath) {
     }
 
     // no-empty-lines
-    if (line.trim() === "") {
+    if (!args.fix && line.trim() === "") {
       fileErrors++;
       blankLines.push(i);
       continue;
@@ -307,7 +207,7 @@ function lintLineByLine(fm, filePath) {
 
     // no-whitespace-before-colon
     const wsbcRegex = /\s+:/g;
-    while ((match = wsbcRegex.exec(line)) !== null) {
+    while (!args.fix && (match = wsbcRegex.exec(line)) !== null) {
       fileErrors++;
       const row = i;
       const col = match.index + match[0].search(/:/) + 1;
@@ -321,7 +221,7 @@ function lintLineByLine(fm, filePath) {
 
     // no-quotes
     const quoteRegex = /['"]/g;
-    while ((match = quoteRegex.exec(line)) !== null) {
+    while (!args.fix && (match = quoteRegex.exec(line)) !== null) {
       quoteRegex.lastIndex = match.index + 1;
       fileErrors++;
       const row = i;
@@ -335,7 +235,7 @@ function lintLineByLine(fm, filePath) {
 
     // no-trailing-spaces
     const trailingSpaceRegex = /\s+$/g;
-    if (line.search(trailingSpaceRegex) !== -1) {
+    if (!args.fix && line.search(trailingSpaceRegex) !== -1) {
       fileErrors++;
       const row = i;
       const col = line.length + 1;
@@ -348,7 +248,7 @@ function lintLineByLine(fm, filePath) {
 
     // no-brackets
     const bracketsRegex = /[\[\]]/g;
-    while ((match = bracketsRegex.exec(line)) !== null) {
+    while (!args.fix && (match = bracketsRegex.exec(line)) !== null) {
       bracketsRegex.lastIndex = match.index + 1;
       fileErrors++;
       const row = i;
@@ -362,7 +262,7 @@ function lintLineByLine(fm, filePath) {
 
     // no-curly-braces
     const curlyBraceRegex = /[\{\}]/g;
-    while ((match = curlyBraceRegex.exec(line)) !== null) {
+    while (!args.fix && (match = curlyBraceRegex.exec(line)) !== null) {
       curlyBraceRegex.lastIndex = match.index + 1;
       fileErrors++;
       const row = i;
@@ -376,7 +276,7 @@ function lintLineByLine(fm, filePath) {
 
     // incorrect-indentation
     const indentationCurr = line.search(/\S/g);
-    if (indentationCurr > 0) {
+    if (!args.fix && indentationCurr > 0) {
       let indentationPrev = fm[i - 1].search(/\S/g);
       indentationPrev = indentationPrev === -1 ? 0 : indentationPrev;
       if (indentationCurr - indentationPrev > 2) {
@@ -405,9 +305,23 @@ function lintLineByLine(fm, filePath) {
       });
     }
 
+    // one-space-after-colon
+    const spacesAfterColon = /:[ \t]{2,}\S/g;
+    while (!args.fix && (match = spacesAfterColon.exec(line)) !== null) {
+      spacesAfterColon.lastIndex = match.index + 1;
+      warningNumber++;
+      const row = i;
+      const col = match.index + match[0].search(/[ \t]\S/g) + 2;
+      repeatingSpaces.push({
+        row,
+        col,
+        snippet: getSnippet(fm, col, i),
+      });
+    }
+
     // no-trailing-commas
     const trailingCommaRegex = /,\s*$/g;
-    if (line.search(trailingCommaRegex) !== -1) {
+    if (!args.fix && line.search(trailingCommaRegex) !== -1) {
       fileErrors++;
       const row = i;
       const col = line.length + 1;
@@ -458,20 +372,70 @@ function lintLineByLine(fm, filePath) {
   return fileErrors;
 }
 
-function getConfig() {
+/**
+ * Retrieves arguments from the command line
+ * @returns {Object} - arguments object
+ */
+function getArguments() {
+  const args = process.argv.slice(2);
+  let pathRead = false;
+  const argv = args.reduce((acc, curr) => {
+    let [key, value] = curr.split("=");
+    if (key.startsWith("-")) {
+      key = key.replace(/^-{1,2}/, "");
+    } else if (!pathRead) {
+      value = key;
+      key = "path";
+      pathRead = true;
+    } else {
+      console.log(
+        `${chalk.red("Invalid argument:")} ${chalk.yellow(
+          `\"${curr}\"`
+        )}. Only one path argument is allowed.`
+      );
+      process.exit(9);
+    }
+
+    if (key === "path") {
+      if (value.startsWith(cwd)) {
+        value = value.replace(cwd, "");
+      }
+      value = value.replace(/\\/g, "/");
+    }
+
+    acc[key] = value === "false" ? false : value ?? true;
+    return acc;
+  }, {});
+
+  if (!pathRead) {
+    console.log(
+      `${chalk.red(
+        "Invalid arguments:"
+      )} No path argument found. Please specify a path.`
+    );
+    process.exit(9);
+  }
+
+  return argv;
+}
+
+function getConfig(a) {
   let config = {
     ...JSON.parse(readFileSync(`./config/default.json`)),
-    ...(args.config ? JSON.parse(readFileSync(args.config)) : {}),
+    ...(a.config ? JSON.parse(readFileSync(a.config)) : {}),
   };
-  readFilePromise(`${process.cwd().replace(/\\/g, "/")}/.yaml-fm-lint.json`)
-    .then(JSON.parse)
-    .then((localConfig) => (config = { ...config, ...localConfig }));
+  try {
+    config = {
+      ...config,
+      ...JSON.parse(readFileSync(`${cwd}/.yaml-fm-lint.json`)),
+    };
+  } catch (_) {}
 
   config.mandatory =
-    args.m !== undefined
-      ? args.m
-      : args.mandatory !== undefined
-      ? args.mandatory
+    a.m !== undefined
+      ? a.m
+      : a.mandatory !== undefined
+      ? a.mandatory
       : config.mandatory;
 
   return config;
@@ -492,14 +456,17 @@ function main(a, c) {
         process.exitCode = 1;
         errorNumber++;
       })
-      .finally(resolve);
+      .finally(() => resolve({ errorNumber, warningNumber }));
   });
 }
 
 function run() {
   console.time("Linting took");
 
-  main(getArguments(), getConfig()).then(() => {
+  const a = getArguments();
+  const c = getConfig(a);
+
+  main(a, c).then(({ errorNumber, warningNumber }) => {
     if (warningNumber) {
       console.log(
         chalk.yellow(
@@ -527,8 +494,8 @@ function run() {
 
 module.exports = {
   run,
-  main
+  main,
 };
 
 // Run if invoked as a CLI
-if (require.main === module) run()
+if (require.main === module) run();
