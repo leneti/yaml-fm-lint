@@ -1,7 +1,11 @@
 ---
-keywords: [test, passing]
-tags: [test, passing]
-sidebar_label: Test Passing
+sidebar_label: Test passing
+keywords:
+  - test
+  - passing
+tags:
+  - test
+  - passing
 ---
 
 Test Passing

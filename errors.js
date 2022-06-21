@@ -10,27 +10,24 @@ function getSnippets(arr, filePath) {
 }
 
 function showError(message, filePath, errors) {
-  const snippets = getSnippets(errors, filePath)
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} ${message}.\n${snippets}`
-  );
+  const snippets = getSnippets(errors, filePath);
+  console.log(`${chalk.red("YAMLException:")} ${message}.\n${snippets}`);
 }
 
-function checkAttributes(attributes, requiredAttributes, filePath) {
+function checkAttributes(attributes, requiredAttributes, filePath, quiet) {
   const missingAttributes = requiredAttributes.filter(
     (attr) => !attributes.includes(attr)
   );
 
   if (missingAttributes.length > 0) {
-    console.log(
-      `${chalk.red(
-        "YAMLException:"
-      )} missing attributes in ${cwd}/${filePath}: ${missingAttributes.join(
-        ", "
-      )}\n`
-    );
+    if (!quiet)
+      console.log(
+        `${chalk.red(
+          "YAMLException:"
+        )} missing attributes in ${cwd}/${filePath}: ${missingAttributes.join(
+          ", "
+        )}\n`
+      );
 
     return 1;
   }
@@ -38,7 +35,8 @@ function checkAttributes(attributes, requiredAttributes, filePath) {
 }
 
 function indentationError(indentation, filePath) {
-  const message = "lines cannot be indented more than 2 spaces from the previous line";
+  const message =
+    "lines cannot be indented more than 2 spaces from the previous line";
   showError(message, filePath, indentation);
 }
 
@@ -70,12 +68,13 @@ function trailingSpacesError(trailingSpaces, filePath) {
 }
 
 function bracketsError(brackets, filePath) {
-  const message = "there should be no brackets. Please use hyphen "-" symbols followed by a space to list items on separate lines";
+  const message = `there should be no brackets. Please use hyphen "-" symbols followed by a space to list items on separate lines`;
   showError(message, filePath, brackets);
 }
 
 function curlyBracesError(curlyBraces, filePath) {
-  const message = "there should be no curly braces. Please list key-value pairs on separate lines indented with 2 spaces";
+  const message =
+    "there should be no curly braces. Please list key-value pairs on separate lines indented with 2 spaces";
   showError(message, filePath, curlyBraces);
 }
 

@@ -33,6 +33,7 @@ const cwd = process.cwd().replace(/\\/g, "/");
 let args;
 let config;
 let errorNumber = 0;
+let fixableErrors = 0;
 let warningNumber = 0;
 let allExcludedDirs = [];
 
@@ -128,11 +129,13 @@ function lintFile(filePath) {
         const fmClosingTagIndex = lines.indexOf("---", 2);
 
         if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
-          console.log(
-            `${(config.mandatory ? chalk.red : chalk.yellow)(
-              "YAMLException:"
-            )} front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
-          );
+          if (!args.q && !args.quiet) {
+            console.log(
+              `${(config.mandatory ? chalk.red : chalk.yellow)(
+                "YAMLException:"
+              )} front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
+            );
+          }
           if (config.mandatory) {
             process.exitCode = 1;
             errorNumber++;
@@ -158,7 +161,7 @@ function lintFile(filePath) {
 
               const content = lines.slice(fmClosingTagIndex + 1).join("\n");
 
-              lintLineByLine(fixedFm, filePath);
+              errorNumber += lintLineByLine(fixedFm, filePath);
               fixedFm.shift();
 
               return writeFilePromise(
@@ -206,6 +209,7 @@ function lintLineByLine(fm, filePath) {
     // no-empty-lines
     if (!args.fix && line.trim() === "") {
       fileErrors++;
+      fixableErrors++;
       blankLines.push(i);
       continue;
     }
@@ -214,6 +218,7 @@ function lintLineByLine(fm, filePath) {
     const wsbcRegex = /\s+:/g;
     while (!args.fix && (match = wsbcRegex.exec(line)) !== null) {
       fileErrors++;
+      fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(/:/) + 1;
       wsbcRegex.lastIndex = col - 1;
@@ -229,6 +234,7 @@ function lintLineByLine(fm, filePath) {
     while (!args.fix && (match = quoteRegex.exec(line)) !== null) {
       quoteRegex.lastIndex = match.index + 1;
       fileErrors++;
+      fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(quoteRegex) + 2;
       quotes.push({
@@ -242,6 +248,7 @@ function lintLineByLine(fm, filePath) {
     const trailingSpaceRegex = /\s+$/g;
     if (!args.fix && line.search(trailingSpaceRegex) !== -1) {
       fileErrors++;
+      fixableErrors++;
       const row = i;
       const col = line.length + 1;
       trailingSpaces.push({
@@ -256,6 +263,7 @@ function lintLineByLine(fm, filePath) {
     while (!args.fix && (match = bracketsRegex.exec(line)) !== null) {
       bracketsRegex.lastIndex = match.index + 1;
       fileErrors++;
+      fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(bracketsRegex) + 2;
       brackets.push({
@@ -270,6 +278,7 @@ function lintLineByLine(fm, filePath) {
     while (!args.fix && (match = curlyBraceRegex.exec(line)) !== null) {
       curlyBraceRegex.lastIndex = match.index + 1;
       fileErrors++;
+      fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(curlyBraceRegex) + 2;
       curlyBraces.push({
@@ -286,6 +295,7 @@ function lintLineByLine(fm, filePath) {
       indentationPrev = indentationPrev === -1 ? 0 : indentationPrev;
       if (indentationCurr - indentationPrev > 2) {
         fileErrors++;
+        fixableErrors++;
         const row = i;
         const col = indentationCurr + 1;
         indentation.push({
@@ -328,6 +338,7 @@ function lintLineByLine(fm, filePath) {
     const trailingCommaRegex = /,\s*$/g;
     if (!args.fix && line.search(trailingCommaRegex) !== -1) {
       fileErrors++;
+      fixableErrors++;
       const row = i;
       const col = line.length + 1;
       trailingCommas.push({
@@ -352,9 +363,14 @@ function lintLineByLine(fm, filePath) {
     }
   }
 
-  if (args.q || args.quiet) return fileErrors;
+  fileErrors += checkAttributes(
+    attributes,
+    config.requiredAttributes,
+    filePath,
+    args.q || args.quiet
+  );
 
-  checkAttributes(attributes, config.requiredAttributes, filePath);
+  if (args.q || args.quiet) return fileErrors;
 
   if (!args.fix) {
     if (blankLines.length > 0) blankLinesError(blankLines, filePath);
@@ -426,7 +442,9 @@ function getArguments() {
 
 function getConfig(a) {
   let config = {
-    ...JSON.parse(readFileSync(`${__dirname.replace(/\\/g, "/")}/config/default.json`)),
+    ...JSON.parse(
+      readFileSync(`${__dirname.replace(/\\/g, "/")}/config/default.json`)
+    ),
     ...(a.config ? JSON.parse(readFileSync(a.config)) : {}),
   };
   try {
@@ -485,11 +503,13 @@ function run() {
       process.exitCode = 1;
       console.log(
         chalk.red(
-          `✘ ${errorNumber} error${
-            errorNumber > 1 ? "s" : ""
-          } found. You can fix the error${
-            errorNumber > 1 ? "s" : ""
-          } with the \`--fix\` option.`
+          `✘ ${errorNumber} error${errorNumber > 1 ? "s" : ""} found.${
+            fixableErrors > 0
+              ? ` ${fixableErrors} error${
+                  fixableErrors > 1 ? "s" : ""
+                } fixable with the \`--fix\` option.`
+              : ""
+          }`
         )
       );
     }
