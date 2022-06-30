@@ -9,18 +9,50 @@ function getSnippets(arr, filePath) {
   );
 }
 
-function showError(message, filePath, errors) {
+function showError(message, filePath, errors, colored) {
   const snippets = getSnippets(errors, filePath);
-  console.log(`${chalk.red("YAMLException:")} ${message}.\n${snippets}`);
+  console.log(
+    `${
+      colored ? chalk.red("YAMLException:") : "YAMLException:"
+    } ${message}.\n${snippets}`
+  );
 }
 
-function checkAttributes(attributes, requiredAttributes, filePath, quiet) {
+function showWarning(message, filePath, warnings, colored) {
+  const snippets = getSnippets(warnings, filePath);
+  console.log(
+    `${
+      colored ? chalk.yellow("YAMLException:") : "YAMLException:"
+    } ${message}.\n${snippets}`
+  );
+}
+
+function showOneline(type, message, filePath, affected, colored) {
+  if (typeof affected === "object") {
+    affected.forEach((errObj) => {
+      showOneline(type, message, filePath, `${errObj.row}:${errObj.col}`, colored);
+    });
+  } else
+    console.log(
+      `${
+        colored
+          ? (type === "Error" ? chalk.red : chalk.yellow)(`YAML-${type}:`)
+          : `YAML-${type}:`
+      } <${message}> ${cwd}/${filePath}: ${affected}`
+    );
+}
+
+function checkAttributes(attributes, requiredAttributes, filePath, args) {
   const missingAttributes = requiredAttributes.filter(
     (attr) => !attributes.includes(attr)
   );
 
   if (missingAttributes.length > 0) {
-    if (!quiet)
+    if (args.oneline) {
+      missingAttributes.forEach((attr) => {
+        showOneline("Error", "missing required attribute", filePath, attr, args.colored);
+      });
+    } else if (!args.quiet)
       console.log(
         `${chalk.red(
           "YAMLException:"
@@ -34,71 +66,82 @@ function checkAttributes(attributes, requiredAttributes, filePath, quiet) {
   return 0;
 }
 
-function indentationError(indentation, filePath) {
-  const message =
-    "lines cannot be indented more than 2 spaces from the previous line";
-  showError(message, filePath, indentation);
+function indentationError(indentation, filePath, args) {
+  const message = "lines cannot be indented more than 2 spaces from the previous line";
+
+  if (args.oneline) showOneline("Error", message, filePath, indentation, args.colored);
+  else showError(message, filePath, indentation);
 }
 
-function spaceBeforeColonError(spacesBeforeColon, filePath) {
+function spaceBeforeColonError(spacesBeforeColon, filePath, args) {
   const message = "there should be no whitespace before colons";
-  showError(message, filePath, spacesBeforeColon);
+
+  if (args.oneline) showOneline("Error", message, filePath, spacesBeforeColon, args.colored);
+  else showError(message, filePath, spacesBeforeColon, args.colored);
 }
 
-function blankLinesError(blankLines, filePath) {
-  const blankLinesStr = blankLines.reduce(
-    (acc, curr) => `${acc}\n  at ${cwd}/${filePath}:${curr}.\n`,
-    ""
-  );
-  console.log(
-    `${chalk.red(
-      "YAMLException:"
-    )} there should be no empty lines.\n${blankLinesStr}`
-  );
+function blankLinesError(blankLines, filePath, args) {
+  const message = "there should be no empty lines";
+  if (args.oneline) {
+    blankLines.forEach((line) => {
+      showOneline("Error", message, filePath, line, args.colored);
+    });
+  } else {
+    const blankLinesStr = blankLines.reduce(
+      (acc, curr) => `${acc}\n  at ${cwd}/${filePath}:${curr}.\n`,
+      ""
+    );
+    console.log(`${chalk.red("YAMLException:")} ${message}.\n${blankLinesStr}`);
+  }
 }
 
-function quotesError(quotes, filePath) {
+function quotesError(quotes, filePath, args) {
   const message = "there should be no quotes in the front matter";
-  showError(message, filePath, quotes);
+
+  if (args.oneline) showOneline("Error", message, filePath, quotes, args.colored);
+  else showError(message, filePath, quotes, args.colored);
 }
 
-function trailingSpacesError(trailingSpaces, filePath) {
+function trailingSpacesError(trailingSpaces, filePath, args) {
   const message = "there should be no trailing spaces";
-  showError(message, filePath, trailingSpaces);
+
+  if (args.oneline) showOneline("Error", message, filePath, trailingSpaces, args.colored);
+  else showError(message, filePath, trailingSpaces, args.colored);
 }
 
-function bracketsError(brackets, filePath) {
+function bracketsError(brackets, filePath, args) {
   const message = `there should be no brackets. Please use hyphen "-" symbols followed by a space to list items on separate lines`;
-  showError(message, filePath, brackets);
+
+  if (args.oneline) showOneline("Error", "there should be no brackets", filePath, brackets, args.colored);
+  else showError(message, filePath, brackets, args.colored);
 }
 
-function curlyBracesError(curlyBraces, filePath) {
-  const message =
-    "there should be no curly braces. Please list key-value pairs on separate lines indented with 2 spaces";
-  showError(message, filePath, curlyBraces);
+function curlyBracesError(curlyBraces, filePath, args) {
+  const message = "there should be no curly braces. Please list key-value pairs on separate lines indented with 2 spaces";
+
+  if (args.oneline) showOneline("Error", "there should be no curly braces", filePath, curlyBraces, args.colored);
+  else showError(message, filePath, curlyBraces, args.colored);
 }
 
-function repeatingSpacesWarning(repeatingSpaces, filePath) {
-  const repeatingSpacesStr = getSnippets(repeatingSpaces, filePath);
-  console.log(
-    `${chalk.yellow(
-      "YAMLException:"
-    )} found possibly unintended whitespace.\n${repeatingSpacesStr}`
-  );
-}
-
-function warnCommasWarning(warnCommas, filePath) {
-  const warnCommasStr = getSnippets(warnCommas, filePath);
-  console.log(
-    `${chalk.yellow(
-      "YAMLException:"
-    )} found possibly unintended commas.\n${warnCommasStr}`
-  );
-}
-
-function trailingCommasError(trailingCommas, filePath) {
+function trailingCommasError(trailingCommas, filePath, args) {
   const message = "there should be no trailing commas";
-  showError(message, filePath, trailingCommas);
+
+  if (args.oneline) showOneline("Error", message, filePath, trailingCommas, args.colored);
+  else showError(message, filePath, trailingCommas, args.colored);
+}
+
+function repeatingSpacesWarning(repeatingSpaces, filePath, args) {
+  const message = "possibly unintended whitespace";
+
+  if (args.oneline) showOneline("Warning", message, filePath, repeatingSpaces, args.colored);
+  else showWarning(message, filePath, repeatingSpaces, args.colored);
+}
+
+function warnCommasWarning(warnCommas, filePath, args) {
+  const message = "possibly unintended commas";
+
+  if (args.oneline) showOneline("Warning", message, filePath, warnCommas, args.colored);
+  else showWarning(message, filePath, warnCommas, args.colored);
 }
 
 module.exports = {

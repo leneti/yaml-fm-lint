@@ -77,6 +77,14 @@ You can provide additional arguments:
 - `-r, --recursive`: *(default: `false`)* Recursively lint all files in the given directory.
 - `-m, --mandatory`: *(default: `true`)* If set to false will show warnings instead of errors if no front matter is found.
 - `-q, --quiet`: *(default: `false`)* If set to true will not show erroneous code snippets.
+- `-o, --oneline`: *(default: `false`)* If set to true will condense error messages to one line, skipping snippets.
+- `-c, --colored`: *(default: `true`)* If set to false will not color the output.
+
+### Example:
+```sh
+npm run fmlint -- docs --config="src/configs/.yaml-fm-lint.json" -r --oneline --colored=false
+```
+This command would recursively look for all markdown files in the `docs` directory and lint them based on the `.yaml-fm-lint.json` config file located under `src/configs/`. The output would not be colored and would not show code snippets.
 
 ## Configuration
 

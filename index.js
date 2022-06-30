@@ -72,9 +72,9 @@ function lintNonRecursively(path) {
       lintFile(path).then(resolve).catch(reject);
     } else {
       reject(
-        `${chalk.red(
+        `${args.colored ? chalk.red(
           "YAMLException:"
-        )} ${path} does not have a valid extension.`
+        ) : "YAMLException:"} ${path} does not have a valid extension.`
       );
     }
   });
@@ -129,11 +129,11 @@ function lintFile(filePath) {
         const fmClosingTagIndex = lines.indexOf("---", 2);
 
         if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
-          if (!args.q && !args.quiet) {
+          if (!args.quiet) {
             console.log(
-              `${(config.mandatory ? chalk.red : chalk.yellow)(
+              `${args.colored ? (config.mandatory ? chalk.red : chalk.yellow)(
                 "YAMLException:"
-              )} front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
+              ) : "YAMLException:"} front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
             );
           }
           if (config.mandatory) {
@@ -367,28 +367,28 @@ function lintLineByLine(fm, filePath) {
     attributes,
     config.requiredAttributes,
     filePath,
-    args.q || args.quiet
+    args
   );
 
-  if (args.q || args.quiet) return fileErrors;
+  if (args.quiet) return fileErrors;
 
   if (!args.fix) {
-    if (blankLines.length > 0) blankLinesError(blankLines, filePath);
+    if (blankLines.length > 0) blankLinesError(blankLines, filePath, args);
     if (trailingSpaces.length > 0)
-      trailingSpacesError(trailingSpaces, filePath);
+      trailingSpacesError(trailingSpaces, filePath, args);
     if (spacesBeforeColon.length > 0)
-      spaceBeforeColonError(spacesBeforeColon, filePath);
-    if (quotes.length > 0) quotesError(quotes, filePath);
-    if (brackets.length > 0) bracketsError(brackets, filePath);
-    if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath);
-    if (indentation.length > 0) indentationError(indentation, filePath);
+      spaceBeforeColonError(spacesBeforeColon, filePath, args);
+    if (quotes.length > 0) quotesError(quotes, filePath, args);
+    if (brackets.length > 0) bracketsError(brackets, filePath, args);
+    if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath, args);
+    if (indentation.length > 0) indentationError(indentation, filePath, args);
     if (trailingCommas.length > 0)
-      trailingCommasError(trailingCommas, filePath);
+      trailingCommasError(trailingCommas, filePath, args);
   }
 
-  if (warnCommas.length > 0) warnCommasWarning(warnCommas, filePath);
+  if (warnCommas.length > 0) warnCommasWarning(warnCommas, filePath, args);
   if (repeatingSpaces.length > 0)
-    repeatingSpacesWarning(repeatingSpaces, filePath);
+    repeatingSpacesWarning(repeatingSpaces, filePath, args);
 
   return fileErrors;
 }
@@ -437,7 +437,18 @@ function getArguments() {
     process.exit(9);
   }
 
-  return argv;
+  const arguments = {
+    path: argv.path,
+    fix: argv.fix !== undefined ? argv.fix : false,
+    config: argv.config,
+    recursive: argv.recursive !== undefined ? argv.recursive : argv.r !== undefined ? argv.r : false,
+    mandatory: argv.mandatory !== undefined ? argv.mandatory : argv.m !== undefined ? argv.m : true,
+    quiet: argv.quiet !== undefined ? argv.quiet : argv.q !== undefined ? argv.q : false,
+    oneline: argv.oneline !== undefined ? argv.oneline : argv.o !== undefined ? argv.o : false,
+    colored: argv.colored !== undefined ? argv.colored : argv.c !== undefined ? argv.c : true,
+  };
+
+  return arguments;
 }
 
 function getConfig(a) {
@@ -454,12 +465,7 @@ function getConfig(a) {
     };
   } catch (_) {}
 
-  config.mandatory =
-    a.m !== undefined
-      ? a.m
-      : a.mandatory !== undefined
-      ? a.mandatory
-      : config.mandatory;
+  config.mandatory = a.mandatory !== undefined ? a.mandatory : config.mandatory;
 
   return config;
 }
@@ -470,7 +476,7 @@ function main(a, c) {
     config = { ...c };
     allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
 
-    (!args.recursive && !args.r
+    (!args.recursive
       ? lintNonRecursively(args.path)
       : lintRecursively(args.path)
     )
@@ -492,16 +498,18 @@ function run() {
   main(a, c).then(({ errorNumber, warningNumber }) => {
     if (warningNumber) {
       console.log(
-        chalk.yellow(
-          `⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`
-        )
+        args.colored
+          ? chalk.yellow(
+              `⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`
+            )
+          : `⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`
       );
     }
     if (!errorNumber) {
-      console.log(chalk.green("✔ All parsed files have valid front matter."));
+      console.log(args.colored ? chalk.green("✔ All parsed files have valid front matter.") : "✔ All parsed files have valid front matter.");
     } else {
       process.exitCode = 1;
-      console.log(
+      console.log(args.colored ?
         chalk.red(
           `✘ ${errorNumber} error${errorNumber > 1 ? "s" : ""} found.${
             fixableErrors > 0
@@ -510,7 +518,13 @@ function run() {
                 } fixable with the \`--fix\` option.`
               : ""
           }`
-        )
+        ) : `✘ ${errorNumber} error${errorNumber > 1 ? "s" : ""} found.${
+          fixableErrors > 0
+            ? ` ${fixableErrors} error${
+                fixableErrors > 1 ? "s" : ""
+              } fixable with the \`--fix\` option.`
+            : ""
+        }`
       );
     }
     console.timeEnd("Linting took");
