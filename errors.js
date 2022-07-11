@@ -144,6 +144,11 @@ function warnCommasWarning(warnCommas, filePath, args) {
   else showWarning(message, filePath, warnCommas, args.colored);
 }
 
+function customError(message, errors, filePath, args) {
+  if (args.oneline) showOneline("Error", message, filePath, errors, args.colored);
+  else showError(message, filePath, errors, args.colored);
+}
+
 module.exports = {
   checkAttributes,
   indentationError,
@@ -156,4 +161,6 @@ module.exports = {
   repeatingSpacesWarning,
   warnCommasWarning,
   trailingCommasError,
+  customError,
+  showOneline
 };

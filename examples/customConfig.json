@@ -4,5 +4,5 @@
   "extensions": [".md"],
   "includeDirs": [],
   "mandatory": true,
-  "requiredAttributes": []
+  "requiredAttributes": ["customTest"]
 }
