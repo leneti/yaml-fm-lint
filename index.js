@@ -175,8 +175,8 @@ function lintFile(filePath) {
           }
 
         } catch (error) {
-          const row = error.mark?.line;
-          const col = error.mark?.column;
+          const row = error.mark ? error.mark.line : undefined;
+          const col = error.mark ? error.mark.column : undefined;
           console.log(`${args.colored ? chalk.red("YAMLException:") : "YAMLException:"} ${
             error.reason
           }.\n\n  at ${cwd}/${filePath}:${row ? row + 1 : ""}${
