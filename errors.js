@@ -70,7 +70,7 @@ function indentationError(indentation, filePath, args) {
   const message = "lines cannot be indented more than 2 spaces from the previous line";
 
   if (args.oneline) showOneline("Error", message, filePath, indentation, args.colored);
-  else showError(message, filePath, indentation);
+  else showError(message, filePath, indentation, args.colored);
 }
 
 function spaceBeforeColonError(spacesBeforeColon, filePath, args) {

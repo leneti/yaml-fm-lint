@@ -30,11 +30,11 @@
 
 ## What is this
 
-A CLI NodeJS script which extracts yaml front matter from markdown files and lints the extracted data based on a config file.
+An opinionated CLI NodeJS script which extracts yaml front matter from markdown files, lints the extracted data based on a config file and, if required, fixes most issues regarding the yaml.
 
 ## Features
 
-- **Quick** - Only has three light-weight dependencies and lints directories asyncronously.
+- **Quick** - Only has two light-weight dependencies and lints directories asyncronously.
 - **Configurable** - Lints the extracted data based on a config file.
 - **Tiny** - Barely takes up space in your project.
 

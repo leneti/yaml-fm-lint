@@ -1,4 +1,7 @@
 examples/
 assets/
+coverage/
+__tests__/
 package-lock.json
 .yaml-fm-lint.json
+jest.config.js

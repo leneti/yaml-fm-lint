@@ -8,7 +8,6 @@ const {
   writeFile,
 } = require("fs");
 const { promisify } = require("util");
-const { lint } = require("yaml-lint");
 const chalk = require("chalk");
 const { load, dump } = require("js-yaml");
 const {
@@ -37,11 +36,11 @@ let fixableErrors = 0;
 let warningNumber = 0;
 let allExcludedDirs = [];
 
-function getSnippet(lines, col, i) {
-  return `${i - 1 > 0 ? `${i - 1} | ${lines[i - 1]}\n` : ""}${i} | ${
-    lines[i]
-  }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(i)), "-")}\n${
-    i + 1 < lines.length ? `${i + 1} | ${lines[i + 1]}\n` : ""
+function getSnippet(lines, col, row) {
+  return !col || !row ? "" :`${row - 1 > 0 ? `${row - 1} | ${lines[row - 1]}\n` : ""}${row} | ${
+    lines[row]
+  }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(row)), "-")}\n${
+    row + 1 < lines.length ? `${row + 1} | ${lines[row + 1]}\n` : ""
   }`;
 }
 
@@ -72,9 +71,9 @@ function lintNonRecursively(path) {
       lintFile(path).then(resolve).catch(reject);
     } else {
       reject(
-        `${args.colored ? chalk.red(
-          "YAMLException:"
-        ) : "YAMLException:"} ${path} does not have a valid extension.`
+        `${
+          args.colored ? chalk.red("YAMLException:") : "YAMLException:"
+        } ${path} does not have a valid extension.`
       );
     }
   });
@@ -131,9 +130,13 @@ function lintFile(filePath) {
         if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
           if (!args.quiet) {
             console.log(
-              `${args.colored ? (config.mandatory ? chalk.red : chalk.yellow)(
-                "YAMLException:"
-              ) : "YAMLException:"} front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
+              `${
+                args.colored
+                  ? (config.mandatory ? chalk.red : chalk.yellow)(
+                      "YAMLException:"
+                    )
+                  : "YAMLException:"
+              } front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
             );
           }
           if (config.mandatory) {
@@ -146,34 +149,43 @@ function lintFile(filePath) {
         }
 
         const frontMatter = lines.slice(0, fmClosingTagIndex + 1);
-        const attributes = load(
-          frontMatter.filter((l) => l !== "---").join("\n")
-        );
 
-        lint(frontMatter.join("\n"))
-          .then(() => {
-            if (args.fix) {
-              const fixedFm = dump(attributes)
-                .split("\n")
-                .map((line) => line.replace(/\s*,$/g, ""));
-              fixedFm.unshift("", "---");
-              fixedFm[fixedFm.length - 1] = "---";
+        try {
+          const attributes = load(
+            frontMatter.filter((l) => l !== "---").join("\n")
+          );
 
-              const content = lines.slice(fmClosingTagIndex + 1).join("\n");
+          if (args.fix) {
+            const fixedFm = dump(attributes)
+              .split("\n")
+              .map((line) => line.replace(/\s*,$/g, ""));
+            fixedFm.unshift("", "---");
+            fixedFm[fixedFm.length - 1] = "---";
 
-              errorNumber += lintLineByLine(fixedFm, filePath);
-              fixedFm.shift();
+            const content = lines.slice(fmClosingTagIndex + 1).join("\n");
 
-              return writeFilePromise(
-                filePath,
-                `${fixedFm.join("\n")}\n${content}`
-              );
-            } else {
-              errorNumber += lintLineByLine(frontMatter, filePath);
-            }
-          })
-          .then(resolve)
-          .catch(reject);
+            errorNumber += lintLineByLine(fixedFm, filePath);
+            fixedFm.shift();
+
+            writeFilePromise(filePath, `${fixedFm.join("\n")}\n${content}`)
+              .then(resolve)
+              .catch(reject);
+          } else {
+            errorNumber += lintLineByLine(frontMatter, filePath);
+          }
+
+        } catch (error) {
+          const row = error.mark?.line;
+          const col = error.mark?.column;
+          console.log(`${args.colored ? chalk.red("YAMLException:") : "YAMLException:"} ${
+            error.reason
+          }.\n\n  at ${cwd}/${filePath}:${row ? row + 1 : ""}${
+            col ? `:${col + 1}` : ""
+          }.\n\n${row && col ? getSnippet(frontMatter, col+1, row+1) : ""}\n`)
+          errorNumber++;
+        } finally {
+          resolve();
+        }
       })
       .catch(reject);
   });
@@ -183,6 +195,7 @@ function lintFile(filePath) {
  * Parses given string and logs errors if any.
  * @param {string} data - data to parse
  * @param {string} filePath - path to the file
+ * @returns {number} number of errors
  */
 function lintLineByLine(fm, filePath) {
   let fileErrors = 0;
@@ -398,9 +411,8 @@ function lintLineByLine(fm, filePath) {
  * @returns {Object} - arguments object
  */
 function getArguments() {
-  const args = process.argv.slice(2);
   let pathRead = false;
-  const argv = args.reduce((acc, curr) => {
+  const argv = process.argv.slice(2).reduce((acc, curr) => {
     let [key, value] = curr.split("=");
     if (key.startsWith("-")) {
       key = key.replace(/^-{1,2}/, "");
@@ -437,18 +449,41 @@ function getArguments() {
     process.exit(9);
   }
 
-  const arguments = {
+  return {
     path: argv.path,
     fix: argv.fix !== undefined ? argv.fix : false,
     config: argv.config,
-    recursive: argv.recursive !== undefined ? argv.recursive : argv.r !== undefined ? argv.r : false,
-    mandatory: argv.mandatory !== undefined ? argv.mandatory : argv.m !== undefined ? argv.m : true,
-    quiet: argv.quiet !== undefined ? argv.quiet : argv.q !== undefined ? argv.q : false,
-    oneline: argv.oneline !== undefined ? argv.oneline : argv.o !== undefined ? argv.o : false,
-    colored: argv.colored !== undefined ? argv.colored : argv.c !== undefined ? argv.c : true,
+    recursive:
+      argv.recursive !== undefined
+        ? argv.recursive
+        : argv.r !== undefined
+        ? argv.r
+        : false,
+    mandatory:
+      argv.mandatory !== undefined
+        ? argv.mandatory
+        : argv.m !== undefined
+        ? argv.m
+        : true,
+    quiet:
+      argv.quiet !== undefined
+        ? argv.quiet
+        : argv.q !== undefined
+        ? argv.q
+        : false,
+    oneline:
+      argv.oneline !== undefined
+        ? argv.oneline
+        : argv.o !== undefined
+        ? argv.o
+        : false,
+    colored:
+      argv.colored !== undefined
+        ? argv.colored
+        : argv.c !== undefined
+        ? argv.c
+        : true,
   };
-
-  return arguments;
 }
 
 function getConfig(a) {
@@ -490,44 +525,60 @@ function main(a, c) {
 }
 
 function run() {
-  console.time("Linting took");
+  return new Promise((resolve) => {
+    console.time("Linting took");
 
-  const a = getArguments();
-  const c = getConfig(a);
+    const a = getArguments();
+    const c = getConfig(a);
 
-  main(a, c).then(({ errorNumber, warningNumber }) => {
-    if (warningNumber) {
-      console.log(
-        args.colored
-          ? chalk.yellow(
-              `⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`
-            )
-          : `⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`
-      );
-    }
-    if (!errorNumber) {
-      console.log(args.colored ? chalk.green("✔ All parsed files have valid front matter.") : "✔ All parsed files have valid front matter.");
-    } else {
-      process.exitCode = 1;
-      console.log(args.colored ?
-        chalk.red(
-          `✘ ${errorNumber} error${errorNumber > 1 ? "s" : ""} found.${
-            fixableErrors > 0
-              ? ` ${fixableErrors} error${
-                  fixableErrors > 1 ? "s" : ""
-                } fixable with the \`--fix\` option.`
-              : ""
-          }`
-        ) : `✘ ${errorNumber} error${errorNumber > 1 ? "s" : ""} found.${
-          fixableErrors > 0
-            ? ` ${fixableErrors} error${
-                fixableErrors > 1 ? "s" : ""
-              } fixable with the \`--fix\` option.`
-            : ""
-        }`
-      );
-    }
-    console.timeEnd("Linting took");
+    main(a, c)
+      .then(({ errorNumber, warningNumber }) => {
+        if (warningNumber) {
+          console.log(
+            args.colored
+              ? chalk.yellow(
+                  `⚠ ${warningNumber} warning${
+                    warningNumber > 1 ? "s" : ""
+                  } found.`
+                )
+              : `⚠ ${warningNumber} warning${
+                  warningNumber > 1 ? "s" : ""
+                } found.`
+          );
+        }
+        if (!errorNumber) {
+          console.log(
+            args.colored
+              ? chalk.green("✔ All parsed files have valid front matter.")
+              : "✔ All parsed files have valid front matter."
+          );
+        } else {
+          process.exitCode = 1;
+          console.log(
+            args.colored
+              ? chalk.red(
+                  `✘ ${errorNumber} error${
+                    errorNumber === 1 ? "" : "s"
+                  } found.${
+                    fixableErrors > 0
+                      ? ` ${fixableErrors} error${
+                          fixableErrors === 1 ? "" : "s"
+                        } fixable with the \`--fix\` option.`
+                      : ""
+                  }`
+                )
+              : `✘ ${errorNumber} error${errorNumber === 1 ? "" : "s"} found.${
+                  fixableErrors > 0
+                    ? ` ${fixableErrors} error${
+                        fixableErrors === 1 ? "" : "s"
+                      } fixable with the \`--fix\` option.`
+                    : ""
+                }`
+          );
+        }
+        console.timeEnd("Linting took");
+      })
+      .finally(resolve);
   });
 }
 
