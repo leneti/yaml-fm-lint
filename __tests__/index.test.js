@@ -6,7 +6,7 @@ const mockArgs = {
   mandatory: true,
   quiet: false,
   oneline: false,
-  colored: false,
+  colored: true,
 };
 
 const mockConfig = {
@@ -19,14 +19,27 @@ const mockConfig = {
 };
 
 describe("yaml-fm-lint", () => {
+  const orgProcess = { ...process };
+  const orgConsole = { ...console };
+
+  beforeEach(() => {
+    console = {
+      ...orgConsole,
+      log: jest.fn(),
+      time: jest.fn(),
+      timeEnd: jest.fn(),
+      jestLog: orgConsole.log,
+    };
+  });
+
+  afterEach(() => {
+    jest.resetModules();
+    jest.clearAllMocks();
+    process = { ...orgProcess };
+    console = { ...orgConsole };
+  });
+
   describe("example file tests: ", () => {
-    beforeEach(() => {
-      jest.resetModules();
-      console.log = jest.fn();
-    });
-
-    afterEach(jest.clearAllMocks);
-
     it("testPassing.md should return no errors/warnings", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testPassing.md" };
@@ -45,228 +58,223 @@ describe("yaml-fm-lint", () => {
     it("testMissingAttributes.md should return 'missing attributes' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testMissingAttributes.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/missing attributes.*test/)
-          );
-          expect(errorNumber).toBe(1);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/missing attributes.*test/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testBlankLines.md should return 'no empty lines' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testBlankLines.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/there should be no empty lines/)
-          );
-          expect(errorNumber).toBe(1);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/there should be no empty lines/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testTrailingSpaces.md should return 'no trailing spaces' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testTrailingSpaces.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/there should be no trailing spaces/)
-          );
-          expect(errorNumber).toBe(1);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/there should be no trailing spaces/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testSpaceBeforeColon.md should return 'no whitespace before colons' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testSpaceBeforeColon.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/there should be no whitespace before colons/)
-          );
-          expect(errorNumber).toBe(1);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(
+                /there should be no whitespace before colons/
+              )
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testQuotes.md should return 'no quotes' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testQuotes.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/there should be no quotes/)
-          );
-          expect(errorNumber).toBe(2);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/there should be no quotes/)
+            );
+            expect(errorNumber).toBe(2);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testBrackets.md should return 'no brackets' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testBrackets.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/there should be no brackets/)
-          );
-          expect(errorNumber).toBe(2);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/there should be no brackets/)
+            );
+            expect(errorNumber).toBe(2);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testCurlyBraces.md should return 'no curly braces' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testCurlyBraces.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/there should be no curly braces/)
-          );
-          expect(errorNumber).toBe(2);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/there should be no curly braces/)
+            );
+            expect(errorNumber).toBe(2);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testIndentation.md should return 'cannot be indented more than 2 spaces' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testIndentation.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/cannot be indented more than 2 spaces/)
-          );
-          expect(errorNumber).toBe(1);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/cannot be indented more than 2 spaces/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testTrailingCommas.md should return 'no trailing commas' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testTrailingCommas.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/there should be no trailing commas/)
-          );
-          expect(errorNumber).toBe(1);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/there should be no trailing commas/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testCommas.md should return 'unintended commas' warning", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testCommas.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/unintended commas/)
-          );
-          expect(errorNumber).toBe(0);
-          expect(warningNumber).toBe(1);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/unintended commas/)
+            );
+            expect(errorNumber).toBe(0);
+            expect(warningNumber).toBe(1);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testWhitespace.md should return 'unintended whitespace' warning", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testWhitespace.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/unintended whitespace/)
-          );
-          expect(errorNumber).toBe(0);
-          expect(warningNumber).toBe(2);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/unintended whitespace/)
+            );
+            expect(errorNumber).toBe(0);
+            expect(warningNumber).toBe(2);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     });
 
     it("testBadFormat.md should return 'bad mapping entry' error", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testBadFormat.md" };
-      
+
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
-        .then(({ errorNumber, warningNumber }) => {
-          expect(console.log).toHaveBeenCalledWith(
-            expect.stringMatching(/bad indentation of a mapping entry/)
-          );
-          expect(errorNumber).toBe(1);
-          expect(warningNumber).toBe(0);
-        })
-        .then(resolve)
-        .catch(reject)
-      })
-    })
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/bad indentation of a mapping entry/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
   });
 
   describe("args tests: ", () => {
-    beforeEach(() => {
-      jest.resetModules();
-      console.log = jest.fn();
-    });
-
-    afterEach(jest.clearAllMocks);
-
     it("should replace '.' with an empty string if included in lint dir", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "." };
@@ -322,9 +330,6 @@ describe("yaml-fm-lint", () => {
     });
 
     it("should prioritise config provided as an argument", () => {
-      const argv = process.argv;
-      console.time = jest.fn();
-      console.timeEnd = jest.fn();
       process.argv = [
         "node",
         "index.js",
@@ -341,7 +346,6 @@ describe("yaml-fm-lint", () => {
               expect.stringMatching(/valid front matter/)
             );
             expect(console.timeEnd).toHaveBeenCalled();
-            process.argv = argv;
           })
           .then(resolve)
           .catch(reject);
@@ -495,15 +499,7 @@ describe("yaml-fm-lint", () => {
     });
 
     it("should give 'invalid argument' error if given an invalid argument", () => {
-      const argv = process.argv;
-      console.time = jest.fn();
-      console.timeEnd = jest.fn();
-      process.argv = [
-        "node",
-        "index.js",
-        "examples/testPassing.md",
-        "test",
-      ];
+      process.argv = ["node", "index.js", "examples/testPassing.md", "test"];
       const { run } = require("../index");
 
       return new Promise((resolve, reject) => {
@@ -514,12 +510,184 @@ describe("yaml-fm-lint", () => {
               expect.stringMatching(/Invalid argument.+test/)
             );
             expect(console.timeEnd).toHaveBeenCalled();
-            process.argv = argv;
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("should display errors on a single line if given the '--oneline' flag", () => {
+      const { main } = require("../index");
+      const args = {
+        ...mockArgs,
+        path: "examples/testNoYaml.md",
+        oneline: true,
+      };
+
+      return new Promise((resolve, reject) => {
+        main(args, mockConfig)
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/<front matter not found>/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("should display 'missing attribute' error on a single line if given the '--oneline' flag", () => {
+      const { main } = require("../index");
+      const args = {
+        ...mockArgs,
+        path: "examples/testMissingAttributes.md",
+        oneline: true,
+      };
+
+      return new Promise((resolve, reject) => {
+        main(args, mockConfig)
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/<missing required attribute>.+test/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
           })
           .then(resolve)
           .catch(reject);
       });
     })
 
+    it("should display 'no empty lines' error on a single line if given the '--oneline' flag", () => {
+      const { main } = require("../index");
+      const args = {
+        ...mockArgs,
+        path: "examples/testBlankLines.md",
+        oneline: true,
+      };
+
+      return new Promise((resolve, reject) => {
+        main(args, mockConfig)
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/<.+no empty lines>/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
+
+    it("should remove the cwd from path if it was included", () => {
+      const { run } = require("../index");
+
+      process.argv = [
+        "node",
+        "index.js",
+        "C:/Coding/yaml-lint/examples/testBadFormat.md",
+        "-o",
+      ];
+
+      return new Promise((resolve, reject) => {
+        run()
+          .then(({args}) => {
+            expect(args.path).toBe("examples/testBadFormat.md");
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("should show a 'No path argument found' error if no path is given", () => {
+      const { run } = require("../index");
+
+      process.argv = ["node", "index.js"];
+
+      return new Promise((resolve, reject) => {
+        run()
+          .then(() => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/No path argument found/)
+            );
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
+
+    it("should show the number of warnings found", () => {
+      const { run } = require("../index");
+
+      process.argv = [
+        "node",
+        "index.js",
+        "examples/testWhitespace.md",
+      ];
+
+      return new Promise((resolve, reject) => {
+        run()
+          .then(({warningNumber, errorNumber}) => {
+            expect(warningNumber).toBe(2);
+            expect(errorNumber).toBe(0);
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/2 warnings found/)
+            );
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
+
+    it("should show colored output by default", () => {
+      const { run } = require("../index");
+      jest.mock("chalk", () => ({
+        ...jest.requireActual("chalk"),
+        green: jest.fn((msg) => `chalk.green ${msg}`),
+        red: jest.fn((msg) => `chalk.red ${msg}`),
+        yellow: jest.fn((msg) => `chalk.yellow ${msg}`)
+      }));
+
+      process.argv = ["node", "index.js", "examples/testPassing.md"];
+
+      return new Promise((resolve, reject) => {
+        run()
+          .then(({args}) => {
+            expect(args.colored).toBe(true);
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/chalk.green/)
+            );
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
+
+    it("should show uncolored if the '--colored' flag is set to false", () => {
+      const { run } = require("../index");
+      jest.mock("chalk", () => ({
+        ...jest.requireActual("chalk"),
+        green: jest.fn((msg) => `chalk.green ${msg}`),
+        red: jest.fn((msg) => `chalk.red ${msg}`),
+        yellow: jest.fn((msg) => `chalk.yellow ${msg}`)
+      }));
+
+      process.argv = ["node", "index.js", "examples/testPassing.md", "--colored=false"];
+
+      return new Promise((resolve, reject) => {
+        run()
+          .then(({args}) => {
+            expect(args.colored).toBe(false);
+            expect(console.log).toHaveBeenCalledWith(
+              expect.not.stringMatching(/chalk.green/)
+            );
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
   });
 });

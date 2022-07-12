@@ -33,13 +33,11 @@ let warningNumber = 0;
 let allExcludedDirs = [];
 
 function getSnippet(lines, col, row) {
-  return !col || !row
-    ? ""
-    : `${row - 1 > 0 ? `${row - 1} | ${lines[row - 1]}\n` : ""}${row} | ${
-        lines[row]
-      }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(row)), "-")}\n${
-        row + 1 < lines.length ? `${row + 1} | ${lines[row + 1]}\n` : ""
-      }`;
+  return `${row - 1} | ${lines[row - 1]}\n${row} | ${
+    lines[row]
+  }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(row)), "-")}\n${
+    row + 1
+  } | ${lines[row + 1]}\n`;
 }
 
 /**
@@ -441,7 +439,7 @@ function getArguments() {
 
     if (key === "path") {
       if (value.startsWith(cwd)) {
-        value = value.replace(cwd, "");
+        value = value.replace(`${cwd}/`, "");
       }
       value = value.replace(/\\/g, "/");
     }
@@ -597,8 +595,9 @@ function run() {
           );
         }
         console.timeEnd("Linting took");
+        return { errorNumber, warningNumber, args, config };
       })
-      .finally(resolve);
+      .then(resolve);
   });
 }
 
