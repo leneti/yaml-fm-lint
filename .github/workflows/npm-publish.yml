@@ -26,7 +26,7 @@ jobs:
     - name: Update version
       run: npm version from-git -m "Updated package.json version to %s" --no-git-tag-version --if-present
     - name: Push to GitHub
-      run: git push --if-present
+      run: git push
 
   publish-npm:
     needs: [build, update-version]
