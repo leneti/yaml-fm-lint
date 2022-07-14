@@ -2,7 +2,7 @@
   "author": "Dominykas Gudauskas <leneti>",
   "name": "yaml-fm-lint",
   "description": "nodejs linter for yaml front matter in markdown files",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "license": "MIT",
   "main": "./index.js",
   "bin": "./index.js",
