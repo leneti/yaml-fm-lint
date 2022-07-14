@@ -4,7 +4,7 @@ const {
   writeFile: writeFilePromise,
   readFile: readFilePromise,
   readdir: readdirPromise,
-} = require("fs/promises");
+} = require("fs").promises;
 const chalk = require("chalk");
 const { load, dump } = require("js-yaml");
 const {

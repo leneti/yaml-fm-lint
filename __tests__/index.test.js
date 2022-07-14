@@ -472,16 +472,19 @@ describe("yaml-fm-lint", () => {
 
     it("should fix errors if given the --fix flag", () => {
       const { main } = require("../index");
-      const { writeFile: writeFilePromise } = require("fs/promises");
+      const { writeFile: writeFilePromise } = require("fs").promises;
 
-      jest.mock("fs/promises", () => ({
-        ...jest.requireActual("fs/promises"),
-        writeFile: jest.fn(() => Promise.resolve()),
+      jest.mock("fs", () => ({
+        ...jest.requireActual("fs"),
+        promises: {
+          ...jest.requireActual("fs").promises,
+          writeFile: jest.fn(() => Promise.resolve()),
+        },
       }));
 
       const args = {
         ...mockArgs,
-        path: "examples/testBlankLines.md",
+        path: "examples/testPassing.md",
         fix: true,
       };
 
@@ -558,7 +561,7 @@ describe("yaml-fm-lint", () => {
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
     it("should display 'no empty lines' error on a single line if given the '--oneline' flag", () => {
       const { main } = require("../index");
@@ -580,7 +583,7 @@ describe("yaml-fm-lint", () => {
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
     it("should remove the cwd from path if it was included", () => {
       const { run } = require("../index");
@@ -594,7 +597,7 @@ describe("yaml-fm-lint", () => {
 
       return new Promise((resolve, reject) => {
         run()
-          .then(({args}) => {
+          .then(({ args }) => {
             expect(args.path).toBe("examples/testBadFormat.md");
           })
           .then(resolve)
@@ -617,20 +620,16 @@ describe("yaml-fm-lint", () => {
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
     it("should show the number of warnings found", () => {
       const { run } = require("../index");
 
-      process.argv = [
-        "node",
-        "index.js",
-        "examples/testWhitespace.md",
-      ];
+      process.argv = ["node", "index.js", "examples/testWhitespace.md"];
 
       return new Promise((resolve, reject) => {
         run()
-          .then(({warningNumber, errorNumber}) => {
+          .then(({ warningNumber, errorNumber }) => {
             expect(warningNumber).toBe(2);
             expect(errorNumber).toBe(0);
             expect(console.log).toHaveBeenCalledWith(
@@ -640,7 +639,7 @@ describe("yaml-fm-lint", () => {
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
     it("should show colored output by default", () => {
       const { run } = require("../index");
@@ -648,14 +647,14 @@ describe("yaml-fm-lint", () => {
         ...jest.requireActual("chalk"),
         green: jest.fn((msg) => `chalk.green ${msg}`),
         red: jest.fn((msg) => `chalk.red ${msg}`),
-        yellow: jest.fn((msg) => `chalk.yellow ${msg}`)
+        yellow: jest.fn((msg) => `chalk.yellow ${msg}`),
       }));
 
       process.argv = ["node", "index.js", "examples/testPassing.md"];
 
       return new Promise((resolve, reject) => {
         run()
-          .then(({args}) => {
+          .then(({ args }) => {
             expect(args.colored).toBe(true);
             expect(console.log).toHaveBeenCalledWith(
               expect.stringMatching(/chalk.green/)
@@ -664,7 +663,7 @@ describe("yaml-fm-lint", () => {
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
     it("should show uncolored if the '--colored' flag is set to false", () => {
       const { run } = require("../index");
@@ -672,14 +671,19 @@ describe("yaml-fm-lint", () => {
         ...jest.requireActual("chalk"),
         green: jest.fn((msg) => `chalk.green ${msg}`),
         red: jest.fn((msg) => `chalk.red ${msg}`),
-        yellow: jest.fn((msg) => `chalk.yellow ${msg}`)
+        yellow: jest.fn((msg) => `chalk.yellow ${msg}`),
       }));
 
-      process.argv = ["node", "index.js", "examples/testPassing.md", "--colored=false"];
+      process.argv = [
+        "node",
+        "index.js",
+        "examples/testPassing.md",
+        "--colored=false",
+      ];
 
       return new Promise((resolve, reject) => {
         run()
-          .then(({args}) => {
+          .then(({ args }) => {
             expect(args.colored).toBe(false);
             expect(console.log).toHaveBeenCalledWith(
               expect.not.stringMatching(/chalk.green/)
@@ -688,6 +692,6 @@ describe("yaml-fm-lint", () => {
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
   });
 });

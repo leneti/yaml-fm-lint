@@ -2,22 +2,23 @@
   "author": "Dominykas Gudauskas <leneti>",
   "name": "yaml-fm-lint",
   "description": "nodejs linter for yaml front matter in markdown files",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "license": "MIT",
   "main": "./index.js",
   "bin": "./index.js",
   "type": "commonjs",
   "scripts": {
     "fmlint": "node .",
-    "test": "jest --coverage --verbose",
-    "test:file": "jest --verbose"
+    "test": "jest",
+    "test:file": "jest --verbose",
+    "test:cov": "jest --coverage --verbose"
   },
   "dependencies": {
     "chalk": "^4.1.2",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
-    "@types/jest": "^28.1.4",
+    "@types/jest": "^28.1.5",
     "jest": "^28.1.3"
   },
   "keywords": [
