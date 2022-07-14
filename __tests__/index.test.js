@@ -25,10 +25,9 @@ describe("yaml-fm-lint", () => {
   beforeEach(() => {
     console = {
       ...orgConsole,
-      log: jest.fn(),
-      time: jest.fn(),
-      timeEnd: jest.fn(),
-      jestLog: orgConsole.log,
+      log: jest.fn().mockName("console.log"),
+      time: jest.fn().mockName("console.time"),
+      timeEnd: jest.fn().mockName("console.timeEnd"),
     };
   });
 
@@ -693,5 +692,26 @@ describe("yaml-fm-lint", () => {
           .catch(reject);
       });
     });
+
+    it("should not show full errors when given the '--quiet'", () => {
+      const { main } = require("../index");
+      const args = {
+        ...mockArgs,
+        path: "examples",
+        quiet: true,
+        recursive: true
+      };
+
+      return new Promise((resolve, reject) => {
+        main(args, mockConfig)
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).not.toHaveBeenCalled();
+            expect(errorNumber).not.toBe(0);
+            expect(warningNumber).not.toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
   });
 });
