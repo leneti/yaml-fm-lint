@@ -2,6 +2,7 @@ examples/
 assets/
 coverage/
 __tests__/
+.github/
 package-lock.json
 .yaml-fm-lint.json
 jest.config.js
