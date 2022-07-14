@@ -180,15 +180,17 @@ function lintFile(filePath) {
             errorNumber += lintLineByLine(frontMatter, filePath);
           }
         } catch (error) {
-          const row = error.mark ? error.mark.line + 1 : undefined;
-          const col = error.mark ? error.mark.column + 1 : undefined;
-          customError(
-            error.reason,
-            [{ row, col, snippet: getSnippet(frontMatter, col, row) }],
-            filePath,
-            args
-          );
           errorNumber++;
+          if (!args.quiet) {
+            const row = error.mark ? error.mark.line + 1 : undefined;
+            const col = error.mark ? error.mark.column + 1 : undefined;
+            customError(
+              error.reason,
+              [{ row, col, snippet: getSnippet(frontMatter, col, row) }],
+              filePath,
+              args
+            );
+          }
         } finally {
           resolve();
         }
