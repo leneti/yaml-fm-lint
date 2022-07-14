@@ -591,7 +591,7 @@ describe("yaml-fm-lint", () => {
       process.argv = [
         "node",
         "index.js",
-        "C:/Coding/yaml-lint/examples/testBadFormat.md",
+        `${process.cwd().replace(/\\/g, "/")}/examples/testBadFormat.md`,
         "-o",
       ];
 
