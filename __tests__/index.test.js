@@ -699,7 +699,7 @@ describe("yaml-fm-lint", () => {
         ...mockArgs,
         path: "examples",
         quiet: true,
-        recursive: true
+        recursive: true,
       };
 
       return new Promise((resolve, reject) => {
@@ -708,6 +708,105 @@ describe("yaml-fm-lint", () => {
             expect(console.log).not.toHaveBeenCalled();
             expect(errorNumber).not.toBe(0);
             expect(warningNumber).not.toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+  });
+
+  describe("lintFile tests: ", () => {
+    it("should return an error if filePath is invalid", () => {
+      const { lintFile } = require("../index");
+      const filePath = "no_such_file.md";
+      return new Promise((resolve, reject) => {
+        lintFile(filePath).then(reject).catch(resolve);
+      });
+    })
+
+    it("testPassing.md should return no erorrs", () => {
+      const { lintFile } = require("../index");
+      const file = "examples/testPassing.md";
+      const fileContents = require("fs").readFileSync(file, "utf8");
+      return new Promise((resolve, reject) => {
+        lintFile(file, fileContents, mockArgs, mockConfig)
+          .then(({fileErrors}) => {
+            expect(fileErrors).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("testMissingAttributes.md should return a missingAttributes containing 'test'", () => {
+      const { lintFile } = require("../index");
+      const file = "examples/testMissingAttributes.md";
+      const fileContents = require("fs").readFileSync(file, "utf8");
+      return new Promise((resolve, reject) => {
+        lintFile(file, fileContents, mockArgs, mockConfig)
+          .then(({fileErrors, errors}) => {
+            expect(fileErrors).toBe(1);
+            expect(errors.missingAttributes).toContain("test");
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
+
+    it("testBlankLines.md should return an array with the blank lines", () => {
+      const { lintFile } = require("../index");
+      const file = "examples/testBlankLines.md";
+      const fileContents = require("fs").readFileSync(file, "utf8");
+      return new Promise((resolve, reject) => {
+        lintFile(file, fileContents, mockArgs, mockConfig)
+          .then(({fileErrors, errors}) => {
+            expect(fileErrors).toBe(1);
+            expect(errors.blankLines).toContain(3);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("testWhitespace.md should return an array with the whitespace warnings", () => {
+      const { lintFile } = require("../index");
+      const file = "examples/testWhitespace.md";
+      const fileContents = require("fs").readFileSync(file, "utf8");
+      return new Promise((resolve, reject) => {
+        lintFile(file, fileContents, mockArgs, mockConfig)
+          .then(({fileErrors, errors}) => {
+            expect(fileErrors).toBe(0);
+            expect(errors.repeatingSpaces.length).toBe(2);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("testNoYaml.md should return a 'noFrontMatter' error", () => {
+      const { lintFile } = require("../index");
+      const file = "examples/testNoYaml.md";
+      const fileContents = require("fs").readFileSync(file, "utf8");
+      return new Promise((resolve, reject) => {
+        lintFile(file, fileContents, mockArgs, mockConfig)
+          .then(({fileErrors, errors}) => {
+            expect(fileErrors).toBe(1);
+            expect(errors.noFrontMatter).toBe(true);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
+
+    it("testBadFormat.md should return a 'bad mapping entry' error", () => {
+      const { lintFile } = require("../index");
+      const file = "examples/testBadFormat.md";
+      const fileContents = require("fs").readFileSync(file, "utf8");
+      return new Promise((resolve, reject) => {
+        lintFile(file, fileContents, mockArgs, mockConfig)
+          .then(({fileErrors, errors}) => {
+            expect(fileErrors).toBe(1);
+            expect(errors).toHaveProperty("customError")
           })
           .then(resolve)
           .catch(reject);
