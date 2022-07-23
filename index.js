@@ -115,91 +115,108 @@ function lintRecursively(path) {
  * @param {string} filePath - path to file
  * @returns null if everything is ok, otherwise error message
  */
-function lintFile(filePath) {
-  return new Promise((resolve, reject) => {
-    readFilePromise(filePath, "utf8")
-      .then((data) => {
-        const lines = data.replace(/\r/g, "").split("\n");
-        lines.unshift("");
-        const fmClosingTagIndex = lines.indexOf("---", 2);
+function lintFile(filePath, text = "", a = {}, c = {}) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      let data = "";
 
-        if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
-          if (!args.quiet) {
-            if (args.oneline) {
-              showOneline(
-                config.mandatory ? "Error" : "Warning",
-                "front matter not found",
-                filePath,
-                "Make sure front matter is at the beginning of the file.",
-                args.colored
-              );
-            } else {
-              console.log(
-                `${
-                  args.colored
-                    ? (config.mandatory ? chalk.red : chalk.yellow)(
-                        "YAMLException:"
-                      )
-                    : "YAMLException:"
-                } front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
-              );
-            }
-          }
-          if (config.mandatory) {
-            process.exitCode = 1;
-            errorNumber++;
-          } else {
-            warningNumber++;
-          }
-          return resolve({ noFrontMatter: true });
-        }
+      if (text) {
+        data = text;
+        args = { ...a };
+        config = { ...c };
+      } else {
+        data = await readFilePromise(filePath, "utf8");
+      }
 
-        const frontMatter = lines.slice(0, fmClosingTagIndex + 1);
+      const lines = data.replace(/\r/g, "").split("\n");
+      lines.unshift("");
+      const fmClosingTagIndex = lines.indexOf("---", 2);
 
-        try {
-          const attributes = load(
-            frontMatter.filter((l) => l !== "---").join("\n")
-          );
-
-          if (args.fix) {
-            const fixedFm = dump(attributes)
-              .split("\n")
-              .map((line) => line.replace(/\s*,$/g, ""));
-            fixedFm.unshift("", "---");
-            fixedFm[fixedFm.length - 1] = "---";
-
-            const content = lines.slice(fmClosingTagIndex + 1).join("\n");
-
-            errorNumber += lintLineByLine(fixedFm, filePath);
-            fixedFm.shift();
-
-            writeFilePromise(filePath, `${fixedFm.join("\n")}\n${content}`)
-              .then(resolve)
-              .catch(reject);
-          } else {
-            const errors = lintLineByLine(frontMatter, filePath, true);
-            errorNumber += errors.fileErrors;
-            resolve(errors);
-          }
-        } catch (error) {
-          errorNumber++;
-          const row = error.mark ? error.mark.line + 1 : undefined;
-          const col = error.mark ? error.mark.column + 1 : undefined;
-          if (!args.quiet) {
-            customError(
-              error.reason,
-              [{ row, col, snippet: getSnippet(frontMatter, col, row) }],
+      if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
+        if (!args.quiet) {
+          if (args.oneline) {
+            showOneline(
+              config.mandatory ? "Error" : "Warning",
+              "front matter not found",
               filePath,
-              args
+              "Make sure front matter is at the beginning of the file.",
+              args.colored
+            );
+          } else {
+            console.log(
+              `${
+                args.colored
+                  ? (config.mandatory ? chalk.red : chalk.yellow)(
+                      "YAMLException:"
+                    )
+                  : "YAMLException:"
+              } front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
             );
           }
-          resolve({ filePath, customError: {
-            message: error.reason,
-            row, col
-          } });
         }
-      })
-      .catch(reject);
+        if (config.mandatory) {
+          process.exitCode = 1;
+          errorNumber++;
+        } else {
+          warningNumber++;
+        }
+        return resolve({ filePath, fileErrors: 1, errors: {noFrontMatter: true} });
+      }
+
+      const frontMatter = lines.slice(0, fmClosingTagIndex + 1);
+
+      try {
+        const attributes = load(
+          frontMatter.filter((l) => l !== "---").join("\n")
+        );
+
+        if (args.fix) {
+          const fixedFm = dump(attributes)
+            .split("\n")
+            .map((line) => line.replace(/\s*,$/g, ""));
+          fixedFm.unshift("", "---");
+          fixedFm[fixedFm.length - 1] = "---";
+
+          const content = lines.slice(fmClosingTagIndex + 1).join("\n");
+
+          errorNumber += lintLineByLine(fixedFm, filePath);
+          fixedFm.shift();
+
+          writeFilePromise(filePath, `${fixedFm.join("\n")}\n${content}`)
+            .then(resolve)
+            .catch(reject);
+        } else {
+          const errors = lintLineByLine(frontMatter, filePath, true);
+          errorNumber += errors.fileErrors;
+          resolve(errors);
+        }
+      } catch (error) {
+        errorNumber++;
+        const row = error.mark ? error.mark.line + 1 : undefined;
+        const col = error.mark ? error.mark.column + 1 : undefined;
+        if (!args.quiet) {
+          customError(
+            error.reason,
+            [{ row, col, snippet: getSnippet(frontMatter, col, row) }],
+            filePath,
+            args
+          );
+        }
+        resolve({
+          filePath,
+          fileErrors: 1,
+          errors: {
+            customError: {
+              message: error.reason,
+              row,
+              col,
+            }
+          },
+        });
+      }
+    } catch (error) {
+      reject(error);
+    }
   });
 }
 
@@ -436,24 +453,24 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
     repeatingSpacesWarning(repeatingSpaces, filePath, args);
 
   return returnErrors
-  ? {
-      filePath,
-      fileErrors,
-      errors: {
-        missingAttributes,
-        spacesBeforeColon,
-        blankLines,
-        quotes,
-        trailingSpaces,
-        brackets,
-        curlyBraces,
-        indentation,
-        repeatingSpaces,
-        warnCommas,
-        trailingCommas,
-      },
-    }
-  : fileErrors;
+    ? {
+        filePath,
+        fileErrors,
+        errors: {
+          missingAttributes,
+          spacesBeforeColon,
+          blankLines,
+          quotes,
+          trailingSpaces,
+          brackets,
+          curlyBraces,
+          indentation,
+          repeatingSpaces,
+          warnCommas,
+          trailingCommas,
+        },
+      }
+    : fileErrors;
 }
 
 /**
@@ -649,6 +666,7 @@ function run() {
 module.exports = {
   run,
   main,
+  lintFile
 };
 
 // Run if invoked as a CLI
