@@ -9,8 +9,8 @@ function getSnippets(arr, filePath) {
   );
 }
 
-function showError(message, filePath, errors, colored) {
-  const snippets = getSnippets(errors, filePath);
+function showError(message, filePath, errors, colored, noSnippets = false) {
+  const snippets = noSnippets ? "" : getSnippets(errors, filePath);
   console.log(
     `${
       colored ? chalk.red("YAMLException:") : "YAMLException:"
@@ -48,22 +48,18 @@ function checkAttributes(attributes, requiredAttributes, filePath, args) {
   );
 
   if (missingAttributes.length > 0) {
-    if (args.oneline) {
-      missingAttributes.forEach((attr) => {
-        showOneline("Error", "missing required attribute", filePath, attr, args.colored);
-      });
-    } else if (!args.quiet)
-      console.log(
-        `${chalk.red(
-          "YAMLException:"
-        )} missing attributes in ${cwd}/${filePath}: ${missingAttributes.join(
-          ", "
-        )}\n`
-      );
-
-    return 1;
+    if (!args.quiet) {
+      if (args.oneline) {
+        missingAttributes.forEach((attr) => {
+          showOneline("Error", "missing required attribute", filePath, attr, args.colored);
+        });
+      } else {
+        const message = `missing attributes in ${cwd}/${filePath}: ${missingAttributes.join(", ")}`
+        showError(message, null, null, args.colored, true);
+      }
+    }
   }
-  return 0;
+  return missingAttributes;
 }
 
 function indentationError(indentation, filePath, args) {

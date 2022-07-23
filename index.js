@@ -151,7 +151,7 @@ function lintFile(filePath) {
           } else {
             warningNumber++;
           }
-          return resolve();
+          return resolve({ noFrontMatter: true });
         }
 
         const frontMatter = lines.slice(0, fmClosingTagIndex + 1);
@@ -177,13 +177,15 @@ function lintFile(filePath) {
               .then(resolve)
               .catch(reject);
           } else {
-            errorNumber += lintLineByLine(frontMatter, filePath);
+            const errors = lintLineByLine(frontMatter, filePath, true);
+            errorNumber += errors.fileErrors;
+            resolve(errors);
           }
         } catch (error) {
           errorNumber++;
+          const row = error.mark ? error.mark.line + 1 : undefined;
+          const col = error.mark ? error.mark.column + 1 : undefined;
           if (!args.quiet) {
-            const row = error.mark ? error.mark.line + 1 : undefined;
-            const col = error.mark ? error.mark.column + 1 : undefined;
             customError(
               error.reason,
               [{ row, col, snippet: getSnippet(frontMatter, col, row) }],
@@ -191,8 +193,10 @@ function lintFile(filePath) {
               args
             );
           }
-        } finally {
-          resolve();
+          resolve({ filePath, customError: {
+            message: error.reason,
+            row, col
+          } });
         }
       })
       .catch(reject);
@@ -203,9 +207,8 @@ function lintFile(filePath) {
  * Parses given string and logs errors if any.
  * @param {string} data - data to parse
  * @param {string} filePath - path to the file
- * @returns {number} number of errors
  */
-function lintLineByLine(fm, filePath) {
+function lintLineByLine(fm, filePath, returnErrors = false) {
   let fileErrors = 0;
   const attributes = [];
   const spacesBeforeColon = [];
@@ -384,14 +387,35 @@ function lintLineByLine(fm, filePath) {
     }
   }
 
-  fileErrors += checkAttributes(
+  const missingAttributes = checkAttributes(
     attributes,
     config.requiredAttributes,
     filePath,
     args
   );
 
-  if (args.quiet) return fileErrors;
+  if (missingAttributes.length) fileErrors++;
+
+  if (args.quiet)
+    return returnErrors
+      ? {
+          filePath,
+          fileErrors,
+          errors: {
+            missingAttributes,
+            spacesBeforeColon,
+            blankLines,
+            quotes,
+            trailingSpaces,
+            brackets,
+            curlyBraces,
+            indentation,
+            repeatingSpaces,
+            warnCommas,
+            trailingCommas,
+          },
+        }
+      : fileErrors;
 
   if (!args.fix) {
     if (blankLines.length > 0) blankLinesError(blankLines, filePath, args);
@@ -411,7 +435,25 @@ function lintLineByLine(fm, filePath) {
   if (repeatingSpaces.length > 0)
     repeatingSpacesWarning(repeatingSpaces, filePath, args);
 
-  return fileErrors;
+  return returnErrors
+  ? {
+      filePath,
+      fileErrors,
+      errors: {
+        missingAttributes,
+        spacesBeforeColon,
+        blankLines,
+        quotes,
+        trailingSpaces,
+        brackets,
+        curlyBraces,
+        indentation,
+        repeatingSpaces,
+        warnCommas,
+        trailingCommas,
+      },
+    }
+  : fileErrors;
 }
 
 /**
@@ -529,12 +571,13 @@ function main(a, c) {
       ? lintNonRecursively(args.path)
       : lintRecursively(args.path)
     )
+      .then((errors) => resolve({ errors, errorNumber, warningNumber }))
       .catch((err) => {
         console.log(err);
         process.exitCode = 1;
         errorNumber++;
-      })
-      .finally(() => resolve({ errorNumber, warningNumber }));
+        resolve({ errorNumber, warningNumber });
+      });
   });
 }
 
