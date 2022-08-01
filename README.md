@@ -111,7 +111,7 @@ In addition to the default config you can also add your own custom linters. Thes
 
 The functions receive an object with the following properties:
 - `frontMatter` - The yaml front matter as a JavaScript object
-- `showOneline` - Function to call one-line error messages Receives the following arguments:
+- `showOneline` - Function to call one-line error messages. Receives the following arguments:
   - `type` - "Error" or "Warning"
   - `message` - The error message
   - `affected` - This can either be a `string` or an array of `objects` with `row` and `col` values for precise error locations
