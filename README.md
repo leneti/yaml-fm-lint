@@ -100,3 +100,44 @@ This command would recursively look for all markdown files in the `docs` directo
 | includeDirs        | `[]`      | Array of directories to include in linting.                                                                                    |
 | requiredAttributes | `[]`      | Array of attributes that must be present in the yaml front matter.                                                             |
 | mandatory          | `true`    | If set to false will show warning instead of error if no front matter is found.                                                 |
+
+### `.yaml-fm-lint.js`
+
+You will have to default export the config object.
+
+#### Custom linters
+
+In addition to the default config you can also add your own custom linters. These will be executed after the default linters.
+
+The functions receive an object with the following properties:
+- `frontMatter` - The yaml front matter as a JavaScript object
+- `showOneline` - Function to call one-line error messages Receives the following arguments:
+  - `type` - "Error" or "Warning"
+  - `message` - The error message
+  - `affected` - This can either be a `string` or an array of `objects` with `row` and `col` values for precise error locations
+- `rawFm` - The raw yaml front matter string. Includes lines with `---` dashes
+
+```js
+/**
+ * @param {{frontMatter: Object, showOneline: (type: "Error" | "Warning", message: string, affected: string | {row: number, col: number, snippet?: string}[]) => void, rawFm: string}} param0
+ * @returns {{errors: number, warnings: number}}
+ */
+function lowercaseTags({ frontMatter, showOneline }) {
+  const tags = frontMatter.tags;
+  let errors = 0;
+
+  tags.forEach((tag) => {
+    if (tag.toLowerCase() !== tag) {
+      showOneline("Error", "tags must be lowercase", tag);
+      errors++;
+    }
+  });
+
+  return { errors, warnings: 0 };
+}
+
+module.exports = {
+  extraLintFns: [lowercaseTags],
+  requiredAttributes: ["tags"],
+};
+```

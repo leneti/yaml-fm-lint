@@ -160,7 +160,11 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
         } else {
           warningNumber++;
         }
-        return resolve({ filePath, fileErrors: 1, errors: {noFrontMatter: true} });
+        return resolve({
+          filePath,
+          fileErrors: 1,
+          errors: { noFrontMatter: true },
+        });
       }
 
       const frontMatter = lines.slice(0, fmClosingTagIndex + 1);
@@ -180,6 +184,7 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
           const content = lines.slice(fmClosingTagIndex + 1).join("\n");
 
           errorNumber += lintLineByLine(fixedFm, filePath);
+          extraLinters(attributes, frontMatter, filePath);
           fixedFm.shift();
 
           writeFilePromise(filePath, `${fixedFm.join("\n")}\n${content}`)
@@ -188,6 +193,7 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
         } else {
           const errors = lintLineByLine(frontMatter, filePath, true);
           errorNumber += errors.fileErrors;
+          extraLinters(attributes, frontMatter, filePath);
           resolve(errors);
         }
       } catch (error) {
@@ -210,13 +216,27 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
               message: error.reason,
               row,
               col,
-            }
+            },
           },
         });
       }
     } catch (error) {
       reject(error);
     }
+  });
+}
+
+function extraLinters(frontMatter, rawFm, filePath) {
+  if (!config.extraLintFns) return;
+  config.extraLintFns.forEach((linter) => {
+    const { errors, warnings } = linter({
+      frontMatter,
+      showOneline: (type, message, affected) =>
+        showOneline(type, message, filePath, affected, args.colored),
+      rawFm,
+    });
+    errorNumber += errors;
+    warningNumber += warnings;
   });
 }
 
@@ -475,7 +495,7 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
 
 /**
  * Retrieves arguments from the command line
- * @returns {Object} - arguments object
+ * @returns {{path: string, fix: boolean, config: string, recursive: boolean, mandatory: boolean, quiet: boolean, oneline: boolean, colored: boolean}} - arguments object
  */
 function getArguments() {
   let pathRead = false;
@@ -562,15 +582,27 @@ function getConfig(a) {
     ),
   };
   try {
+    const configJs = require(`${cwd}/.yaml-fm-lint.js`);
     config = {
       ...config,
-      ...JSON.parse(readFileSync(`${cwd}/.yaml-fm-lint.json`)),
+      ...configJs,
     };
-  } catch (_) {}
+  } catch (_) {
+    try {
+      config = {
+        ...config,
+        ...JSON.parse(readFileSync(`${cwd}/.yaml-fm-lint.json`)),
+      };
+    } catch (_) {}
+  }
 
   config = {
     ...config,
-    ...(a.config ? JSON.parse(readFileSync(a.config)) : {}),
+    ...(!a.config
+      ? {}
+      : a.config.endsWith(".js")
+      ? require(`${cwd}/${a.config}`)
+      : JSON.parse(readFileSync(a.config))),
   };
 
   config.mandatory = a.mandatory !== undefined ? a.mandatory : config.mandatory;
@@ -606,7 +638,7 @@ function run() {
 
     if (process.exitCode) {
       console.timeEnd("Linting took");
-      return resolve();
+      return resolve({ errorNumber, warningNumber, args, config });
     }
 
     const c = getConfig(a);
@@ -666,7 +698,7 @@ function run() {
 module.exports = {
   run,
   main,
-  lintFile
+  lintFile,
 };
 
 // Run if invoked as a CLI
