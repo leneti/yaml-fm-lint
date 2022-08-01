@@ -27,6 +27,15 @@ function showWarning(message, filePath, warnings, colored) {
   );
 }
 
+/**
+ * Allows users to see the error in a single line
+ * 
+ * @param {"Error" | "Warning"} type - "Error" or "Warning"
+ * @param {string} message - the message to show
+ * @param {string} filePath - the file path of the file where the error occurred
+ * @param {string | {row: number, col: number, snippet?: string}[]} affected - affected value or array of affected locations
+ * @param {boolean} colored - whether to color the output
+ */
 function showOneline(type, message, filePath, affected, colored) {
   if (typeof affected === "object") {
     affected.forEach((errObj) => {
@@ -140,6 +149,13 @@ function warnCommasWarning(warnCommas, filePath, args) {
   else showWarning(message, filePath, warnCommas, args.colored);
 }
 
+/**
+ * Custom error handler, allowing for custom error messages
+ * @param {string} message - error message
+ * @param {string | {row: number, col: number, snippet?: string}[]} errors - affected value or array of affected locations
+ * @param {string} filePath - path to file
+ * @param {{path: string, fix: boolean, config: string, recursive: boolean, mandatory: boolean, quiet: boolean, oneline: boolean, colored: boolean}} args - arguments
+ */
 function customError(message, errors, filePath, args) {
   if (args.oneline) showOneline("Error", message, filePath, errors, args.colored);
   else showError(message, filePath, errors, args.colored);
