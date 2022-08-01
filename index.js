@@ -231,7 +231,8 @@ function extraLinters(frontMatter, rawFm, filePath) {
   config.extraLintFns.forEach((linter) => {
     const { errors, warnings } = linter({
       frontMatter,
-      showOneline: (type, message, affected) => showOneline(type, message, filePath, affected, args.colored),
+      showOneline: (type, message, affected) =>
+        showOneline(type, message, filePath, affected, args.colored),
       rawFm,
     });
     errorNumber += errors;
@@ -581,19 +582,19 @@ function getConfig(a) {
     ),
   };
   try {
-    config = {
-      ...config,
-      ...JSON.parse(readFileSync(`${cwd}/.yaml-fm-lint.json`)),
-    };
-  } catch (_) {}
-
-  try {
     const configJs = require(`${cwd}/.yaml-fm-lint.js`);
     config = {
       ...config,
       ...configJs,
     };
-  } catch (_) {}
+  } catch (_) {
+    try {
+      config = {
+        ...config,
+        ...JSON.parse(readFileSync(`${cwd}/.yaml-fm-lint.json`)),
+      };
+    } catch (_) {}
+  }
 
   config = {
     ...config,
@@ -637,7 +638,7 @@ function run() {
 
     if (process.exitCode) {
       console.timeEnd("Linting took");
-      return resolve();
+      return resolve({ errorNumber, warningNumber, args, config });
     }
 
     const c = getConfig(a);

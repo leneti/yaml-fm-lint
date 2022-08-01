@@ -271,6 +271,53 @@ describe("yaml-fm-lint", () => {
           .catch(reject);
       });
     });
+
+    it("testLowercaseTags.md should return 'missing attributes' error with no custom config", () => {
+      const { main } = require("../index");
+      const args = { ...mockArgs, path: "examples/testLowercaseTags.md" };
+
+      return new Promise((resolve, reject) => {
+        main(args, mockConfig)
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/missing attributes/)
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("testLowercaseTags.md should return 'tags must be lowercase' error with custom config", () => {
+      process.argv = [
+        "node",
+        "index.js",
+        "examples/testLowercaseTags.md",
+      ];
+      const { run } = require("../index");
+      const { writeFileSync, unlinkSync, readFileSync } = require("fs")
+
+      writeFileSync(".yaml-fm-lint.js", readFileSync("examples/customConfig.js"));
+
+      return new Promise((resolve, reject) => {
+        
+        run()
+          .then(({errorNumber}) => {
+            expect(console.time).toHaveBeenCalled();
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/tags must be lowercase/)
+            );
+            expect(errorNumber).toBe(2);
+            expect(console.timeEnd).toHaveBeenCalled();
+            return ".yaml-fm-lint.js";
+          })
+          .then(unlinkSync)
+          .then(resolve)
+          .catch(reject);
+      });
+    });
   });
 
   describe("args tests: ", () => {
@@ -350,6 +397,30 @@ describe("yaml-fm-lint", () => {
           .catch(reject);
       });
     });
+
+    it("should use .js config if provided", () => {
+      process.argv = [
+        "node",
+        "index.js",
+        "examples/testLowercaseTags.md",
+        "--config=examples/customConfig.js",
+      ];
+      const { run } = require("../index");
+
+      return new Promise((resolve, reject) => {
+        run()
+          .then(({errorNumber}) => {
+            expect(console.time).toHaveBeenCalled();
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(/tags must be lowercase/)
+            );
+            expect(errorNumber).toBe(2);
+            expect(console.timeEnd).toHaveBeenCalled();
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
 
     it("should not lint files with extensions not in the config: non-recursive", () => {
       const { main } = require("../index");
