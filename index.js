@@ -2,7 +2,7 @@
 const { readFileSync, lstatSync, readdirSync, writeFileSync } = require("fs");
 const chalk = require("chalk");
 const { load, dump } = require("js-yaml");
-const { showOneline, showError, showWarning } = require("./errors.js");
+const { lintLog } = require("./errors.js");
 
 const cwd = process.cwd().replace(/\\/g, "/");
 
@@ -12,14 +12,22 @@ let errorNumber = 0;
 let fixableErrors = 0;
 let warningNumber = 0;
 let allExcludedDirs = [];
-
-function getSnippet(lines, col, row) {
-  return `${row - 1} | ${lines[row - 1]}\n${row} | ${
-    lines[row]
-  }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(row)), "-")}\n${
-    row + 1
-  } | ${lines[row + 1]}\n`;
-}
+const errorMessages = {
+  missingAttributes: "missing required attributes",
+  blankLines: "there must be no empty lines",
+  spacesBeforeColon: "there must be no whitespace before colons",
+  quotes: "there must be no quotes in the front matter",
+  trailingSpaces: "there must be no trailing spaces",
+  brackets: "there must be no brackets",
+  curlyBraces: "there must be no curly braces",
+  indentation:
+    "lines cannot be indented more than 2 spaces from the previous line",
+  trailingCommas: "there must be no trailing commas",
+};
+const warningMessages = {
+  repeatingSpaces: "possibly unintended whitespace",
+  warnCommas: "possibly unintended commas",
+};
 
 /**
  * Lints the front matter of all files in a directory non-recursively.
@@ -122,13 +130,14 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
 
       if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
         if (!args.quiet) {
-          (config.mandatory ? showError : showWarning)(
-            "front matter not found",
+          lintLog({
+            type: config.mandatory ? "Error" : "Warning",
+            message: "front matter not found",
             filePath,
-            "Make sure front matter is at the beginning of the file.",
+            affected: "Make sure front matter is at the beginning of the file.",
             args,
-            true
-          );
+            forceOneLine: true,
+          });
         }
 
         if (config.mandatory) {
@@ -190,12 +199,14 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
         const col = error.mark ? error.mark.column + 1 : undefined;
 
         if (!args.quiet) {
-          showError(
-            error.reason,
+          lintLog({
+            type: "Error",
+            message: error.reason,
             filePath,
-            [{ row, col, snippet: getSnippet(fmLines, col, row) }],
-            args
-          );
+            affected: [{ row, col }],
+            args,
+            fmLines,
+          });
         }
 
         resolve({
@@ -227,43 +238,34 @@ function extraLinters(attributes, fmLines, filePath) {
   if (!config.extraLintFns)
     return { extraErrors, extraWarnings, fileErrors, fileWarnings };
 
+  /**
+   * @param {"Error" | "Warning"} type
+   * @param {string} message
+   * @param {string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined} affected - array of string values, line numbers or exact locations of errors or warnings. If omitted, the opening front matter tags will be decorated. `colStart` and `colEnd` are used by the VS Code extension.
+   */
+  function extraLintLog(type, message, affected) {
+    lintLog({type, message, filePath, affected, args, fmLines});
+
+    const updateArray = (arr, msg, aff) => ({
+      ...arr,
+      [msg]: [
+        ...(arr[msg] || []),
+        ...aff,
+      ],
+    })
+
+    if (type === "Error") {
+      extraErrors = updateArray(extraErrors, message, affected);
+    } else {
+      extraWarnings = updateArray(extraWarnings, message, affected);
+    }
+  }
+
   config.extraLintFns.forEach((linter) => {
     const { errors, warnings } = linter({
       attributes,
       fmLines,
-      showOneline: (type, message, affected) => {
-        if (affected && !affected.row && !affected.snippet) return;
-
-        const logAffected = !affected
-          ? undefined
-          : affected.col
-          ? [affected]
-          : affected.row
-          ? affected.row
-          : affected.snippet;
-
-        showOneline(type, message, filePath, logAffected, args);
-
-        const extensionAffected = affected?.row ? affected : { row: 0, col: 3 };
-
-        if (type === "Error") {
-          extraErrors = {
-            ...extraErrors,
-            [message]: [
-              ...(!extraErrors[message] ? [] : extraErrors[message]),
-              extensionAffected,
-            ],
-          };
-        } else {
-          extraWarnings = {
-            ...extraWarnings,
-            [message]: [
-              ...(!extraWarnings[message] ? [] : extraWarnings[message]),
-              extensionAffected,
-            ],
-          };
-        }
-      },
+      lintLog: extraLintLog,
     });
     fileErrors += errors;
     fileWarnings += warnings;
@@ -274,54 +276,49 @@ function extraLinters(attributes, fmLines, filePath) {
 
 /**
  * Parses given string and logs errors if any.
- * @param {string} data - data to parse
+ * @param {string[]} fmLines - front matter lines to parse
  * @param {string} filePath - path to the file
  */
-function lintLineByLine(fm, filePath) {
+function lintLineByLine(fmLines, filePath) {
   let fileErrors = 0;
   let fileWarnings = 0;
   let match;
 
-  const basicErrors = {
-    "missing required attribute": [...config.requiredAttributes],
-    "there must be no whitespace before colons": [],
-    "there must be no empty lines": [],
-    "there must be no quotes in the front matter": [],
-    "there must be no trailing spaces": [],
-    "there must be no brackets": [],
-    "there must be no curly braces": [],
-    "lines cannot be indented more than 2 spaces from the previous line": [],
-    "there must be no trailing commas": [],
-  };
+  const basicErrors = Object.keys(errorMessages).reduce((acc, key) => {
+    acc[errorMessages[key]] = [];
+    return acc;
+  }, {});
+  basicErrors[errorMessages.missingAttributes] = [...config.requiredAttributes];
 
-  const basicWarnings = {
-    "possibly unintended whitespace": [],
-    "possibly unintended commas": [],
-  };
+  const basicWarnings = Object.keys(warningMessages).reduce((acc, key) => {
+    acc[warningMessages[key]] = [];
+    return acc;
+  }, {});
 
   const oneLineErrors = [
-    "there must be no empty lines",
-    "missing required attribute",
+    errorMessages.blankLines,
+    errorMessages.missingAttributes,
   ];
 
-  for (let i = 1; i < fm.length - 1; i++) {
-    const line = `${fm[i]}`;
-
-    // attributes
-    if (line.match(/^"?\w+"?\s*:/g)) {
-      const atr = line.split(":")[0].trim();
-      const atrIndex = basicErrors["missing required attribute"].indexOf(atr);
-      if (atrIndex > -1) {
-        basicErrors["missing required attribute"].splice(atrIndex, 1);
-      }
-    }
+  for (let i = 1; i < fmLines.length - 1; i++) {
+    const line = `${fmLines[i]}`;
 
     // no-empty-lines
     if (!args.fix && line.trim() === "") {
       fileErrors++;
       fixableErrors++;
-      basicErrors["there must be no empty lines"].push(i);
+      basicErrors[errorMessages.blankLines].push(i);
       continue;
+    }
+
+    // attributes
+    if (line.match(/^"?\w+"?\s*:/g)) {
+      const atr = line.split(":")[0].trim();
+      const atrIndex =
+        basicErrors[errorMessages.missingAttributes].indexOf(atr);
+      if (atrIndex > -1) {
+        basicErrors[errorMessages.missingAttributes].splice(atrIndex, 1);
+      }
     }
 
     // no-whitespace-before-colon
@@ -333,12 +330,11 @@ function lintLineByLine(fm, filePath) {
       const row = i;
       const col = match.index + match[0].search(/:/) + 1;
       wsbcRegex.lastIndex = col - 1;
-      basicErrors["there must be no whitespace before colons"].push({
+      basicErrors[errorMessages.spacesBeforeColon].push({
         row,
         col,
         colStart: col - wsbcLength,
         colEnd: col - 1,
-        snippet: getSnippet(fm, col, row),
       });
     }
 
@@ -350,10 +346,9 @@ function lintLineByLine(fm, filePath) {
       fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(quoteRegex) + 2;
-      basicErrors["there must be no quotes in the front matter"].push({
+      basicErrors[errorMessages.quotes].push({
         row,
         col,
-        snippet: getSnippet(fm, col, i),
       });
     }
 
@@ -365,12 +360,11 @@ function lintLineByLine(fm, filePath) {
       fixableErrors++;
       const row = i;
       const col = line.length + 1;
-      basicErrors["there must be no trailing spaces"].push({
+      basicErrors[errorMessages.trailingSpaces].push({
         row,
         col,
         colStart: col - spaceCount,
         colEnd: col,
-        snippet: getSnippet(fm, col, row),
       });
     }
 
@@ -382,10 +376,9 @@ function lintLineByLine(fm, filePath) {
       fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(bracketsRegex) + 2;
-      basicErrors["there must be no brackets"].push({
+      basicErrors[errorMessages.brackets].push({
         row,
         col,
-        snippet: getSnippet(fm, col, i),
       });
     }
 
@@ -397,31 +390,27 @@ function lintLineByLine(fm, filePath) {
       fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(curlyBraceRegex) + 2;
-      basicErrors["there must be no curly braces"].push({
+      basicErrors[errorMessages.curlyBraces].push({
         row,
         col,
-        snippet: getSnippet(fm, col, i),
       });
     }
 
     // incorrect-indentation
     const indentationCurr = line.search(/\S/g);
     if (!args.fix && indentationCurr > 0) {
-      let indentationPrev = fm[i - 1].search(/\S/g);
+      let indentationPrev = fmLines[i - 1].search(/\S/g);
       indentationPrev = indentationPrev === -1 ? 0 : indentationPrev;
       if (indentationCurr - indentationPrev > 2) {
         fileErrors++;
         fixableErrors++;
         const row = i;
         const col = indentationCurr + 1;
-        basicErrors[
-          "lines cannot be indented more than 2 spaces from the previous line"
-        ].push({
+        basicErrors[errorMessages.indentation].push({
           row,
           col,
           colStart: 0,
           colEnd: col - 1,
-          snippet: getSnippet(fm, col, i),
         });
       }
     }
@@ -434,12 +423,11 @@ function lintLineByLine(fm, filePath) {
       fileWarnings++;
       const row = i;
       const col = match.index + match[0].search(/\s\w/g) + 2;
-      basicWarnings["possibly unintended whitespace"].push({
+      basicWarnings[warningMessages.repeatingSpaces].push({
         row,
         col,
         colStart: col - spaceCount,
         colEnd: col - 1,
-        snippet: getSnippet(fm, col, i),
       });
     }
 
@@ -451,12 +439,11 @@ function lintLineByLine(fm, filePath) {
       fileWarnings++;
       const row = i;
       const col = match.index + match[0].search(/[ \t]\S/g) + 2;
-      basicWarnings["possibly unintended whitespace"].push({
+      basicWarnings[warningMessages.repeatingSpaces].push({
         row,
         col,
         colStart: col - spaceCount,
         colEnd: col - 1,
-        snippet: getSnippet(fm, col, i),
       });
     }
 
@@ -467,10 +454,9 @@ function lintLineByLine(fm, filePath) {
       fixableErrors++;
       const row = i;
       const col = line.length + 1;
-      basicErrors["there must be no trailing commas"].push({
+      basicErrors[errorMessages.trailingCommas].push({
         row,
         col,
-        snippet: getSnippet(fm, col, i),
       });
     }
 
@@ -481,32 +467,40 @@ function lintLineByLine(fm, filePath) {
       fileWarnings++;
       const row = i;
       const col = match.index + 2;
-      basicWarnings["possibly unintended commas"].push({
+      basicWarnings[warningMessages.warnCommas].push({
         row,
         col,
-        snippet: getSnippet(fm, col, i),
       });
     }
   }
 
-  fileErrors += basicErrors["missing required attribute"].length;
+  fileErrors += basicErrors[errorMessages.missingAttributes].length;
 
   if (!args.quiet) {
     Object.keys(basicErrors).forEach((message) => {
       if (basicErrors[message].length > 0) {
-        showError(
+        lintLog({
+          type: "Error",
           message,
           filePath,
-          basicErrors[message],
+          fmLines,
+          affected: basicErrors[message],
           args,
-          oneLineErrors.includes(message)
-        );
+          forceOneLine: oneLineErrors.includes(message),
+        });
       }
     });
 
     Object.keys(basicWarnings).forEach((message) => {
       if (basicWarnings[message].length > 0) {
-        showWarning(message, filePath, basicWarnings[message], args);
+        lintLog({
+          type: "Warning",
+          message,
+          filePath,
+          fmLines,
+          affected: basicWarnings[message],
+          args,
+        });
       }
     });
   }
@@ -726,6 +720,8 @@ module.exports = {
   run,
   main,
   lintFile,
+  errorMessages,
+  warningMessages,
 };
 
 // Run if invoked as a CLI

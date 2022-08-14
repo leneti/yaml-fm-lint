@@ -55,14 +55,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testMissingAttributes.md should return 'missing attributes' error", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testMissingAttributes.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/missing attributes.*test/)
+              expect.stringMatching(new RegExp(`${errorMessages.missingAttributes}.+${mockConfig.requiredAttributes.join(".+")}`))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -73,14 +73,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testBlankLines.md should return 'no empty lines' error", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testBlankLines.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/there should be no empty lines/)
+              expect.stringMatching(new RegExp(errorMessages.blankLines))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -90,15 +90,15 @@ describe("yaml-fm-lint", () => {
       });
     });
 
-    it("testTrailingSpaces.md should return 'no trailing spaces' error", () => {
-      const { main } = require("../index");
+    it("testTrailingSpaces.md must return 'no trailing spaces' error", () => {
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testTrailingSpaces.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/there should be no trailing spaces/)
+              expect.stringMatching(new RegExp(errorMessages.trailingSpaces))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -109,16 +109,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testSpaceBeforeColon.md should return 'no whitespace before colons' error", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testSpaceBeforeColon.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(
-                /there should be no whitespace before colons/
-              )
+              expect.stringMatching(new RegExp(errorMessages.spaceBeforeColon))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -129,14 +127,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testQuotes.md should return 'no quotes' error", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testQuotes.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/there should be no quotes/)
+              expect.stringMatching(new RegExp(errorMessages.quotes))
             );
             expect(errorNumber).toBe(2);
             expect(warningNumber).toBe(0);
@@ -147,14 +145,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testBrackets.md should return 'no brackets' error", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testBrackets.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/there should be no brackets/)
+              expect.stringMatching(new RegExp(errorMessages.brackets))
             );
             expect(errorNumber).toBe(2);
             expect(warningNumber).toBe(0);
@@ -165,14 +163,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testCurlyBraces.md should return 'no curly braces' error", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testCurlyBraces.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/there should be no curly braces/)
+              expect.stringMatching(new RegExp(errorMessages.curlyBraces))
             );
             expect(errorNumber).toBe(2);
             expect(warningNumber).toBe(0);
@@ -183,14 +181,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testIndentation.md should return 'cannot be indented more than 2 spaces' error", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testIndentation.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/cannot be indented more than 2 spaces/)
+              expect.stringMatching(new RegExp(errorMessages.indentation))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -201,14 +199,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testTrailingCommas.md should return 'no trailing commas' error", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testTrailingCommas.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/there should be no trailing commas/)
+              expect.stringMatching(new RegExp(errorMessages.trailingCommas))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -219,14 +217,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testCommas.md should return 'unintended commas' warning", () => {
-      const { main } = require("../index");
+      const { main, warningMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testCommas.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/unintended commas/)
+              expect.stringMatching(new RegExp(warningMessages.warnCommas))
             );
             expect(errorNumber).toBe(0);
             expect(warningNumber).toBe(1);
@@ -237,14 +235,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testWhitespace.md should return 'unintended whitespace' warning", () => {
-      const { main } = require("../index");
+      const { main, warningMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testWhitespace.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/unintended whitespace/)
+              expect.stringMatching(new RegExp(warningMessages.repeatingSpaces))
             );
             expect(errorNumber).toBe(0);
             expect(warningNumber).toBe(2);
@@ -272,15 +270,15 @@ describe("yaml-fm-lint", () => {
       });
     });
 
-    it("testLowercaseTags.md should return 'missing attributes' error with no custom config", () => {
-      const { main } = require("../index");
+    it("testLowercaseTags.md should only return 'missing attribute' error with no .js config", () => {
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/testLowercaseTags.md" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/missing attributes/)
+              expect.stringMatching(new RegExp(errorMessages.missingAttributes))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -290,30 +288,27 @@ describe("yaml-fm-lint", () => {
       });
     });
 
-    it("testLowercaseTags.md should return 'tags must be lowercase' error with custom config", () => {
-      process.argv = [
-        "node",
-        "index.js",
-        "examples/testLowercaseTags.md",
-      ];
+    it("testLowercaseTags.md should return 'tags must be lowercase' error with .js config", () => {
+      process.argv = ["node", "index.js", "examples/testLowercaseTags.md"];
       const { run } = require("../index");
-      const { writeFileSync, unlinkSync, readFileSync } = require("fs")
+      const { writeFileSync, unlinkSync, readFileSync } = require("fs");
 
-      writeFileSync(".yaml-fm-lint.js", readFileSync("examples/customConfig.js"));
+      writeFileSync(
+        ".yaml-fm-lint.js",
+        readFileSync("examples/customConfig.js")
+      );
 
       return new Promise((resolve, reject) => {
-        
         run()
-          .then(({errorNumber}) => {
+          .then(({ errorNumber }) => {
+            unlinkSync(".yaml-fm-lint.js");
             expect(console.time).toHaveBeenCalled();
             expect(console.log).toHaveBeenCalledWith(
               expect.stringMatching(/tags must be lowercase/)
             );
             expect(errorNumber).toBe(2);
             expect(console.timeEnd).toHaveBeenCalled();
-            return ".yaml-fm-lint.js";
           })
-          .then(unlinkSync)
           .then(resolve)
           .catch(reject);
       });
@@ -340,14 +335,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("should lint deeply nested files with recursive flag", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, recursive: true, path: "examples/deeply" };
 
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/there should be no empty lines/)
+              expect.stringMatching(new RegExp(errorMessages.blankLines))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -409,7 +404,7 @@ describe("yaml-fm-lint", () => {
 
       return new Promise((resolve, reject) => {
         run()
-          .then(({errorNumber}) => {
+          .then(({ errorNumber }) => {
             expect(console.time).toHaveBeenCalled();
             expect(console.log).toHaveBeenCalledWith(
               expect.stringMatching(/tags must be lowercase/)
@@ -420,7 +415,7 @@ describe("yaml-fm-lint", () => {
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
     it("should not lint files with extensions not in the config: non-recursive", () => {
       const { main } = require("../index");
@@ -448,7 +443,7 @@ describe("yaml-fm-lint", () => {
         path: "examples/testPassing.md",
         recursive: true,
       };
-      const config = { ...mockConfig, extensions: ["test"] };
+      const config = { ...mockConfig, extensions: [".test"] };
 
       return new Promise((resolve, reject) => {
         main(args, config)
@@ -480,7 +475,7 @@ describe("yaml-fm-lint", () => {
     });
 
     it("should always lint files in included directories", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = { ...mockArgs, path: "examples/ignored", recursive: true };
       const config = {
         ...mockConfig,
@@ -492,7 +487,7 @@ describe("yaml-fm-lint", () => {
         main(args, config)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/there should be no empty lines/)
+              expect.stringMatching(new RegExp(errorMessages.blankLines))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -546,7 +541,7 @@ describe("yaml-fm-lint", () => {
 
       jest.mock("fs", () => ({
         ...jest.requireActual("fs"),
-        writeFileSync: jest.fn()
+        writeFileSync: jest.fn(),
       }));
 
       const args = {
@@ -608,11 +603,11 @@ describe("yaml-fm-lint", () => {
       });
     });
 
-    it("should display 'missing attribute' error on a single line if given the '--oneline' flag", () => {
-      const { main } = require("../index");
+    it("should display 'no brackets' error on a single line if given the '--oneline' flag", () => {
+      const { main, errorMessages } = require("../index");
       const args = {
         ...mockArgs,
-        path: "examples/testMissingAttributes.md",
+        path: "examples/testBrackets.md",
         oneline: true,
       };
 
@@ -620,9 +615,9 @@ describe("yaml-fm-lint", () => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/<missing required attribute>.+test/)
+              expect.stringMatching(new RegExp(`<${errorMessages.brackets}>`))
             );
-            expect(errorNumber).toBe(1);
+            expect(errorNumber).toBe(2);
             expect(warningNumber).toBe(0);
           })
           .then(resolve)
@@ -631,7 +626,7 @@ describe("yaml-fm-lint", () => {
     });
 
     it("should display 'no empty lines' error on a single line if given the '--oneline' flag", () => {
-      const { main } = require("../index");
+      const { main, errorMessages } = require("../index");
       const args = {
         ...mockArgs,
         path: "examples/testBlankLines.md",
@@ -642,7 +637,7 @@ describe("yaml-fm-lint", () => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/<.+no empty lines>/)
+              expect.stringMatching(new RegExp(`<${errorMessages.blankLines}>`))
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -790,7 +785,7 @@ describe("yaml-fm-lint", () => {
       return new Promise((resolve, reject) => {
         lintFile(filePath).then(reject).catch(resolve);
       });
-    })
+    });
 
     it("testPassing.md should return no erorrs", () => {
       const { lintFile } = require("../index");
@@ -798,7 +793,7 @@ describe("yaml-fm-lint", () => {
       const fileContents = require("fs").readFileSync(file, "utf8");
       return new Promise((resolve, reject) => {
         lintFile(file, fileContents, mockArgs, mockConfig)
-          .then(({fileErrors}) => {
+          .then(({ fileErrors }) => {
             expect(fileErrors).toBe(0);
           })
           .then(resolve)
@@ -807,29 +802,29 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testMissingAttributes.md should return a missingAttributes containing 'test'", () => {
-      const { lintFile } = require("../index");
+      const { lintFile, errorMessages } = require("../index");
       const file = "examples/testMissingAttributes.md";
       const fileContents = require("fs").readFileSync(file, "utf8");
       return new Promise((resolve, reject) => {
         lintFile(file, fileContents, mockArgs, mockConfig)
-          .then(({fileErrors, errors}) => {
+          .then(({ fileErrors, errors }) => {
             expect(fileErrors).toBe(1);
-            expect(errors.missingAttributes).toContain("test");
+            expect(errors[errorMessages.missingAttributes]).toContain("test");
           })
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
     it("testBlankLines.md should return an array with the blank lines", () => {
-      const { lintFile } = require("../index");
+      const { lintFile, errorMessages } = require("../index");
       const file = "examples/testBlankLines.md";
       const fileContents = require("fs").readFileSync(file, "utf8");
       return new Promise((resolve, reject) => {
         lintFile(file, fileContents, mockArgs, mockConfig)
-          .then(({fileErrors, errors}) => {
+          .then(({ fileErrors, errors }) => {
             expect(fileErrors).toBe(1);
-            expect(errors.blankLines).toContain(3);
+            expect(errors[errorMessages.blankLines]).toContain(3);
           })
           .then(resolve)
           .catch(reject);
@@ -837,14 +832,14 @@ describe("yaml-fm-lint", () => {
     });
 
     it("testWhitespace.md should return an array with the whitespace warnings", () => {
-      const { lintFile } = require("../index");
+      const { lintFile, warningMessages } = require("../index");
       const file = "examples/testWhitespace.md";
       const fileContents = require("fs").readFileSync(file, "utf8");
       return new Promise((resolve, reject) => {
         lintFile(file, fileContents, mockArgs, mockConfig)
-          .then(({fileErrors, errors}) => {
-            expect(fileErrors).toBe(0);
-            expect(errors.repeatingSpaces.length).toBe(2);
+          .then(({ warnings, fileWarnings }) => {
+            expect(fileWarnings).toBe(2);
+            expect(warnings[warningMessages.repeatingSpaces].length).toBe(2);
           })
           .then(resolve)
           .catch(reject);
@@ -857,28 +852,28 @@ describe("yaml-fm-lint", () => {
       const fileContents = require("fs").readFileSync(file, "utf8");
       return new Promise((resolve, reject) => {
         lintFile(file, fileContents, mockArgs, mockConfig)
-          .then(({fileErrors, errors}) => {
+          .then(({ fileErrors, errors }) => {
             expect(fileErrors).toBe(1);
             expect(errors.noFrontMatter).toBe(true);
           })
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
-    it("testBadFormat.md should return a 'bad mapping entry' error", () => {
+    it("testBadFormat.md should return a 'bad mapping entry' custom error", () => {
       const { lintFile } = require("../index");
       const file = "examples/testBadFormat.md";
       const fileContents = require("fs").readFileSync(file, "utf8");
       return new Promise((resolve, reject) => {
         lintFile(file, fileContents, mockArgs, mockConfig)
-          .then(({fileErrors, errors}) => {
+          .then(({ fileErrors, errors }) => {
             expect(fileErrors).toBe(1);
-            expect(errors).toHaveProperty("customError")
+            expect(errors).toHaveProperty("customError");
           })
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
   });
 });

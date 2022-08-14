@@ -1,42 +1,71 @@
 const chalk = require("chalk");
 const cwd = process.cwd().replace(/\\/g, "/");
 
-function getSnippets(arr, filePath) {
+/**
+ * @param {string[]} lines - the lines of the front matter
+ * @param {number} col - the column number of the error
+ * @param {number} row - the line number of the error
+ * @returns the snippet of the line where the error occurred
+ */
+function getSnippet(lines, col, row) {
+  return `${row - 1} | ${lines[row - 1]}\n${row} | ${
+    lines[row]
+  }\n${"----^".padStart(col + 3 + Math.floor(Math.log10(row)), "-")}\n${
+    row + 1
+  } | ${lines[row + 1]}\n`;
+}
+
+/**
+ * @param {{ row: number, col: number }[]} arr
+ * @param {string} filePath
+ * @param {string[]} fmLines
+ * @returns a string of the snippets of the lines where the errors occurred
+ */
+function getSnippets(arr, filePath, fmLines) {
   return arr.reduce(
     (acc, curr) =>
-      `${acc}\n  at ${cwd}/${filePath}:${curr.row}:${curr.col}.\n\n${curr.snippet}\n`,
+      `${acc}\n  at ${cwd}/${filePath}:${curr.row}:${curr.col}.\n\n${getSnippet(
+        fmLines,
+        curr.col,
+        curr.row
+      )}\n`,
     ""
   );
 }
 
-function showError(message, filePath, errors, args, forceOneLine = false) {
-  if (args.oneline || forceOneLine) return showOneline("Error", message, filePath, errors, args);
-  const snippets = getSnippets(errors, filePath);
-  console.log(
-    `${
-      args.colored ? chalk.red("YAMLException:") : "YAMLException:"
-    } ${message}.\n${snippets}`
-  );
-}
+/**
+ * Log a front matter linting error or warning
+ *
+ * @param {{ type: "Error" | "Warning", message: string, filePath: string, fmLines?: string[], affected?: number[] | string[] | { row: number, col: number }[], args: { colored: boolean, oneline: boolean }, forceOneLine: boolean }} props information about the error or warning and how to log it
+ */
+function lintLog({
+  type,
+  message,
+  filePath,
+  fmLines,
+  affected,
+  args,
+  forceOneLine = false,
+}) {
+  if (args.oneline || forceOneLine || !affected || !fmLines)
+    return showOneline(type, message, filePath, affected, args);
 
-function showWarning(message, filePath, warnings, args, forceOneLine = false) {
-  if (args.oneline || forceOneLine) return showOneline("Warning", message, filePath, warnings, args);
-  const snippets = getSnippets(warnings, filePath);
+  const snippets = getSnippets(affected, filePath, fmLines);
   console.log(
     `${
-      args.colored ? chalk.yellow("YAMLException:") : "YAMLException:"
+      args.colored
+        ? (type === "Error" ? chalk.red : chalk.yellow)("YAMLException:")
+        : "YAMLException:"
     } ${message}.\n${snippets}`
   );
 }
 
 /**
- * Allows users to see the error in a single line
- *
  * @param {"Error" | "Warning"} type - "Error" or "Warning"
  * @param {string} message - the message to show
  * @param {string} filePath - the file path of the file where the error occurred
- * @param {string | number | {row: number, col: number, snippet?: string}[] | undefined} affected - affected value, line number or array of affected locations
- * @param {boolean} args.colored - whether to color the output
+ * @param {string[] | number[] | { row: number, col: number }[] | undefined} affected - affected value, line number or array of affected locations
+ * @param {{ colored: boolean, oneline: boolean }} args - used to determine if the output should be colored and if the output should be shown on a single line
  */
 function showOneline(type, message, filePath, affected, args) {
   if (affected === undefined) {
@@ -64,12 +93,12 @@ function showOneline(type, message, filePath, affected, args) {
         args.colored
           ? (type === "Error" ? chalk.red : chalk.yellow)(`YAML-${type}:`)
           : `YAML-${type}:`
-      } <${message}> ${cwd}/${filePath}: ${affected}${!args.oneline ? "\n" : ""}`
+      } <${message}> ${cwd}/${filePath}:${
+        typeof affected == "string" && affected.includes(":")
+          ? affected
+          : ` ${affected}`
+      }${!args.oneline ? "\n" : ""}`
     );
 }
 
-module.exports = {
-  showOneline,
-  showError,
-  showWarning,
-};
+module.exports = { lintLog };

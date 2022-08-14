@@ -1,17 +1,34 @@
 /**
- * @param {{frontMatter: Object, showOneline: (type: "Error" | "Warning", message: string, affected: string | {row: number, col: number, snippet?: string}[]) => void, rawFm: string}} param0
+ * @param {{attributes: Object, fmLines: string[], lintLog: (type: "Error" | "Warning", message: string, affected: string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined) => void}} props
  * @returns {{errors: number, warnings: number}}
  */
-function lowercaseTags({ frontMatter, showOneline }) {
-  const tags = frontMatter.tags;
+ function lowercaseTags({ fmLines, lintLog }) {
+  const tagsRegExp = /^tags.*:/g;
+
+  const tagsLineIndex = fmLines.findIndex((line) => tagsRegExp.test(line));
+  if (tagsLineIndex < 0) return { errors: 0, warnings: 0 };
+  
+  const eachTagRegExp = /^(\s*-\s+)(.+)$/;
+  const locations = [];
   let errors = 0;
 
-  tags.forEach((tag) => {
+  for (let i = tagsLineIndex + 1; i < fmLines.length; i++) {
+    const line = fmLines[i];
+    if (!eachTagRegExp.test(line)) break;
+    const match = line.match(eachTagRegExp);
+    const tag = match[2];
     if (tag.toLowerCase() !== tag) {
-      showOneline("Error", "tags must be lowercase", tag);
+      locations.push({
+        row: i,
+        col: match[1].length + 2,
+        colStart: match[1].length,
+        colEnd: match[1].length + tag.length,
+      })
       errors++;
     }
-  });
+  }
+
+  lintLog("Error", "tags must be lowercase", locations);
 
   return { errors, warnings: 0 };
 }

@@ -32,6 +32,8 @@
 
 An opinionated CLI NodeJS script which extracts yaml front matter from markdown files, lints the extracted data based on a config file and, if required, fixes most issues regarding the yaml.
 
+There is also a [VS Code extension](https://marketplace.visualstudio.com/items?itemName=leneti.yaml-fm-lint) which integrates this script within VS Code and decorates errors/warnings in real time.
+
 ## Features
 
 - **Quick** - Only has two light-weight dependencies and lints directories asyncronously.
@@ -110,29 +112,45 @@ You will have to default export the config object.
 In addition to the default config you can also add your own custom linters. These will be executed after the default linters.
 
 The functions receive an object with the following properties:
-- `frontMatter` - The yaml front matter as a JavaScript object
-- `showOneline` - Function to call one-line error messages. Receives the following arguments:
+- `attributes` - The yaml front matter as a JavaScript object
+- `fmLines` - The yaml front matter lines in a string array. Includes lines with `---` dashes
+- `lintLog` - Function to call error/warning messages. Receives the following arguments:
   - `type` - "Error" or "Warning"
   - `message` - The error message
-  - `affected` - This can either be a `string` or an array of `objects` with `row` and `col` values for precise error locations
-- `rawFm` - The raw yaml front matter string. Includes lines with `---` dashes
+  - `affected` - This is either a `string[]` of word values, a `number[]` of erronious lines or an array of `objects` with `row` and `col` values for precise error locations (should include `colStart` and `colEnd` for decorations in the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=leneti.yaml-fm-lint))
 
 ```js
 /**
- * @param {{frontMatter: Object, showOneline: (type: "Error" | "Warning", message: string, affected: string | {row: number, col: number, snippet?: string}[]) => void, rawFm: string}} param0
+ * @param {{attributes: Object, fmLines: string[], lintLog: (type: "Error" | "Warning", message: string, affected: string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined) => void}} props
  * @returns {{errors: number, warnings: number}}
  */
-function lowercaseTags({ frontMatter, showOneline }) {
-  const tags = frontMatter.tags;
+function lowercaseTags({ fmLines, lintLog }) {
+  const tagsRegExp = /^tags.*:/g;
+
+  const tagsLineIndex = fmLines.findIndex((line) => tagsRegExp.test(line));
+  if (tagsLineIndex < 0) return { errors: 0, warnings: 0 };
+  
+  const eachTagRegExp = /^(\s*-\s+)(.+)$/;
+  const locations = [];
   let errors = 0;
 
-  if (tags)
-    tags.forEach((tag) => {
-      if (tag.toLowerCase() !== tag) {
-        showOneline("Error", "tags must be lowercase", tag);
-        errors++;
-      }
-    });
+  for (let i = tagsLineIndex + 1; i < fmLines.length; i++) {
+    const line = fmLines[i];
+    if (!eachTagRegExp.test(line)) break;
+    const match = line.match(eachTagRegExp);
+    const tag = match[2];
+    if (tag.toLowerCase() !== tag) {
+      locations.push({
+        row: i,
+        col: match[1].length + 2,
+        colStart: match[1].length,
+        colEnd: match[1].length + tag.length,
+      })
+      errors++;
+    }
+  }
+
+  lintLog("Error", "tags must be lowercase", locations);
 
   return { errors, warnings: 0 };
 }
