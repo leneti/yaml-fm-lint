@@ -5,4 +5,5 @@ __tests__/
 .github/
 package-lock.json
 .yaml-fm-lint.json
+.yaml-fm-lint.js
 jest.config.js

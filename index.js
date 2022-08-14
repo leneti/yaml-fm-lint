@@ -1,27 +1,8 @@
 #! /usr/bin/env node
-const { readFileSync, lstatSync, readdirSync } = require("fs");
-const {
-  writeFile: writeFilePromise,
-  readFile: readFilePromise,
-  readdir: readdirPromise,
-} = require("fs").promises;
+const { readFileSync, lstatSync, readdirSync, writeFileSync } = require("fs");
 const chalk = require("chalk");
 const { load, dump } = require("js-yaml");
-const {
-  checkAttributes,
-  indentationError,
-  spaceBeforeColonError,
-  blankLinesError,
-  quotesError,
-  trailingSpacesError,
-  bracketsError,
-  curlyBracesError,
-  repeatingSpacesWarning,
-  trailingCommasError,
-  warnCommasWarning,
-  customError,
-  showOneline,
-} = require("./errors.js");
+const { showOneline, showError, showWarning } = require("./errors.js");
 
 const cwd = process.cwd().replace(/\\/g, "/");
 
@@ -48,21 +29,27 @@ function getSnippet(lines, col, row) {
 function lintNonRecursively(path) {
   return new Promise((resolve, reject) => {
     if (lstatSync(path).isDirectory()) {
-      const files = readdirSync(path, "utf8");
+      try {
+        const files = readdirSync(path, "utf8");
 
-      const promiseArr = [];
-      for (const file of files) {
-        if (config.extensions.some((ext) => file.endsWith(ext))) {
-          promiseArr.push(lintFile(`${path === "." ? "" : `${path}/`}${file}`));
+        const promiseArr = [];
+        for (const file of files) {
+          if (config.extensions.some((ext) => file.endsWith(ext))) {
+            promiseArr.push(
+              lintFile(`${path === "." ? "" : `${path}/`}${file}`)
+            );
+          }
         }
-      }
 
-      if (!promiseArr.length) {
-        console.log(`No markdown files found in ${cwd}/${path}.`);
-        return resolve();
-      }
+        if (!promiseArr.length) {
+          console.log(`No markdown files found in ${cwd}/${path}.`);
+          return resolve();
+        }
 
-      Promise.all(promiseArr).then(resolve).catch(reject);
+        Promise.all(promiseArr).then(resolve).catch(reject);
+      } catch (error) {
+        reject(error);
+      }
     } else if (config.extensions.some((ext) => path.endsWith(ext))) {
       lintFile(path).then(resolve).catch(reject);
     } else {
@@ -92,18 +79,19 @@ function lintRecursively(path) {
       )
         return resolve();
 
-      readdirPromise(path, "utf8")
-        .then((files) => {
-          const promiseArr = [];
-          for (const file of files) {
-            promiseArr.push(
-              lintRecursively(`${path === "." ? "" : `${path}/`}${file}`)
-            );
-          }
+      try {
+        const files = readdirSync(path, "utf8");
+        const promiseArr = [];
+        for (const file of files) {
+          promiseArr.push(
+            lintRecursively(`${path === "." ? "" : `${path}/`}${file}`)
+          );
+        }
 
-          Promise.all(promiseArr).then(resolve).catch(reject);
-        })
-        .catch(reject);
+        Promise.all(promiseArr).then(resolve).catch(reject);
+      } catch (error) {
+        reject(error);
+      }
     } else if (config.extensions.some((ext) => path.endsWith(ext))) {
       lintFile(path).then(resolve).catch(reject);
     } else return resolve();
@@ -113,7 +101,7 @@ function lintRecursively(path) {
 /**
  * Lints the file's YAML front matter.
  * @param {string} filePath - path to file
- * @returns null if everything is ok, otherwise error message
+ * @returns {Promise<{filePath: string, fileErrors: number, fileWarnings: number, errors: { noFrontMatter: true } | { customError: {row: number, col: number, message: string} } | {[message: string]: {row: number, col?: number, colStart?: number, colEnd?: number, snippet?: string}}, warnings: {} | {[message: string]: {row: number, col?: number, colStart?: number, colEnd?: number, snippet?: string}}}>}
  */
 function lintFile(filePath, text = "", a = {}, c = {}) {
   return new Promise(async (resolve, reject) => {
@@ -125,7 +113,7 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
         args = { ...a };
         config = { ...c };
       } else {
-        data = await readFilePromise(filePath, "utf8");
+        data = readFileSync(filePath, "utf8");
       }
 
       const lines = data.replace(/\r/g, "").split("\n");
@@ -134,83 +122,86 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
 
       if (!lines[1].startsWith("---") || fmClosingTagIndex === -1) {
         if (!args.quiet) {
-          if (args.oneline) {
-            showOneline(
-              config.mandatory ? "Error" : "Warning",
-              "front matter not found",
-              filePath,
-              "Make sure front matter is at the beginning of the file.",
-              args.colored
-            );
-          } else {
-            console.log(
-              `${
-                args.colored
-                  ? (config.mandatory ? chalk.red : chalk.yellow)(
-                      "YAMLException:"
-                    )
-                  : "YAMLException:"
-              } front matter not found in ${cwd}/${filePath}. Make sure front matter is at the beginning of the file.\n`
-            );
-          }
+          (config.mandatory ? showError : showWarning)(
+            "front matter not found",
+            filePath,
+            "Make sure front matter is at the beginning of the file.",
+            args,
+            true
+          );
         }
+
         if (config.mandatory) {
           process.exitCode = 1;
           errorNumber++;
         } else {
           warningNumber++;
         }
+
         return resolve({
           filePath,
-          fileErrors: 1,
+          fileErrors: errorNumber,
+          fileWarnings: warningNumber,
           errors: { noFrontMatter: true },
+          warnings: {},
         });
       }
 
-      const frontMatter = lines.slice(0, fmClosingTagIndex + 1);
+      let fmLines = lines.slice(0, fmClosingTagIndex + 1);
 
       try {
-        const attributes = load(
-          frontMatter.filter((l) => l !== "---").join("\n")
-        );
+        const attributes = load(fmLines.filter((l) => l !== "---").join("\n"));
+        let basic, extra;
 
         if (args.fix) {
           const fixedFm = dump(attributes)
             .split("\n")
             .map((line) => line.replace(/\s*,$/g, ""));
-          fixedFm.unshift("", "---");
-          fixedFm[fixedFm.length - 1] = "---";
-
+          fixedFm[fixedFm.unshift("", "---") - 1] = "---";
           const content = lines.slice(fmClosingTagIndex + 1).join("\n");
-
-          errorNumber += lintLineByLine(fixedFm, filePath);
-          extraLinters(attributes, frontMatter, filePath);
-          fixedFm.shift();
-
-          writeFilePromise(filePath, `${fixedFm.join("\n")}\n${content}`)
-            .then(resolve)
-            .catch(reject);
-        } else {
-          const errors = lintLineByLine(frontMatter, filePath, true);
-          errorNumber += errors.fileErrors;
-          extraLinters(attributes, frontMatter, filePath);
-          resolve(errors);
+          writeFileSync(filePath, `${fixedFm.slice(1).join("\n")}\n${content}`);
+          fmLines = fixedFm;
         }
+
+        basic = lintLineByLine(fmLines, filePath);
+        extra = extraLinters(attributes, fmLines, filePath);
+        errorNumber += basic.fileErrors + extra.fileErrors;
+        warningNumber += basic.fileWarnings + extra.fileWarnings;
+
+        resolve({
+          filePath,
+          fileErrors: errorNumber,
+          fileWarnings: warningNumber,
+          errors: {
+            ...basic.errors,
+            ...extra.extraErrors,
+          },
+          warnings: {
+            ...basic.warnings,
+            ...extra.extraWarnings,
+          },
+        });
       } catch (error) {
+        if (text) console.log("ERROR: ", error);
+
         errorNumber++;
+
         const row = error.mark ? error.mark.line + 1 : undefined;
         const col = error.mark ? error.mark.column + 1 : undefined;
+
         if (!args.quiet) {
-          customError(
+          showError(
             error.reason,
-            [{ row, col, snippet: getSnippet(frontMatter, col, row) }],
             filePath,
+            [{ row, col, snippet: getSnippet(fmLines, col, row) }],
             args
           );
         }
+
         resolve({
           filePath,
-          fileErrors: 1,
+          fileErrors: errorNumber,
+          fileWarnings: warningNumber,
           errors: {
             customError: {
               message: error.reason,
@@ -218,6 +209,7 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
               col,
             },
           },
+          warnings: {},
         });
       }
     } catch (error) {
@@ -226,18 +218,58 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
   });
 }
 
-function extraLinters(frontMatter, rawFm, filePath) {
-  if (!config.extraLintFns) return;
+function extraLinters(attributes, fmLines, filePath) {
+  let extraErrors = {};
+  let extraWarnings = {};
+  let fileErrors = 0;
+  let fileWarnings = 0;
+
+  if (!config.extraLintFns)
+    return { extraErrors, extraWarnings, fileErrors, fileWarnings };
+
   config.extraLintFns.forEach((linter) => {
     const { errors, warnings } = linter({
-      frontMatter,
-      showOneline: (type, message, affected) =>
-        showOneline(type, message, filePath, affected, args.colored),
-      rawFm,
+      attributes,
+      fmLines,
+      showOneline: (type, message, affected) => {
+        if (affected && !affected.row && !affected.snippet) return;
+
+        const logAffected = !affected
+          ? undefined
+          : affected.col
+          ? [affected]
+          : affected.row
+          ? affected.row
+          : affected.snippet;
+
+        showOneline(type, message, filePath, logAffected, args);
+
+        const extensionAffected = affected?.row ? affected : { row: 0, col: 3 };
+
+        if (type === "Error") {
+          extraErrors = {
+            ...extraErrors,
+            [message]: [
+              ...(!extraErrors[message] ? [] : extraErrors[message]),
+              extensionAffected,
+            ],
+          };
+        } else {
+          extraWarnings = {
+            ...extraWarnings,
+            [message]: [
+              ...(!extraWarnings[message] ? [] : extraWarnings[message]),
+              extensionAffected,
+            ],
+          };
+        }
+      },
     });
-    errorNumber += errors;
-    warningNumber += warnings;
+    fileErrors += errors;
+    fileWarnings += warnings;
   });
+
+  return { extraErrors, extraWarnings, fileErrors, fileWarnings };
 }
 
 /**
@@ -245,48 +277,68 @@ function extraLinters(frontMatter, rawFm, filePath) {
  * @param {string} data - data to parse
  * @param {string} filePath - path to the file
  */
-function lintLineByLine(fm, filePath, returnErrors = false) {
+function lintLineByLine(fm, filePath) {
   let fileErrors = 0;
-  const attributes = [];
-  const spacesBeforeColon = [];
-  const blankLines = [];
-  const quotes = [];
-  const trailingSpaces = [];
-  const brackets = [];
-  const curlyBraces = [];
-  const indentation = [];
-  const repeatingSpaces = [];
-  const warnCommas = [];
-  const trailingCommas = [];
+  let fileWarnings = 0;
   let match;
 
-  for (let i = 1; i < fm.length - 1; i++) {
-    const line = fm[i];
+  const basicErrors = {
+    "missing required attribute": [...config.requiredAttributes],
+    "there must be no whitespace before colons": [],
+    "there must be no empty lines": [],
+    "there must be no quotes in the front matter": [],
+    "there must be no trailing spaces": [],
+    "there must be no brackets": [],
+    "there must be no curly braces": [],
+    "lines cannot be indented more than 2 spaces from the previous line": [],
+    "there must be no trailing commas": [],
+  };
 
+  const basicWarnings = {
+    "possibly unintended whitespace": [],
+    "possibly unintended commas": [],
+  };
+
+  const oneLineErrors = [
+    "there must be no empty lines",
+    "missing required attribute",
+  ];
+
+  for (let i = 1; i < fm.length - 1; i++) {
+    const line = `${fm[i]}`;
+
+    // attributes
     if (line.match(/^"?\w+"?\s*:/g)) {
-      attributes.push(line.split(":")[0].trim());
+      const atr = line.split(":")[0].trim();
+      const atrIndex = basicErrors["missing required attribute"].indexOf(atr);
+      if (atrIndex > -1) {
+        basicErrors["missing required attribute"].splice(atrIndex, 1);
+      }
     }
 
     // no-empty-lines
     if (!args.fix && line.trim() === "") {
       fileErrors++;
       fixableErrors++;
-      blankLines.push(i);
+      basicErrors["there must be no empty lines"].push(i);
       continue;
     }
 
     // no-whitespace-before-colon
-    const wsbcRegex = /\s+:/g;
+    const wsbcRegex = /(\s+):/g;
     while (!args.fix && (match = wsbcRegex.exec(line)) !== null) {
+      const wsbcLength = match[1].length + 1;
       fileErrors++;
       fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(/:/) + 1;
       wsbcRegex.lastIndex = col - 1;
-      spacesBeforeColon.push({
+      basicErrors["there must be no whitespace before colons"].push({
         row,
         col,
-        snippet: getSnippet(fm, col, i),
+        colStart: col - wsbcLength,
+        colEnd: col - 1,
+        snippet: getSnippet(fm, col, row),
       });
     }
 
@@ -298,7 +350,7 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
       fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(quoteRegex) + 2;
-      quotes.push({
+      basicErrors["there must be no quotes in the front matter"].push({
         row,
         col,
         snippet: getSnippet(fm, col, i),
@@ -306,16 +358,19 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
     }
 
     // no-trailing-spaces
-    const trailingSpaceRegex = /\s+$/g;
+    const trailingSpaceRegex = /(\s+)$/g;
     if (!args.fix && line.search(trailingSpaceRegex) !== -1) {
+      const spaceCount = trailingSpaceRegex.exec(line)[0].length + 1;
       fileErrors++;
       fixableErrors++;
       const row = i;
       const col = line.length + 1;
-      trailingSpaces.push({
+      basicErrors["there must be no trailing spaces"].push({
         row,
         col,
-        snippet: getSnippet(fm, col, i),
+        colStart: col - spaceCount,
+        colEnd: col,
+        snippet: getSnippet(fm, col, row),
       });
     }
 
@@ -327,7 +382,7 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
       fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(bracketsRegex) + 2;
-      brackets.push({
+      basicErrors["there must be no brackets"].push({
         row,
         col,
         snippet: getSnippet(fm, col, i),
@@ -342,7 +397,7 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
       fixableErrors++;
       const row = i;
       const col = match.index + match[0].search(curlyBraceRegex) + 2;
-      curlyBraces.push({
+      basicErrors["there must be no curly braces"].push({
         row,
         col,
         snippet: getSnippet(fm, col, i),
@@ -359,38 +414,48 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
         fixableErrors++;
         const row = i;
         const col = indentationCurr + 1;
-        indentation.push({
+        basicErrors[
+          "lines cannot be indented more than 2 spaces from the previous line"
+        ].push({
           row,
           col,
+          colStart: 0,
+          colEnd: col - 1,
           snippet: getSnippet(fm, col, i),
         });
       }
     }
 
     // no-repeating-spaces
-    const repeatingSpaceRegex = /\w\s{2,}\w/g;
+    const repeatingSpaceRegex = /\w(\s{2,})\w/g;
     while ((match = repeatingSpaceRegex.exec(line)) !== null) {
+      const spaceCount = match[1].length + 1;
       repeatingSpaceRegex.lastIndex = match.index + 1;
-      warningNumber++;
+      fileWarnings++;
       const row = i;
       const col = match.index + match[0].search(/\s\w/g) + 2;
-      repeatingSpaces.push({
+      basicWarnings["possibly unintended whitespace"].push({
         row,
         col,
+        colStart: col - spaceCount,
+        colEnd: col - 1,
         snippet: getSnippet(fm, col, i),
       });
     }
 
     // one-space-after-colon
-    const spacesAfterColon = /:[ \t]{2,}\S/g;
+    const spacesAfterColon = /:([ \t]{2,})\S/g;
     while (!args.fix && (match = spacesAfterColon.exec(line)) !== null) {
+      const spaceCount = match[1].length + 1;
       spacesAfterColon.lastIndex = match.index + 1;
-      warningNumber++;
+      fileWarnings++;
       const row = i;
       const col = match.index + match[0].search(/[ \t]\S/g) + 2;
-      repeatingSpaces.push({
+      basicWarnings["possibly unintended whitespace"].push({
         row,
         col,
+        colStart: col - spaceCount,
+        colEnd: col - 1,
         snippet: getSnippet(fm, col, i),
       });
     }
@@ -402,7 +467,7 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
       fixableErrors++;
       const row = i;
       const col = line.length + 1;
-      trailingCommas.push({
+      basicErrors["there must be no trailing commas"].push({
         row,
         col,
         snippet: getSnippet(fm, col, i),
@@ -413,10 +478,10 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
     const commaInFrontMatterRegex = /,./g;
     while ((match = commaInFrontMatterRegex.exec(line)) !== null) {
       commaInFrontMatterRegex.lastIndex = match.index + 1;
-      warningNumber++;
+      fileWarnings++;
       const row = i;
       const col = match.index + 2;
-      warnCommas.push({
+      basicWarnings["possibly unintended commas"].push({
         row,
         col,
         snippet: getSnippet(fm, col, i),
@@ -424,73 +489,35 @@ function lintLineByLine(fm, filePath, returnErrors = false) {
     }
   }
 
-  const missingAttributes = checkAttributes(
-    attributes,
-    config.requiredAttributes,
-    filePath,
-    args
-  );
+  fileErrors += basicErrors["missing required attribute"].length;
 
-  if (missingAttributes.length) fileErrors++;
-
-  if (args.quiet)
-    return returnErrors
-      ? {
+  if (!args.quiet) {
+    Object.keys(basicErrors).forEach((message) => {
+      if (basicErrors[message].length > 0) {
+        showError(
+          message,
           filePath,
-          fileErrors,
-          errors: {
-            missingAttributes,
-            spacesBeforeColon,
-            blankLines,
-            quotes,
-            trailingSpaces,
-            brackets,
-            curlyBraces,
-            indentation,
-            repeatingSpaces,
-            warnCommas,
-            trailingCommas,
-          },
-        }
-      : fileErrors;
+          basicErrors[message],
+          args,
+          oneLineErrors.includes(message)
+        );
+      }
+    });
 
-  if (!args.fix) {
-    if (blankLines.length > 0) blankLinesError(blankLines, filePath, args);
-    if (trailingSpaces.length > 0)
-      trailingSpacesError(trailingSpaces, filePath, args);
-    if (spacesBeforeColon.length > 0)
-      spaceBeforeColonError(spacesBeforeColon, filePath, args);
-    if (quotes.length > 0) quotesError(quotes, filePath, args);
-    if (brackets.length > 0) bracketsError(brackets, filePath, args);
-    if (curlyBraces.length > 0) curlyBracesError(curlyBraces, filePath, args);
-    if (indentation.length > 0) indentationError(indentation, filePath, args);
-    if (trailingCommas.length > 0)
-      trailingCommasError(trailingCommas, filePath, args);
+    Object.keys(basicWarnings).forEach((message) => {
+      if (basicWarnings[message].length > 0) {
+        showWarning(message, filePath, basicWarnings[message], args);
+      }
+    });
   }
 
-  if (warnCommas.length > 0) warnCommasWarning(warnCommas, filePath, args);
-  if (repeatingSpaces.length > 0)
-    repeatingSpacesWarning(repeatingSpaces, filePath, args);
-
-  return returnErrors
-    ? {
-        filePath,
-        fileErrors,
-        errors: {
-          missingAttributes,
-          spacesBeforeColon,
-          blankLines,
-          quotes,
-          trailingSpaces,
-          brackets,
-          curlyBraces,
-          indentation,
-          repeatingSpaces,
-          warnCommas,
-          trailingCommas,
-        },
-      }
-    : fileErrors;
+  return {
+    filePath,
+    fileErrors,
+    fileWarnings,
+    errors: basicErrors,
+    warnings: basicWarnings,
+  };
 }
 
 /**

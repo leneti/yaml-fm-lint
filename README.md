@@ -126,12 +126,13 @@ function lowercaseTags({ frontMatter, showOneline }) {
   const tags = frontMatter.tags;
   let errors = 0;
 
-  tags.forEach((tag) => {
-    if (tag.toLowerCase() !== tag) {
-      showOneline("Error", "tags must be lowercase", tag);
-      errors++;
-    }
-  });
+  if (tags)
+    tags.forEach((tag) => {
+      if (tag.toLowerCase() !== tag) {
+        showOneline("Error", "tags must be lowercase", tag);
+        errors++;
+      }
+    });
 
   return { errors, warnings: 0 };
 }

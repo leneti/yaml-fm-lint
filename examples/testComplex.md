@@ -7,13 +7,13 @@ age     : "young"
 contact:
 email: email@domain.com
 address: some  location, at yours
-boo: true
+boo:   true
 pets:
   - cat  ,
   - dog,
   - bat
 oldTags: ["tag1", "tag2", "tag3"]
-tags:
+newTags:
   [
     reallylongtag,
     anotherreallyreallylongtag,
@@ -21,6 +21,10 @@ tags:
     andanotherreallyreallylongtag,
     anotherreallyreallyreallyreallyreallylongtag,
   ]
+tags:
+  - TAG1
+  - taG2
+  - Tag3
 references:
              - { title : "Branching Strategies", url: "/" }
              - { title: "Code Reviews, with Pull Requests", url: "/" }

@@ -542,14 +542,11 @@ describe("yaml-fm-lint", () => {
 
     it("should fix errors if given the --fix flag", () => {
       const { main } = require("../index");
-      const { writeFile: writeFilePromise } = require("fs").promises;
+      const { writeFileSync } = require("fs");
 
       jest.mock("fs", () => ({
         ...jest.requireActual("fs"),
-        promises: {
-          ...jest.requireActual("fs").promises,
-          writeFile: jest.fn(() => Promise.resolve()),
-        },
+        writeFileSync: jest.fn()
       }));
 
       const args = {
@@ -561,7 +558,7 @@ describe("yaml-fm-lint", () => {
       return new Promise((resolve, reject) => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
-            expect(writeFilePromise).toHaveBeenCalled();
+            expect(writeFileSync).toHaveBeenCalled();
             expect(console.log).not.toHaveBeenCalled();
             expect(errorNumber).toBe(0);
             expect(warningNumber).toBe(0);
