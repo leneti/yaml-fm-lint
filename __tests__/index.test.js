@@ -417,6 +417,22 @@ describe("yaml-fm-lint", () => {
       });
     });
 
+    it("should use nested config if found", () => {
+      const { main } = require("../index");
+      const args = { ...mockArgs, path: "examples/nested", recursive: true };
+
+      return new Promise((resolve, reject) => {
+        main(args, mockConfig)
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).not.toHaveBeenCalledWith();
+            expect(errorNumber).toBe(0);
+            expect(warningNumber).toBe(0);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
+
     it("should not lint files with extensions not in the config: non-recursive", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testPassing.md" };

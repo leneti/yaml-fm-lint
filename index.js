@@ -1,5 +1,11 @@
 #! /usr/bin/env node
-const { readFileSync, lstatSync, readdirSync, writeFileSync } = require("fs");
+const {
+  readFileSync,
+  lstatSync,
+  readdirSync,
+  writeFileSync,
+  existsSync,
+} = require("fs");
 const chalk = require("chalk");
 const { load, dump } = require("js-yaml");
 const { lintLog } = require("./errors.js");
@@ -84,8 +90,11 @@ function lintRecursively(path) {
         !config.includeDirs.some((includedDirectory) =>
           path.endsWith(includedDirectory)
         )
-      )
+      ) {
         return resolve();
+      }
+
+      config = getConfig(args, path);
 
       try {
         const files = readdirSync(path, "utf8");
@@ -244,15 +253,12 @@ function extraLinters(attributes, fmLines, filePath) {
    * @param {string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined} affected - array of string values, line numbers or exact locations of errors or warnings. If omitted, the opening front matter tags will be decorated. `colStart` and `colEnd` are used by the VS Code extension.
    */
   function extraLintLog(type, message, affected) {
-    lintLog({type, message, filePath, affected, args, fmLines});
+    lintLog({ type, message, filePath, affected, args, fmLines });
 
     const updateArray = (arr, msg, aff) => ({
       ...arr,
-      [msg]: [
-        ...(arr[msg] || []),
-        ...aff,
-      ],
-    })
+      [msg]: [...(arr[msg] || []), ...aff],
+    });
 
     if (type === "Error") {
       extraErrors = updateArray(extraErrors, message, affected);
@@ -596,39 +602,40 @@ function getArguments() {
   };
 }
 
-function getConfig(a) {
-  let config = {
-    ...JSON.parse(
-      readFileSync(`${__dirname.replace(/\\/g, "/")}/config/default.json`)
-    ),
-  };
-  try {
-    const configJs = require(`${cwd}/.yaml-fm-lint.js`);
-    config = {
-      ...config,
-      ...configJs,
+function getConfig(a, dir = cwd) {
+  let conf =
+    dir === cwd
+      ? {
+          ...JSON.parse(
+            readFileSync(`${__dirname.replace(/\\/g, "/")}/config/default.json`)
+          ),
+        }
+      : config;
+
+  if (existsSync(`${dir}/.yaml-fm-lint.js`)) {
+    conf = {
+      ...conf,
+      ...require(`${dir}/.yaml-fm-lint.js`),
     };
-  } catch (_) {
-    try {
-      config = {
-        ...config,
-        ...JSON.parse(readFileSync(`${cwd}/.yaml-fm-lint.json`)),
-      };
-    } catch (_) {}
+  } else if (existsSync(`${dir}/.yaml-fm-lint.json`)) {
+    conf = {
+      ...conf,
+      ...JSON.parse(readFileSync(`${dir}/.yaml-fm-lint.json`)),
+    };
   }
 
-  config = {
-    ...config,
-    ...(!a.config
-      ? {}
-      : a.config.endsWith(".js")
-      ? require(`${cwd}/${a.config}`)
-      : JSON.parse(readFileSync(a.config))),
-  };
+  if (a.config) {
+    conf = {
+      ...conf,
+      ...(a.config.endsWith(".js")
+        ? require(`${cwd}/${a.config}`)
+        : JSON.parse(readFileSync(a.config))),
+    };
+  }
 
-  config.mandatory = a.mandatory !== undefined ? a.mandatory : config.mandatory;
+  conf.mandatory = a.mandatory !== undefined ? a.mandatory : conf.mandatory;
 
-  return config;
+  return conf;
 }
 
 function main(a, c) {
