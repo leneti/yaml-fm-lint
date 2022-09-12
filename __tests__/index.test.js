@@ -28,6 +28,7 @@ describe("yaml-fm-lint", () => {
       log: jest.fn().mockName("console.log"),
       time: jest.fn().mockName("console.time"),
       timeEnd: jest.fn().mockName("console.timeEnd"),
+      jestLog: orgConsole.log,
     };
   });
 
@@ -62,7 +63,13 @@ describe("yaml-fm-lint", () => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(new RegExp(`${errorMessages.missingAttributes}.+${mockConfig.requiredAttributes.join(".+")}`))
+              expect.stringMatching(
+                new RegExp(
+                  `${
+                    errorMessages.missingAttributes
+                  }.+${mockConfig.requiredAttributes.join(".+")}`
+                )
+              )
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -431,7 +438,7 @@ describe("yaml-fm-lint", () => {
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
     it("should not lint files with extensions not in the config: non-recursive", () => {
       const { main } = require("../index");
