@@ -22,14 +22,14 @@ describe("yaml-fm-lint", () => {
   const orgProcess = { ...process };
   const orgConsole = { ...console };
 
-  // beforeEach(() => {
-  //   console = {
-  //     ...orgConsole,
-  //     log: jest.fn().mockName("console.log"),
-  //     time: jest.fn().mockName("console.time"),
-  //     timeEnd: jest.fn().mockName("console.timeEnd"),
-  //   };
-  // });
+  beforeEach(() => {
+    console = {
+      ...orgConsole,
+      log: jest.fn().mockName("console.log"),
+      time: jest.fn().mockName("console.time"),
+      timeEnd: jest.fn().mockName("console.timeEnd"),
+    };
+  });
 
   afterEach(() => {
     jest.resetModules();
@@ -417,7 +417,7 @@ describe("yaml-fm-lint", () => {
       });
     });
 
-    it.only("should use nested config if found", () => {
+    it("should use nested config if found", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/nested", recursive: true };
 
