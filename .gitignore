@@ -1,4 +1,4 @@
 node_modules/
 coverage/
-.yaml-fm-lint.json
-.yaml-fm-lint.js
+/.yaml-fm-lint.json
+/.yaml-fm-lint.js

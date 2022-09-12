@@ -9,8 +9,7 @@
   "type": "commonjs",
   "scripts": {
     "fmlint": "node .",
-    "test": "jest",
-    "test:verbose": "jest --verbose",
+    "test": "jest --verbose",
     "test:cov": "jest --coverage --verbose"
   },
   "dependencies": {

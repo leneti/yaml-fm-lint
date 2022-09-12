@@ -28,7 +28,6 @@ describe("yaml-fm-lint", () => {
       log: jest.fn().mockName("console.log"),
       time: jest.fn().mockName("console.time"),
       timeEnd: jest.fn().mockName("console.timeEnd"),
-      jestLog: orgConsole.log,
     };
   });
 
@@ -424,7 +423,7 @@ describe("yaml-fm-lint", () => {
       });
     });
 
-    it.only("should use nested config if found", () => {
+    it("should use nested config if found", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/nested", recursive: true };
 

@@ -28,7 +28,3 @@ jobs:
 
     - run: npm ci
     - run: npm test
-
-    - name: Verbose test debug
-      if: failure()
-      run: npm run test:verbose

@@ -605,13 +605,6 @@ function getArguments() {
 function getConfig(a, dir = cwd) {
   if (!dir.startsWith(cwd)) dir = `${cwd}/${dir}`;
 
-  const files = readdirSync(dir, "utf8");
-  console.jestLog?.("files: ", files);
-  console.jestLog?.(
-    `exists "${dir}/.yaml-fm-lint.json":`,
-    existsSync(`${dir}/.yaml-fm-lint.json`)
-  );
-
   let conf =
     dir === cwd
       ? {
