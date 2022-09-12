@@ -605,14 +605,12 @@ function getArguments() {
 function getConfig(a, dir = cwd) {
   if (!dir.startsWith(cwd)) dir = `${cwd}/${dir}`;
 
-  if (dir.includes("config")) {
-    const files = readdirSync(dir, "utf8");
-    console.log("files: ", files);
-    console.jestLog?.(
-      `exists "${dir}/.yaml-fm-lint.json":`,
-      existsSync(`${dir}/.yaml-fm-lint.json`)
-    );
-  }
+  const files = readdirSync(dir, "utf8");
+  console.log("files: ", files);
+  console.jestLog?.(
+    `exists "${dir}/.yaml-fm-lint.json":`,
+    existsSync(`${dir}/.yaml-fm-lint.json`)
+  );
 
   let conf =
     dir === cwd
