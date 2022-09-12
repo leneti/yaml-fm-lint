@@ -184,7 +184,8 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
         basic = lintLineByLine(fmLines, filePath);
         extra = extraLinters(attributes, fmLines, filePath);
         errorNumber += basic.fileErrors + extra.fileErrors;
-        console.jestLog?.("basic errors: ", basic);
+        console.jestLog?.("config: ", config);
+        console.jestLog?.("filePath: ", filePath);
         warningNumber += basic.fileWarnings + extra.fileWarnings;
 
         resolve({
@@ -604,6 +605,7 @@ function getArguments() {
 }
 
 function getConfig(a, dir = cwd) {
+  console.jestLog?.("getConfig called with: ", a, dir);
   let conf =
     dir === cwd
       ? {
@@ -612,6 +614,8 @@ function getConfig(a, dir = cwd) {
           ),
         }
       : config;
+
+  console.jestLog?.("conf #1: ", conf);
 
   if (existsSync(`${dir}/.yaml-fm-lint.js`)) {
     conf = {
@@ -624,6 +628,8 @@ function getConfig(a, dir = cwd) {
       ...JSON.parse(readFileSync(`${dir}/.yaml-fm-lint.json`)),
     };
   }
+
+  console.jestLog?.("conf #2: ", conf);
 
   if (a.config) {
     conf = {
