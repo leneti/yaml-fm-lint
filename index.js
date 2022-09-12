@@ -603,7 +603,13 @@ function getArguments() {
 }
 
 function getConfig(a, dir = cwd) {
+  console.jestLog?.(`getConfig called with: "${dir}"`);
   if (!dir.startsWith(cwd)) dir = `${cwd}/${dir}`;
+
+  console.jestLog?.(`dir: "${dir}"`);
+  console.jestLog?.(`cwd: "${cwd}"`);
+  console.jestLog?.(`exists "${dir}/.yaml-fm-lint.json":`, existsSync(`${dir}/.yaml-fm-lint.json`))
+
   let conf =
     dir === cwd
       ? {
