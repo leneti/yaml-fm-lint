@@ -152,7 +152,6 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
         if (config.mandatory) {
           process.exitCode = 1;
           errorNumber++;
-          console.jestLog?.(`errors: ${errorNumber} line: 155`);
         } else {
           warningNumber++;
         }
@@ -185,7 +184,7 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
         basic = lintLineByLine(fmLines, filePath);
         extra = extraLinters(attributes, fmLines, filePath);
         errorNumber += basic.fileErrors + extra.fileErrors;
-        console.jestLog?.(`errors: ${errorNumber} line: 188`);
+        console.jestLog?.(`line: 187 errors: ${errorNumber} basic: ${basic.fileErrors} extra: ${extra.fileErrors} `);
         warningNumber += basic.fileWarnings + extra.fileWarnings;
 
         resolve({
@@ -205,7 +204,6 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
         if (text) console.log("ERROR: ", error);
 
         errorNumber++;
-        console.jestLog?.(`errors: ${errorNumber} line: 208`);
 
         const row = error.mark ? error.mark.line + 1 : undefined;
         const col = error.mark ? error.mark.column + 1 : undefined;
@@ -656,7 +654,6 @@ function main(a, c) {
         console.log(err);
         process.exitCode = 1;
         errorNumber++;
-        console.jestLog?.(`errors: ${errorNumber} line: 659`);
         resolve({ errorNumber, warningNumber });
       });
   });
