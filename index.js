@@ -184,7 +184,7 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
         basic = lintLineByLine(fmLines, filePath);
         extra = extraLinters(attributes, fmLines, filePath);
         errorNumber += basic.fileErrors + extra.fileErrors;
-        console.jestLog?.(`line: 187 errors: ${errorNumber} basic: ${basic.fileErrors} extra: ${extra.fileErrors} `);
+        console.jestLog?.("basic errors: ", basic);
         warningNumber += basic.fileWarnings + extra.fileWarnings;
 
         resolve({
