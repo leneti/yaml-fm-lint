@@ -90,6 +90,9 @@ This command would recursively look for all markdown files in the `docs` directo
 
 ## Configuration
 
+When run recursively, the script will look for the most nested config file, overriding properties from previous configurations.  
+Config path specified in CLI arguments will never be overriden. 
+
 ### `.yaml-fm-lint.json`
 
 [Default config file](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json)

@@ -62,7 +62,13 @@ describe("yaml-fm-lint", () => {
         main(args, mockConfig)
           .then(({ errorNumber, warningNumber }) => {
             expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(new RegExp(`${errorMessages.missingAttributes}.+${mockConfig.requiredAttributes.join(".+")}`))
+              expect.stringMatching(
+                new RegExp(
+                  `${
+                    errorMessages.missingAttributes
+                  }.+${mockConfig.requiredAttributes.join(".+")}`
+                )
+              )
             );
             expect(errorNumber).toBe(1);
             expect(warningNumber).toBe(0);
@@ -411,6 +417,22 @@ describe("yaml-fm-lint", () => {
             );
             expect(errorNumber).toBe(2);
             expect(console.timeEnd).toHaveBeenCalled();
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("should use nested config if found", () => {
+      const { main } = require("../index");
+      const args = { ...mockArgs, path: "examples/nested", recursive: true };
+
+      return new Promise((resolve, reject) => {
+        main(args, mockConfig)
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).not.toHaveBeenCalledWith();
+            expect(errorNumber).toBe(0);
+            expect(warningNumber).toBe(0);
           })
           .then(resolve)
           .catch(reject);
