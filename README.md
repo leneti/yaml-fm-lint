@@ -11,6 +11,7 @@
   <p>
 
 <!-- ![Dependencies](https://img.shields.io/depfu/dependencies/github/leneti/yaml-fm-lint) -->
+
 ![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size)
 ![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)
 ![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)
@@ -43,13 +44,17 @@ There is also a [VS Code extension](https://marketplace.visualstudio.com/items?i
 ## Install
 
 You can either install the package as a devDependency with
+
 ```sh
 npm i -D yaml-fm-lint
 ```
+
 ```sh
 yarn add yaml-fm-lint -D
 ```
-or use it directly with 
+
+or use it directly with
+
 ```sh
 npx yaml-fm-lint <path>
 ```
@@ -69,42 +74,47 @@ Then run the script:
 ```sh
 npm run fmlint -- path/to/your/markdown/files
 ```
+
 ```sh
 yarn run fmlint -- path/to/your/markdown/files
 ```
 
 You can provide additional arguments:
+
 - `--fix`: Automatically fix the errors.
 - `--config`: Path to the config file if not in root directory of project.
-- `-r, --recursive`: *(default: `false`)* Recursively lint all files in the given directory.
-- `-m, --mandatory`: *(default: `true`)* If set to false will show warnings instead of errors if no front matter is found.
-- `-q, --quiet`: *(default: `false`)* If set to true will not show erroneous code snippets.
-- `-o, --oneline`: *(default: `false`)* If set to true will condense error messages to one line, skipping snippets.
-- `-c, --colored`: *(default: `true`)* If set to false will not color the output.
+- `-r, --recursive`: _(default: `false`)_ Recursively lint all files in the given directory.
+- `-m, --mandatory`: _(default: `true`)_ If set to false will show warnings instead of errors if no front matter is found.
+- `-q, --quiet`: _(default: `false`)_ If set to true will not show erroneous code snippets.
+- `-o, --oneline`: _(default: `false`)_ If set to true will condense error messages to one line, skipping snippets.
+- `-c, --colored`: _(default: `true`)_ If set to false will not color the output.
 
 ### Example:
+
 ```sh
 npm run fmlint -- docs --config="src/configs/.yaml-fm-lint.json" -r --oneline --colored=false
 ```
+
 This command would recursively look for all markdown files in the `docs` directory and lint them based on the `.yaml-fm-lint.json` config file located under `src/configs/`. The output would not be colored and would not show code snippets.
 
 ## Configuration
 
 When run recursively, the script will look for the most nested config file, overriding properties from previous configurations.  
-Config path specified in CLI arguments will never be overriden. 
+Config path specified in CLI arguments will never be overriden.
 
 ### `.yaml-fm-lint.json`
 
 [Default config file](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json)
 
-| Property name      | default | description                                                                                                                       |
-|--------------------|---------|-----------------------------------------------------------------------------------------------------------------------------------|
-| excludeDirs        | [See default config](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json)   | An array of directories to exclude from linting (🛑You should not overwrite this in your config unless you know what you are doing) |
-| extraExcludeDirs   | `[]`      | Additional array of directories to exclude from linting.                                                                       |
-| extensions         | `[".md"]` | Array of extensions of files to parse.                                                                              |
-| includeDirs        | `[]`      | Array of directories to include in linting.                                                                                    |
-| requiredAttributes | `[]`      | Array of attributes that must be present in the yaml front matter.                                                             |
-| mandatory          | `true`    | If set to false will show warning instead of error if no front matter is found.                                                 |
+| Property name      | default                                                                                    | description                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| disabledAttributes | `[]`                                                                                       | Array of attributes to exclude from linting                                                                                         |
+| excludeDirs        | [See default config](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json) | An array of directories to exclude from linting (🛑You should not overwrite this in your config unless you know what you are doing) |
+| extraExcludeDirs   | `[]`                                                                                       | Additional array of directories to exclude from linting                                                                             |
+| extensions         | `[".md"]`                                                                                  | Array of extensions of files to parse                                                                                               |
+| includeDirs        | `[]`                                                                                       | Array of directories to include in linting                                                                                          |
+| requiredAttributes | `[]`                                                                                       | Array of attributes that must be present in the yaml front matter                                                                   |
+| mandatory          | `true`                                                                                     | If set to false will show warning instead of error if no front matter is found                                                      |
 
 ### `.yaml-fm-lint.js`
 
@@ -115,6 +125,7 @@ You will have to default export the config object.
 In addition to the default config you can also add your own custom linters. These will be executed after the default linters.
 
 The functions receive an object with the following properties:
+
 - `attributes` - The yaml front matter as a JavaScript object
 - `fmLines` - The yaml front matter lines in a string array. Includes lines with `---` dashes
 - `lintLog` - Function to call error/warning messages. Receives the following arguments:
@@ -132,7 +143,7 @@ function lowercaseTags({ fmLines, lintLog }) {
 
   const tagsLineIndex = fmLines.findIndex((line) => tagsRegExp.test(line));
   if (tagsLineIndex < 0) return { errors: 0, warnings: 0 };
-  
+
   const eachTagRegExp = /^(\s*-\s+)(.+)$/;
   const locations = [];
   let errors = 0;
@@ -148,7 +159,7 @@ function lowercaseTags({ fmLines, lintLog }) {
         col: match[1].length + 2,
         colStart: match[1].length,
         colEnd: match[1].length + tag.length,
-      })
+      });
       errors++;
     }
   }

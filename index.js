@@ -289,6 +289,7 @@ function lintLineByLine(fmLines, filePath) {
   let fileErrors = 0;
   let fileWarnings = 0;
   let match;
+  let skip = false;
 
   const basicErrors = Object.keys(errorMessages).reduce(
     (acc, key) => ({
@@ -334,14 +335,19 @@ function lintLineByLine(fmLines, filePath) {
     }
 
     // attributes
-    if (line.match(/^"?\w+"?\s*:/g)) {
+    if (/^"?\w+"?\s*:/.test(line)) {
       const atr = line.split(":")[0].trim();
+
+      skip = config.disabledAttributes.includes(atr);
+
       const atrIndex =
         basicErrors[errorMessages.missingAttributes].indexOf(atr);
       if (atrIndex > -1) {
         basicErrors[errorMessages.missingAttributes].splice(atrIndex, 1);
       }
     }
+
+    if (skip) continue;
 
     // no-whitespace-before-colon
     const wsbcRegex = /(\s+):/g;

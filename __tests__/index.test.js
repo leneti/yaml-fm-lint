@@ -10,6 +10,7 @@ const mockArgs = {
 };
 
 const mockConfig = {
+  disabledAttributes: [],
   excludeDirs: ["__mocks__", "__tests__", ".git", "coverage", "node_modules"],
   extraExcludeDirs: [],
   extensions: [".md"],
@@ -476,6 +477,28 @@ describe("yaml-fm-lint", () => {
             .catch(reject);
         })
       ]);
+    })
+
+    it("should not lint attributes specified in config", () => {
+      const { main, errorMessages, warningMessages } = require("../index");
+      const args = { ...mockArgs, path: "examples/testDisabledRuleConfig.md" };
+      const config = { ...mockConfig, disabledAttributes: ["disabledTags"] };
+
+      return new Promise((resolve, reject) => {
+        main(args, config)
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(new RegExp(errorMessages.quotes))
+            );
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(new RegExp(warningMessages.warnCommas))
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(1);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
     })
 
     it("should not lint files with extensions not in the config: non-recursive", () => {
