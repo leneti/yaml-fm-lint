@@ -290,16 +290,22 @@ function lintLineByLine(fmLines, filePath) {
   let fileWarnings = 0;
   let match;
 
-  const basicErrors = Object.keys(errorMessages).reduce((acc, key) => {
-    acc[errorMessages[key]] = [];
-    return acc;
-  }, {});
+  const basicErrors = Object.keys(errorMessages).reduce(
+    (acc, key) => ({
+      ...acc,
+      [errorMessages[key]]: [],
+    }),
+    {}
+  );
   basicErrors[errorMessages.missingAttributes] = [...config.requiredAttributes];
 
-  const basicWarnings = Object.keys(warningMessages).reduce((acc, key) => {
-    acc[warningMessages[key]] = [];
-    return acc;
-  }, {});
+  const basicWarnings = Object.keys(warningMessages).reduce(
+    (acc, key) => ({
+      ...acc,
+      [warningMessages[key]]: [],
+    }),
+    {}
+  );
 
   const oneLineErrors = [
     errorMessages.blankLines,
@@ -307,7 +313,17 @@ function lintLineByLine(fmLines, filePath) {
   ];
 
   for (let i = 1; i < fmLines.length - 1; i++) {
-    const line = `${fmLines[i]}`;
+    let line = fmLines[i];
+
+    if (/^\s*#/.test(line)) {
+      if (line.includes("fmlint-disable-next-line")) i++;
+      continue;
+    }
+
+    if (/\s+#/.test(line)) {
+      if (line.includes("fmlint-disable-line")) continue;
+      line = line.substring(0, line.search(/\s*#/));
+    }
 
     // no-empty-lines
     if (!args.fix && line.trim() === "") {
