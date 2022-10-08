@@ -10,6 +10,7 @@ const mockArgs = {
 };
 
 const mockConfig = {
+  disabledAttributes: [],
   excludeDirs: ["__mocks__", "__tests__", ".git", "coverage", "node_modules"],
   extraExcludeDirs: [],
   extensions: [".md"],
@@ -321,7 +322,7 @@ describe("yaml-fm-lint", () => {
     });
   });
 
-  describe("args tests: ", () => {
+  describe("args and config tests: ", () => {
     it("should replace '.' with an empty string if included in lint dir", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "." };
@@ -438,6 +439,67 @@ describe("yaml-fm-lint", () => {
           .catch(reject);
       });
     });
+
+    it("should return no linting errors for disabled line", () => {
+      const { lintFile, warningMessages, errorMessages } = require("../index");
+      const path = "examples/testDisabledRule.md";
+      const fileDisabledLint = require("fs").readFileSync(path, "utf8");
+      const fileEnabledLint = fileDisabledLint
+        .split("\n")
+        .filter((line) => !/^\s*# fmlint-disable-next-line/.test(line))
+        .map((line) => {
+          const commentIndex = line.search(/\s+# fmlint-disable-line/);
+          return commentIndex > 0 ? line.substring(0, commentIndex) : line;
+        })
+        .join("\n");
+        console.log("fileEnabledLint", fileEnabledLint)
+
+      return Promise.all([
+        new Promise((resolve, reject) => {
+          lintFile(path, fileDisabledLint, mockArgs, mockConfig)
+            .then(({ fileErrors, fileWarnings }) => {
+              expect(fileErrors).toBe(0);
+              expect(fileWarnings).toBe(0);
+            })
+            .then(resolve)
+            .catch(reject);
+        }),
+
+        new Promise((resolve, reject) => {
+          lintFile(path, fileEnabledLint, mockArgs, mockConfig)
+            .then(({ warnings, fileWarnings, errors, fileErrors }) => {
+              expect(fileWarnings).toBe(1);
+              expect(fileErrors).toBe(1);
+              expect(warnings[warningMessages.warnCommas].length).toBe(1);
+              expect(errors[errorMessages.quotes].length).toBe(1);
+            })
+            .then(resolve)
+            .catch(reject);
+        })
+      ]);
+    })
+
+    it("should not lint attributes specified in config", () => {
+      const { main, errorMessages, warningMessages } = require("../index");
+      const args = { ...mockArgs, path: "examples/testDisabledRuleConfig.md" };
+      const config = { ...mockConfig, disabledAttributes: ["disabledTags"] };
+
+      return new Promise((resolve, reject) => {
+        main(args, config)
+          .then(({ errorNumber, warningNumber }) => {
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(new RegExp(errorMessages.quotes))
+            );
+            expect(console.log).toHaveBeenCalledWith(
+              expect.stringMatching(new RegExp(warningMessages.warnCommas))
+            );
+            expect(errorNumber).toBe(1);
+            expect(warningNumber).toBe(1);
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    })
 
     it("should not lint files with extensions not in the config: non-recursive", () => {
       const { main } = require("../index");
@@ -800,7 +862,7 @@ describe("yaml-fm-lint", () => {
     });
   });
 
-  describe("lintFile tests: ", () => {
+  describe("lintFile() tests: ", () => {
     it("should return an error if filePath is invalid", () => {
       const { lintFile } = require("../index");
       const filePath = "no_such_file.md";

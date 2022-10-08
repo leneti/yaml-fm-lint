@@ -289,17 +289,24 @@ function lintLineByLine(fmLines, filePath) {
   let fileErrors = 0;
   let fileWarnings = 0;
   let match;
+  let skip = false;
 
-  const basicErrors = Object.keys(errorMessages).reduce((acc, key) => {
-    acc[errorMessages[key]] = [];
-    return acc;
-  }, {});
+  const basicErrors = Object.keys(errorMessages).reduce(
+    (acc, key) => ({
+      ...acc,
+      [errorMessages[key]]: [],
+    }),
+    {}
+  );
   basicErrors[errorMessages.missingAttributes] = [...config.requiredAttributes];
 
-  const basicWarnings = Object.keys(warningMessages).reduce((acc, key) => {
-    acc[warningMessages[key]] = [];
-    return acc;
-  }, {});
+  const basicWarnings = Object.keys(warningMessages).reduce(
+    (acc, key) => ({
+      ...acc,
+      [warningMessages[key]]: [],
+    }),
+    {}
+  );
 
   const oneLineErrors = [
     errorMessages.blankLines,
@@ -307,7 +314,17 @@ function lintLineByLine(fmLines, filePath) {
   ];
 
   for (let i = 1; i < fmLines.length - 1; i++) {
-    const line = `${fmLines[i]}`;
+    let line = fmLines[i];
+
+    if (/^\s*#/.test(line)) {
+      if (line.includes("fmlint-disable-next-line")) i++;
+      continue;
+    }
+
+    if (/\s+#/.test(line)) {
+      if (line.includes("fmlint-disable-line")) continue;
+      line = line.substring(0, line.search(/\s*#/));
+    }
 
     // no-empty-lines
     if (!args.fix && line.trim() === "") {
@@ -318,14 +335,19 @@ function lintLineByLine(fmLines, filePath) {
     }
 
     // attributes
-    if (line.match(/^"?\w+"?\s*:/g)) {
+    if (/^"?\w+"?\s*:/.test(line)) {
       const atr = line.split(":")[0].trim();
+
+      skip = config.disabledAttributes.includes(atr);
+
       const atrIndex =
         basicErrors[errorMessages.missingAttributes].indexOf(atr);
       if (atrIndex > -1) {
         basicErrors[errorMessages.missingAttributes].splice(atrIndex, 1);
       }
     }
+
+    if (skip) continue;
 
     // no-whitespace-before-colon
     const wsbcRegex = /(\s+):/g;
