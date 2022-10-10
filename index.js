@@ -9,6 +9,7 @@ const {
 const chalk = require("chalk");
 const { load, dump } = require("js-yaml");
 const { lintLog } = require("./errors.js");
+const path = require("path");
 
 const cwd = process.cwd().replace(/\\/g, "/");
 
@@ -637,7 +638,7 @@ function getConfig(a, dir = cwd) {
   if (existsSync(`${dir}/.yaml-fm-lint.js`)) {
     conf = {
       ...conf,
-      ...require(`${dir}/.yaml-fm-lint.js`),
+      ...require(path.resolve(cwd, `${dir}/.yaml-fm-lint.js`)),
     };
   } else if (existsSync(`${dir}/.yaml-fm-lint.json`)) {
     conf = {
