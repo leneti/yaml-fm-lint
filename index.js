@@ -589,39 +589,43 @@ function getArguments() {
   }
 
   return {
-    path: argv.path,
-    fix: argv.fix !== undefined ? argv.fix : false,
-    config: argv.config,
-    recursive:
-      argv.recursive !== undefined
-        ? argv.recursive
-        : argv.r !== undefined
-        ? argv.r
-        : false,
-    mandatory:
-      argv.mandatory !== undefined
-        ? argv.mandatory
-        : argv.m !== undefined
-        ? argv.m
-        : true,
-    quiet:
-      argv.quiet !== undefined
-        ? argv.quiet
-        : argv.q !== undefined
-        ? argv.q
-        : false,
-    oneline:
-      argv.oneline !== undefined
-        ? argv.oneline
-        : argv.o !== undefined
-        ? argv.o
-        : false,
     colored:
       argv.colored !== undefined
         ? argv.colored
         : argv.c !== undefined
         ? argv.c
         : true,
+    config: argv.config,
+    fix: argv.fix !== undefined ? argv.fix : false,
+    mandatory:
+      argv.mandatory !== undefined
+        ? argv.mandatory
+        : argv.m !== undefined
+        ? argv.m
+        : true,
+    oneline:
+      argv.oneline !== undefined
+        ? argv.oneline
+        : argv.o !== undefined
+        ? argv.o
+        : false,
+    path: argv.path,
+    quiet:
+      argv.quiet !== undefined
+        ? argv.quiet
+        : argv.q !== undefined
+        ? argv.q
+        : false,
+    recursive:
+      argv.recursive !== undefined
+        ? argv.recursive
+        : argv.r !== undefined
+        ? argv.r
+        : false,
+    slash:
+      argv.backslash || argv.bs
+          ? "back"
+          : "forward",
   };
 }
 
@@ -689,7 +693,7 @@ function run() {
 
     if (process.exitCode) {
       console.timeEnd("Linting took");
-      return resolve({ errorNumber, warningNumber, args, config });
+      return resolve({ errorNumber, warningNumber, args: a, config });
     }
 
     const c = getConfig(a);

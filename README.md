@@ -81,13 +81,14 @@ yarn run fmlint -- path/to/your/markdown/files
 
 You can provide additional arguments:
 
-- `--fix`: Automatically fix the errors.
-- `--config`: Path to the config file if not in root directory of project.
-- `-r, --recursive`: _(default: `false`)_ Recursively lint all files in the given directory.
-- `-m, --mandatory`: _(default: `true`)_ If set to false will show warnings instead of errors if no front matter is found.
-- `-q, --quiet`: _(default: `false`)_ If set to true will not show erroneous code snippets.
-- `-o, --oneline`: _(default: `false`)_ If set to true will condense error messages to one line, skipping snippets.
-- `-c, --colored`: _(default: `true`)_ If set to false will not color the output.
+- `--fix`: Automatically fix the errors
+- `--config`: Path to the config file if not in root directory of project
+- `-r, --recursive`: _(default: `false`)_ Recursively lint all files in the given directory
+- `-m, --mandatory`: _(default: `true`)_ If set to false will show warnings instead of errors if no front matter is found
+- `-q, --quiet`: _(default: `false`)_ If set to true will not show erroneous code snippets
+- `-o, --oneline`: _(default: `false`)_ If set to true will condense error messages to one line, skipping snippets
+- `-c, --colored`: _(default: `true`)_ If set to false will not color the output
+- `-bs, --backslash`: _(default: `false`)_ When logging, use backslashes instead of forward slashes
 
 ### Example:
 
