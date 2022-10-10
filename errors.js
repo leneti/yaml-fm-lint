@@ -21,16 +21,63 @@ function getSnippet(lines, col, row) {
  * @param {string[]} fmLines
  * @returns a string of the snippets of the lines where the errors occurred
  */
-function getSnippets(arr, filePath, fmLines) {
-  return arr.reduce(
-    (acc, curr) =>
-      `${acc}\n  at ${cwd}/${filePath}:${curr.row}:${curr.col}.\n\n${getSnippet(
-        fmLines,
-        curr.col,
-        curr.row
-      )}\n`,
-    ""
-  );
+function getSnippets(arr, filePath, fmLines, args) {
+  return arr.reduce((acc, curr) => {
+    const path =
+      args.slash === "back"
+        ? `${cwd}/${filePath}`.replace(/\//g, "\\")
+        : `${cwd}/${filePath}`;
+    return `${acc}\n  at ${path}:${curr.row}:${curr.col}.\n\n${getSnippet(
+      fmLines,
+      curr.col,
+      curr.row
+    )}\n`;
+  }, "");
+}
+
+/**
+ * @param {"Error" | "Warning"} type - "Error" or "Warning"
+ * @param {string} message - the message to show
+ * @param {string} filePath - the file path of the file where the error occurred
+ * @param {string[] | number[] | { row: number, col: number }[] | undefined} affected - affected value, line number or array of affected locations
+ * @param {{ colored: boolean, oneline: boolean }} args - used to determine if the output should be colored and if the output should be shown on a single line
+ */
+function showOneline(type, message, filePath, affected, args) {
+  const path =
+    args.slash === "back"
+      ? `${cwd}/${filePath}`.replace(/\//g, "\\")
+      : `${cwd}/${filePath}`;
+  if (affected === undefined) {
+    const fileName = filePath.split("/").pop();
+    console.log(
+      `${
+        args.colored
+          ? (type === "Error" ? chalk.red : chalk.yellow)(`YAML-${type}:`)
+          : `YAML-${type}:`
+      } <${message}> ${path} ${fileName}${!args.oneline ? "\n" : ""}`
+    );
+  } else if (typeof affected === "object") {
+    affected.forEach((err) => {
+      showOneline(
+        type,
+        message,
+        filePath,
+        typeof err === "object" ? `${err.row}:${err.col}` : err,
+        args
+      );
+    });
+  } else
+    console.log(
+      `${
+        args.colored
+          ? (type === "Error" ? chalk.red : chalk.yellow)(`YAML-${type}:`)
+          : `YAML-${type}:`
+      } <${message}> ${path}:${
+        typeof affected == "string" && affected.includes(":")
+          ? affected
+          : ` ${affected}`
+      }${!args.oneline ? "\n" : ""}`
+    );
 }
 
 /**
@@ -50,7 +97,7 @@ function lintLog({
   if (args.oneline || forceOneLine || !affected || !fmLines)
     return showOneline(type, message, filePath, affected, args);
 
-  const snippets = getSnippets(affected, filePath, fmLines);
+  const snippets = getSnippets(affected, filePath, fmLines, args);
   console.log(
     `${
       args.colored
@@ -58,47 +105,6 @@ function lintLog({
         : "YAMLException:"
     } ${message}.\n${snippets}`
   );
-}
-
-/**
- * @param {"Error" | "Warning"} type - "Error" or "Warning"
- * @param {string} message - the message to show
- * @param {string} filePath - the file path of the file where the error occurred
- * @param {string[] | number[] | { row: number, col: number }[] | undefined} affected - affected value, line number or array of affected locations
- * @param {{ colored: boolean, oneline: boolean }} args - used to determine if the output should be colored and if the output should be shown on a single line
- */
-function showOneline(type, message, filePath, affected, args) {
-  if (affected === undefined) {
-    const fileName = filePath.split("/").pop();
-    console.log(
-      `${
-        args.colored
-          ? (type === "Error" ? chalk.red : chalk.yellow)(`YAML-${type}:`)
-          : `YAML-${type}:`
-      } <${message}> ${cwd}/${filePath} ${fileName}${!args.oneline ? "\n" : ""}`
-    );
-  } else if (typeof affected === "object") {
-    affected.forEach((err) => {
-      showOneline(
-        type,
-        message,
-        filePath,
-        typeof err === "object" ? `${err.row}:${err.col}` : err,
-        args
-      );
-    });
-  } else
-    console.log(
-      `${
-        args.colored
-          ? (type === "Error" ? chalk.red : chalk.yellow)(`YAML-${type}:`)
-          : `YAML-${type}:`
-      } <${message}> ${cwd}/${filePath}:${
-        typeof affected == "string" && affected.includes(":")
-          ? affected
-          : ` ${affected}`
-      }${!args.oneline ? "\n" : ""}`
-    );
 }
 
 module.exports = { lintLog };

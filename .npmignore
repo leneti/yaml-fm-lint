@@ -3,6 +3,7 @@ assets/
 coverage/
 __tests__/
 .github/
+.vscode/
 package-lock.json
 .yaml-fm-lint.json
 .yaml-fm-lint.js
