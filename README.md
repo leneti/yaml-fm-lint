@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png" alt="Project logo" height="160" />
+  <img src="assets/logo2.png" alt="Project logo" height="160" />
   <br>
   <br>
   <p>
@@ -12,9 +12,9 @@
 
 <!-- ![Dependencies](https://img.shields.io/depfu/dependencies/github/leneti/yaml-fm-lint) -->
 
-![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size)
-![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)
-![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)
+[![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size)](https://bundlephobia.com/package/yaml-fm-lint)
+[![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)](https://www.npmjs.com/package/yaml-fm-lint)
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/leneti.yaml-fm-lint?color=success&label=Visual%20Studio%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=leneti.yaml-fm-lint)
 
   </p>
 </div>
