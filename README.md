@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png" alt="Project logo" height="160" />
+  <img src="assets/logo2.png" alt="Project logo" height="160" />
   <br>
   <br>
   <p>
@@ -12,9 +12,9 @@
 
 <!-- ![Dependencies](https://img.shields.io/depfu/dependencies/github/leneti/yaml-fm-lint) -->
 
-![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size)
-![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)
-![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)
+[![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size)](https://bundlephobia.com/package/yaml-fm-lint)
+[![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)](https://www.npmjs.com/package/yaml-fm-lint)
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/leneti.yaml-fm-lint?color=success&label=Visual%20Studio%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=leneti.yaml-fm-lint)
 
   </p>
 </div>
@@ -28,6 +28,8 @@
 - [Install](#install)
 - [Usage](#usage)
 - [Configuration](#configuration)
+  - [Disabling linting](#disabling-linting)
+  - [Config files](#config-files)
 
 ## What is this
 
@@ -99,6 +101,32 @@ npm run fmlint -- docs --config="src/configs/.yaml-fm-lint.json" -r --oneline --
 This command would recursively look for all markdown files in the `docs` directory and lint them based on the `.yaml-fm-lint.json` config file located under `src/configs/`. The output would not be colored and would not show code snippets.
 
 ## Configuration
+
+Text passed to `yaml-fm-lint` is parsed as YAML, analysed, and any issues reported.
+
+### Disabling linting
+
+To disable rules for a particular line within the front matter, add one of these markers to the appropriate place (comments don't affect the file's metadata):
+
+- Disable all rules for the current line: `# fmlint-disable-line`
+- Disable all rules for the next line: `# fmlint-disable-next-line`
+
+For example:
+
+```yaml
+sidebar_label: Configuration
+description: It's the configuration file # fmlint-disable-line
+```
+
+Or:
+
+```yaml
+sidebar_label: Configuration
+ # fmlint-disable-next-line
+description: It's the configuration file
+```
+
+### Config files
 
 When run recursively, the script will look for the most nested config file, overriding properties from previous configurations.  
 Config path specified in CLI arguments will never be overriden.
