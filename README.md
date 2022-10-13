@@ -28,6 +28,8 @@
 - [Install](#install)
 - [Usage](#usage)
 - [Configuration](#configuration)
+  - [Disabling linting](#disabling-linting)
+  - [Config files](#config-files)
 
 ## What is this
 
@@ -99,6 +101,32 @@ npm run fmlint -- docs --config="src/configs/.yaml-fm-lint.json" -r --oneline --
 This command would recursively look for all markdown files in the `docs` directory and lint them based on the `.yaml-fm-lint.json` config file located under `src/configs/`. The output would not be colored and would not show code snippets.
 
 ## Configuration
+
+Text passed to `yaml-fm-lint` is parsed as YAML, analysed, and any issues reported.
+
+### Disabling linting
+
+To disable rules for a particular line within the front matter, add one of these markers to the appropriate place (comments don't affect the file's metadata):
+
+- Disable all rules for the current line: `# fmlint-disable-line`
+- Disable all rules for the next line: `# fmlint-disable-next-line`
+
+For example:
+
+```yaml
+sidebar_label: Configuration
+description: It's the configuration file # fmlint-disable-line
+```
+
+Or:
+
+```yaml
+sidebar_label: Configuration
+ # fmlint-disable-next-line
+description: It's the configuration file
+```
+
+### Config files
 
 When run recursively, the script will look for the most nested config file, overriding properties from previous configurations.  
 Config path specified in CLI arguments will never be overriden.
