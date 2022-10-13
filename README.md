@@ -13,8 +13,8 @@
 <!-- ![Dependencies](https://img.shields.io/depfu/dependencies/github/leneti/yaml-fm-lint) -->
 
 [![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size)](https://bundlephobia.com/package/yaml-fm-lint)
-[![NPM version](https://img.shields.io/npm/v/yaml-fm-lint)](https://www.npmjs.com/package/yaml-fm-lint)
-[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/leneti.yaml-fm-lint?color=success&label=Visual%20Studio%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=leneti.yaml-fm-lint)
+[![NPM version](https://img.shields.io/npm/v/yaml-fm-lint?logo=npm&color=%23CB3837)](https://www.npmjs.com/package/yaml-fm-lint)
+[![VS Code extension](https://img.shields.io/visual-studio-marketplace/v/leneti.yaml-fm-lint?color=success&label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=leneti.yaml-fm-lint)
 
   </p>
 </div>
