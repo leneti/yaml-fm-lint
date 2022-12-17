@@ -622,13 +622,16 @@ function getArguments() {
         : argv.r !== undefined
         ? argv.r
         : false,
-    slash:
-      argv.backslash || argv.bs
-          ? "back"
-          : "forward",
+    slash: argv.backslash || argv.bs ? "back" : "forward",
   };
 }
 
+/**
+ * Finds and returns the custom linter config, or the default one.
+ * @param {{ mandatory: boolean, config: string }} a args object including at least `mandatory` and `config` values
+ * @param {string} dir path to config file (current working directory by default)
+ * @returns {{ disabledAttributes: string[], excludeDirs: string[], extraExcludeDirs: string[], extensions: string[], includeDirs: string[], mandatory: boolean, requiredAttributes: string[] }}
+ */
 function getConfig(a, dir = cwd) {
   let conf =
     dir === cwd
