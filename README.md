@@ -100,6 +100,14 @@ npm run fmlint -- docs --config="src/configs/.yaml-fm-lint.json" -r --oneline --
 
 This command would recursively look for all markdown files in the `docs` directory and lint them based on the `.yaml-fm-lint.json` config file located under `src/configs/`. The output would not be colored and would not show code snippets.
 
+You can also use glob patterns to find files.
+
+```sh
+npm run fmlint -- "**/[!README]*.{md,mdx}"
+```
+
+`node_modules` folder is ignored by default.
+
 ## Configuration
 
 Text passed to `yaml-fm-lint` is parsed as YAML, analysed, and any issues reported.
