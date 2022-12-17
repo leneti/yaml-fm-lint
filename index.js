@@ -1,4 +1,14 @@
 #! /usr/bin/env node
+
+/**
+ * @typedef {{ noFrontMatter: true } | { customError: {row: number, col: number, message: string} } | {[message: string]: {row: number, col?: number, colStart?: number, colEnd?: number, snippet?: string}}} LintErrors
+ * @typedef {{[message: string]: {row: number, col?: number, colStart?: number, colEnd?: number, snippet?: string}}} LintWarnings
+ * @typedef {{filePath: string, fileErrors: number, fileWarnings: number, errors: LintErrors, warnings: LintWarnings}} LintResult
+ * @typedef {{ path: string, fix: boolean, config: string, recursive: boolean, mandatory: boolean, quiet: boolean, oneline: boolean, colored: boolean }} LintArgs
+ * @typedef {{ disabledAttributes: string[], excludeDirs: string[], extraExcludeDirs: string[], extensions: string[], includeDirs: string[], mandatory: boolean, requiredAttributes: string[] }} LintConfig
+ * @typedef {string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined} Affected
+ */
+
 const {
   readFileSync,
   lstatSync,
@@ -13,8 +23,16 @@ const path = require("path");
 
 const cwd = process.cwd().replace(/\\/g, "/");
 
+/**
+ * @type LintArgs
+ */
 let args;
+
+/**
+ * @type LintConfig
+ */
 let config;
+
 let errorNumber = 0;
 let fixableErrors = 0;
 let warningNumber = 0;
@@ -39,7 +57,7 @@ const warningMessages = {
 /**
  * Lints the front matter of all files in a directory non-recursively.
  * @param {string} path - path to file or directory
- * @returns {Promise<string?>} - null if everything is ok, otherwise error message
+ * @returns {Promise<LintResult[]>} - null if everything is ok, otherwise error message
  */
 function lintNonRecursively(path) {
   return new Promise((resolve, reject) => {
@@ -58,7 +76,7 @@ function lintNonRecursively(path) {
 
         if (!promiseArr.length) {
           console.log(`No markdown files found in ${cwd}/${path}.`);
-          return resolve();
+          return resolve([]);
         }
 
         Promise.all(promiseArr).then(resolve).catch(reject);
@@ -66,7 +84,9 @@ function lintNonRecursively(path) {
         reject(error);
       }
     } else if (config.extensions.some((ext) => path.endsWith(ext))) {
-      lintFile(path).then(resolve).catch(reject);
+      lintFile(path)
+        .then((lintRes) => resolve([lintRes]))
+        .catch(reject);
     } else {
       reject(
         `${
@@ -80,6 +100,7 @@ function lintNonRecursively(path) {
 /**
  * Lints the front matter of all files in a directory recursively.
  * @param {string} path - path to file or directory
+ * @returns {Promise<LintResult[]>}
  */
 function lintRecursively(path) {
   return new Promise((resolve, reject) => {
@@ -92,13 +113,14 @@ function lintRecursively(path) {
           path.endsWith(includedDirectory)
         )
       ) {
-        return resolve();
+        return resolve([]);
       }
 
       config = getConfig(args, path);
 
       try {
         const files = readdirSync(path, "utf8");
+
         const promiseArr = [];
         for (const file of files) {
           promiseArr.push(
@@ -111,15 +133,19 @@ function lintRecursively(path) {
         reject(error);
       }
     } else if (config.extensions.some((ext) => path.endsWith(ext))) {
-      lintFile(path).then(resolve).catch(reject);
-    } else return resolve();
+      lintFile(path)
+        .then((lintRes) => resolve([lintRes]))
+        .catch(reject);
+    } else {
+      return resolve([]);
+    }
   });
 }
 
 /**
  * Lints the file's YAML front matter.
- * @param {string} filePath - path to file
- * @returns {Promise<{filePath: string, fileErrors: number, fileWarnings: number, errors: { noFrontMatter: true } | { customError: {row: number, col: number, message: string} } | {[message: string]: {row: number, col?: number, colStart?: number, colEnd?: number, snippet?: string}}, warnings: {} | {[message: string]: {row: number, col?: number, colStart?: number, colEnd?: number, snippet?: string}}}>}
+ * @param {string} filePath path to file
+ * @returns {Promise<LintResult>}
  */
 function lintFile(filePath, text = "", a = {}, c = {}) {
   return new Promise(async (resolve, reject) => {
@@ -239,32 +265,39 @@ function lintFile(filePath, text = "", a = {}, c = {}) {
   });
 }
 
+/**
+ * @param {{[key: string]: any}} attributes YAML front matter / metadata pairs
+ * @param {string[]} fmLines front matter line array
+ * @param {string} filePath path to file
+ * @returns {{extraErrors: {[msg: string]: Affected[]}, extraWarnings: {[msg: string]: Affected[]}, fileErrors: number, fileWarnings: number}}
+ */
 function extraLinters(attributes, fmLines, filePath) {
   let extraErrors = {};
   let extraWarnings = {};
   let fileErrors = 0;
   let fileWarnings = 0;
 
-  if (!config.extraLintFns)
+  if (!config.extraLintFns) {
     return { extraErrors, extraWarnings, fileErrors, fileWarnings };
+  }
 
   /**
    * @param {"Error" | "Warning"} type
    * @param {string} message
-   * @param {string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined} affected - array of string values, line numbers or exact locations of errors or warnings. If omitted, the opening front matter tags will be decorated. `colStart` and `colEnd` are used by the VS Code extension.
+   * @param {Affected} affected - array of string values, line numbers or exact locations of errors or warnings. If omitted, errors/warnings will be shown on the opening front matter tags. `colStart` and `colEnd` are used by the VS Code extension.
    */
   function extraLintLog(type, message, affected) {
     lintLog({ type, message, filePath, affected, args, fmLines });
 
-    const updateArray = (arr, msg, aff) => ({
+    const updateObj = (arr, msg, aff) => ({
       ...arr,
       [msg]: [...(arr[msg] || []), ...aff],
     });
 
     if (type === "Error") {
-      extraErrors = updateArray(extraErrors, message, affected);
+      extraErrors = updateObj(extraErrors, message, affected);
     } else {
-      extraWarnings = updateArray(extraWarnings, message, affected);
+      extraWarnings = updateObj(extraWarnings, message, affected);
     }
   }
 
@@ -283,8 +316,9 @@ function extraLinters(attributes, fmLines, filePath) {
 
 /**
  * Parses given string and logs errors if any.
- * @param {string[]} fmLines - front matter lines to parse
- * @param {string} filePath - path to the file
+ * @param {string[]} fmLines front matter lines to parse
+ * @param {string} filePath path to the file
+ * @returns {LintResult}
  */
 function lintLineByLine(fmLines, filePath) {
   let fileErrors = 0;
@@ -545,7 +579,7 @@ function lintLineByLine(fmLines, filePath) {
 
 /**
  * Retrieves arguments from the command line
- * @returns {{path: string, fix: boolean, config: string, recursive: boolean, mandatory: boolean, quiet: boolean, oneline: boolean, colored: boolean}} - arguments object
+ * @returns {LintArgs} - arguments object
  */
 function getArguments() {
   let pathRead = false;
@@ -628,9 +662,9 @@ function getArguments() {
 
 /**
  * Finds and returns the custom linter config, or the default one.
- * @param {{ mandatory: boolean, config: string }} a args object including at least `mandatory` and `config` values
+ * @param {LintArgs} a args object including at least `mandatory` and `config` values
  * @param {string} dir path to config file (current working directory by default)
- * @returns {{ disabledAttributes: string[], excludeDirs: string[], extraExcludeDirs: string[], extensions: string[], includeDirs: string[], mandatory: boolean, requiredAttributes: string[] }}
+ * @returns {LintConfig}
  */
 function getConfig(a, dir = cwd) {
   let conf =
@@ -668,11 +702,18 @@ function getConfig(a, dir = cwd) {
   return conf;
 }
 
+/**
+ * @param {LintArgs} a args object
+ * @param {LintConfig} c config object
+ * @returns {Promise<{errors: LintErrors, errorNumber: number, warningNumber: number}>}
+ */
 function main(a, c) {
   return new Promise((resolve) => {
     args = { ...a };
     config = { ...c };
     allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
+
+    // if (args.path)
 
     (!args.recursive
       ? lintNonRecursively(args.path)
@@ -688,6 +729,9 @@ function main(a, c) {
   });
 }
 
+/**
+ * @returns {{errorNumber: number, warningNumber: number, args: LintArgs, config: LintConfig}}
+ */
 function run() {
   return new Promise((resolve) => {
     console.time("Linting took");
