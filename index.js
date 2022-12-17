@@ -18,8 +18,9 @@ const {
 } = require("fs");
 const chalk = require("chalk");
 const { load, dump } = require("js-yaml");
-const { lintLog } = require("./errors.js");
 const path = require("path");
+const glob = require("glob");
+const { lintLog } = require("./errors.js");
 
 const cwd = process.cwd().replace(/\\/g, "/");
 
@@ -140,6 +141,22 @@ function lintRecursively(path) {
       return resolve([]);
     }
   });
+}
+
+/**
+ * Lints files found with the provided glob pattern.
+ * @param {string[]} files array of file paths
+ * @returns {Promise<LintResult[]>}
+ */
+function lintGlob(files) {
+  const promiseArr = files.map(file => lintFile(file));
+
+  if (!promiseArr.length) {
+    console.log(`No markdown files found with glob pattern "${args.path}".`);
+    return Promise.resolve([]);
+  }
+
+  return Promise.all(promiseArr);
 }
 
 /**
@@ -705,7 +722,7 @@ function getConfig(a, dir = cwd) {
 /**
  * @param {LintArgs} a args object
  * @param {LintConfig} c config object
- * @returns {Promise<{errors: LintErrors, errorNumber: number, warningNumber: number}>}
+ * @returns {Promise<{errors?: LintErrors, errorNumber: number, warningNumber: number}>}
  */
 function main(a, c) {
   return new Promise((resolve) => {
@@ -713,12 +730,19 @@ function main(a, c) {
     config = { ...c };
     allExcludedDirs = [...config.excludeDirs, ...config.extraExcludeDirs];
 
-    // if (args.path)
+    let lintPromise;
 
-    (!args.recursive
-      ? lintNonRecursively(args.path)
-      : lintRecursively(args.path)
-    )
+    if (args.path.includes("*")) {
+      lintPromise = lintGlob(
+        glob.sync(args.path, { ignore: "node_modules/**/*" })
+      );
+    } else if (args.recursive) {
+      lintPromise = lintRecursively(args.path);
+    } else {
+      lintPromise = lintNonRecursively(args.path);
+    }
+
+    lintPromise
       .then((errors) => resolve({ errors, errorNumber, warningNumber }))
       .catch((err) => {
         console.log(err);
