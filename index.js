@@ -320,6 +320,7 @@ function extraLinters(attributes, fmLines, filePath) {
 
   config.extraLintFns.forEach((linter) => {
     const { errors, warnings } = linter({
+      filePath,
       attributes,
       fmLines,
       lintLog: extraLintLog,
