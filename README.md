@@ -163,6 +163,7 @@ In addition to the default config you can also add your own custom linters. Thes
 
 The functions receive an object with the following properties:
 
+- `filePath` - The path to the currently linted file
 - `attributes` - The yaml front matter as a JavaScript object
 - `fmLines` - The yaml front matter lines in a string array. Includes lines with `---` dashes
 - `lintLog` - Function to call error/warning messages. Receives the following arguments:
