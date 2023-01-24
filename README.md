@@ -172,7 +172,7 @@ The functions receive an object with the following properties:
 
 ```js
 /**
- * @param {{attributes: Object, fmLines: string[], lintLog: (type: "Error" | "Warning", message: string, affected: string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined) => void}} props
+ * @param {{filePath: string, attributes: Object, fmLines: string[], lintLog: (type: "Error" | "Warning", message: string, affected: string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined) => void}} props
  * @returns {{errors: number, warnings: number}}
  */
 function lowercaseTags({ fmLines, lintLog }) {
