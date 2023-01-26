@@ -1,5 +1,4 @@
 const chalk = require("chalk");
-const cwd = process.cwd().replace(/\\/g, "/");
 
 /**
  * @param {string[]} lines - the lines of the front matter
@@ -24,9 +23,7 @@ function getSnippet(lines, col, row) {
 function getSnippets(arr, filePath, fmLines, args) {
   return arr.reduce((acc, curr) => {
     const path =
-      args.slash === "back"
-        ? `${cwd}/${filePath}`.replace(/\//g, "\\")
-        : `${cwd}/${filePath}`;
+      args.slash === "back" ? filePath.replace(/\//g, "\\") : filePath;
     return `${acc}\n  at ${path}:${curr.row}:${curr.col}.\n\n${getSnippet(
       fmLines,
       curr.col,
@@ -43,10 +40,7 @@ function getSnippets(arr, filePath, fmLines, args) {
  * @param {{ colored: boolean, oneline: boolean }} args - used to determine if the output should be colored and if the output should be shown on a single line
  */
 function showOneline(type, message, filePath, affected, args) {
-  const path =
-    args.slash === "back"
-      ? `${cwd}/${filePath}`.replace(/\//g, "\\")
-      : `${cwd}/${filePath}`;
+  const path = args.slash === "back" ? filePath.replace(/\//g, "\\") : filePath;
   if (affected === undefined) {
     const fileName = filePath.split("/").pop();
     console.log(
