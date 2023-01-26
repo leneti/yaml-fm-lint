@@ -76,7 +76,7 @@ function lintNonRecursively(path) {
         }
 
         if (!promiseArr.length) {
-          console.log(`No markdown files found in ${cwd}/${path}.`);
+          console.log(`No markdown files found in ${path}.`);
           return resolve([]);
         }
 

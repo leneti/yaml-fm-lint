@@ -31,17 +31,13 @@
   - [Disabling linting](#disabling-linting)
   - [Config files](#config-files)
 
+---
+
 ## What is this
 
 An opinionated CLI NodeJS script which extracts yaml front matter from markdown files, lints the extracted data based on a config file and, if required, fixes most issues regarding the yaml.
 
 There is also a [VS Code extension](https://marketplace.visualstudio.com/items?itemName=leneti.yaml-fm-lint) which integrates this script within VS Code and decorates errors/warnings in real time.
-
-## Features
-
-- **Quick** - Only has two light-weight dependencies and lints directories asyncronously.
-- **Configurable** - Lints the extracted data based on a config file.
-- **Tiny** - Barely takes up space in your project.
 
 ## Install
 
@@ -61,36 +57,42 @@ or use it directly with
 npx yaml-fm-lint <path>
 ```
 
+---
+
 ## Usage
 
 Include the script in your `package.json` file:
 
 ```json
 "scripts": {
-  "fmlint": "yaml-fm-lint"
+  "fmlint": "yaml-fm-lint path/to/your/markdown/files -r"
 }
 ```
 
 Then run the script:
 
 ```sh
-npm run fmlint -- path/to/your/markdown/files
+npm run fmlint
 ```
 
 ```sh
-yarn run fmlint -- path/to/your/markdown/files
+yarn run fmlint
 ```
 
-You can provide additional arguments:
+You can either provide arguments inside the script itself, or when running it in the CLI after two dashes ' -- ' (e.g. `npm run fmlint -- --fix`).
 
-- `--fix`: Automatically fix the errors
-- `--config`: Path to the config file if not in root directory of project
-- `-r, --recursive`: _(default: `false`)_ Recursively lint all files in the given directory
-- `-m, --mandatory`: _(default: `true`)_ If set to false will show warnings instead of errors if no front matter is found
-- `-q, --quiet`: _(default: `false`)_ If set to true will not show erroneous code snippets
-- `-o, --oneline`: _(default: `false`)_ If set to true will condense error messages to one line, skipping snippets
-- `-c, --colored`: _(default: `true`)_ If set to false will not color the output
-- `-bs, --backslash`: _(default: `false`)_ When logging, use backslashes instead of forward slashes
+**Additional arguments:**
+
+| Argument           |     Default     | Description                                                              |
+| ------------------ | :-------------: | ------------------------------------------------------------------------ |
+| `--config`         | `process.cwd()` | Path to the config file                                                  |
+| `--fix`            |     `false`     | Automatically fix the errors                                             |
+| `-r, --recursive`  |     `false`     | Recursively lint accepted files if given a specific directory            |
+| `-q, --quiet`      |     `false`     | Will only show the number of warnings and errors                         |
+| `-o, --oneline`    |     `false`     | Condense error messages to one line, skipping snippets                   |
+| `-bs, --backslash` |     `false`     | When logging, use backslashes instead of forward slashes                 |
+| `-m, --mandatory`  |     `true`      | If no front matter is found, show an error. Shows a warning when `false` |
+| `-c, --colored`    |     `true`      | Use control characters to color the output                               |
 
 ### Example:
 
@@ -107,6 +109,8 @@ npm run fmlint -- "**/[!README]*.{md,mdx}"
 ```
 
 `node_modules` folder is ignored by default.
+
+---
 
 ## Configuration
 
@@ -130,7 +134,7 @@ Or:
 
 ```yaml
 sidebar_label: Configuration
- # fmlint-disable-next-line
+# fmlint-disable-next-line
 description: It's the configuration file
 ```
 
