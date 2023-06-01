@@ -13,6 +13,7 @@ const mockConfig = {
   disabledAttributes: [],
   excludeDirs: ["__mocks__", "__tests__", ".git", "coverage", "node_modules"],
   extraExcludeDirs: [],
+  excludeFiles: [],
   extensions: [".md"],
   includeDirs: [],
   mandatory: true,
@@ -452,7 +453,6 @@ describe("yaml-fm-lint", () => {
           return commentIndex > 0 ? line.substring(0, commentIndex) : line;
         })
         .join("\n");
-        console.log("fileEnabledLint", fileEnabledLint)
 
       return Promise.all([
         new Promise((resolve, reject) => {
@@ -475,9 +475,9 @@ describe("yaml-fm-lint", () => {
             })
             .then(resolve)
             .catch(reject);
-        })
+        }),
       ]);
-    })
+    });
 
     it("should not lint attributes specified in config", () => {
       const { main, errorMessages, warningMessages } = require("../index");
@@ -499,7 +499,7 @@ describe("yaml-fm-lint", () => {
           .then(resolve)
           .catch(reject);
       });
-    })
+    });
 
     it("should not lint files with extensions not in the config: non-recursive", () => {
       const { main } = require("../index");
