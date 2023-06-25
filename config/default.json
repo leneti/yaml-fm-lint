@@ -23,6 +23,7 @@
     "typings"
   ],
   "extraExcludeDirs": [],
+  "excludeFiles": [],
   "extensions": [".md"],
   "includeDirs": [],
   "mandatory": true,

@@ -48,7 +48,7 @@ npm i -D yaml-fm-lint
 ```
 
 ```sh
-yarn add yaml-fm-lint -D
+yarn add -D yaml-fm-lint
 ```
 
 or use it directly with
@@ -79,20 +79,19 @@ npm run fmlint
 yarn run fmlint
 ```
 
-You can either provide arguments inside the script itself, or when running it in the CLI after two dashes ' -- ' (e.g. `npm run fmlint -- --fix`).
-
 **Additional arguments:**
 
-| Argument           |     Default     | Description                                                              |
-| ------------------ | :-------------: | ------------------------------------------------------------------------ |
-| `--config`         | `process.cwd()` | Path to the config file                                                  |
-| `--fix`            |     `false`     | Automatically fix the errors                                             |
-| `-r, --recursive`  |     `false`     | Recursively lint accepted files if given a specific directory            |
-| `-q, --quiet`      |     `false`     | Will only show the number of warnings and errors                         |
-| `-o, --oneline`    |     `false`     | Condense error messages to one line, skipping snippets                   |
-| `-bs, --backslash` |     `false`     | When logging, use backslashes instead of forward slashes                 |
-| `-m, --mandatory`  |     `true`      | If no front matter is found, show an error. Shows a warning when `false` |
-| `-c, --colored`    |     `true`      | Use control characters to color the output                               |
+| Argument           |     Default     | Description                                                                                         |
+| ------------------ | :-------------: | --------------------------------------------------------------------------------------------------- |
+| `--config`         | `process.cwd()` | Path to the config file                                                                             |
+| `--fix`            |     `false`     | Automatically fix the errors                                                                        |
+| `--globOnly`       |     `false`     | Override extra excluded and included directories/files and just use the glob matching to lint files |
+| `-r, --recursive`  |     `false`     | Recursively lint accepted files if given a specific directory                                       |
+| `-q, --quiet`      |     `false`     | Will only show the number of warnings and errors                                                    |
+| `-o, --oneline`    |     `false`     | Condense error messages to one line, skipping snippets                                              |
+| `-bs, --backslash` |     `false`     | When logging, use backslashes instead of forward slashes                                            |
+| `-m, --mandatory`  |     `true`      | If no front matter is found, show an error. Shows a warning when `false`                            |
+| `-c, --colored`    |     `true`      | Use control characters to color the output                                                          |
 
 ### Example:
 
@@ -152,6 +151,7 @@ Config path specified in CLI arguments will never be overriden.
 | disabledAttributes | `[]`                                                                                       | Array of attributes to exclude from linting                                                                                         |
 | excludeDirs        | [See default config](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json) | An array of directories to exclude from linting (🛑You should not overwrite this in your config unless you know what you are doing) |
 | extraExcludeDirs   | `[]`                                                                                       | Additional array of directories to exclude from linting                                                                             |
+| excludeFiles       | `[]`                                                                                       | Array of file names or file paths to exclude from linting                                                                           |
 | extensions         | `[".md"]`                                                                                  | Array of extensions of files to parse                                                                                               |
 | includeDirs        | `[]`                                                                                       | Array of directories to include in linting                                                                                          |
 | requiredAttributes | `[]`                                                                                       | Array of attributes that must be present in the yaml front matter                                                                   |

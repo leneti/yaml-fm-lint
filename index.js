@@ -4,8 +4,8 @@
  * @typedef {{ noFrontMatter: true } | { customError: {row: number, col: number, message: string} } | {[message: string]: {row: number, col?: number, colStart?: number, colEnd?: number, snippet?: string}}} LintErrors
  * @typedef {{[message: string]: {row: number, col?: number, colStart?: number, colEnd?: number, snippet?: string}}} LintWarnings
  * @typedef {{filePath: string, fileErrors: number, fileWarnings: number, errors: LintErrors, warnings: LintWarnings}} LintResult
- * @typedef {{ path: string, fix: boolean, config: string, recursive: boolean, mandatory: boolean, quiet: boolean, oneline: boolean, colored: boolean }} LintArgs
- * @typedef {{ disabledAttributes: string[], excludeDirs: string[], extraExcludeDirs: string[], extensions: string[], includeDirs: string[], mandatory: boolean, requiredAttributes: string[] }} LintConfig
+ * @typedef {{ path: string, fix: boolean, config: string, recursive: boolean, mandatory: boolean, quiet: boolean, oneline: boolean, colored: boolean, globOnly: boolean }} LintArgs
+ * @typedef {{ disabledAttributes: string[], excludeDirs: string[], extraExcludeDirs: string[], excludeFiles: string[], extensions: string[], includeDirs: string[], mandatory: boolean, requiredAttributes: string[] }} LintConfig
  * @typedef {string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined} Affected
  */
 
@@ -63,27 +63,26 @@ const warningMessages = {
 function lintNonRecursively(path) {
   return new Promise((resolve, reject) => {
     if (lstatSync(path).isDirectory()) {
-      try {
-        const files = readdirSync(path, "utf8");
+      const files = readdirSync(path, "utf8");
 
-        const promiseArr = [];
-        for (const file of files) {
-          if (config.extensions.some((ext) => file.endsWith(ext))) {
-            promiseArr.push(
-              lintFile(`${path === "." ? "" : `${path}/`}${file}`)
-            );
-          }
+      const promiseArr = [];
+      for (const file of files) {
+        if (config.extensions.some((ext) => file.endsWith(ext))) {
+          promiseArr.push(lintFile(`${path === "." ? "" : `${path}/`}${file}`));
         }
-
-        if (!promiseArr.length) {
-          console.log(`No markdown files found in ${path}.`);
-          return resolve([]);
-        }
-
-        Promise.all(promiseArr).then(resolve).catch(reject);
-      } catch (error) {
-        reject(error);
       }
+
+      if (!promiseArr.length) {
+        console.log(`No markdown files found in ${path}.`);
+        return resolve([]);
+      }
+
+      Promise.all(promiseArr).then(resolve).catch(reject);
+    } else if (
+      config.excludeFiles.some((ignoredFile) => path.endsWith(ignoredFile))
+    ) {
+      console.log(`Excluded: ${path}`);
+      return resolve([]);
     } else if (config.extensions.some((ext) => path.endsWith(ext))) {
       lintFile(path)
         .then((lintRes) => resolve([lintRes]))
@@ -119,20 +118,21 @@ function lintRecursively(path) {
 
       config = getConfig(args, path);
 
-      try {
-        const files = readdirSync(path, "utf8");
+      const files = readdirSync(path, "utf8");
 
-        const promiseArr = [];
-        for (const file of files) {
-          promiseArr.push(
-            lintRecursively(`${path === "." ? "" : `${path}/`}${file}`)
-          );
-        }
-
-        Promise.all(promiseArr).then(resolve).catch(reject);
-      } catch (error) {
-        reject(error);
+      const promiseArr = [];
+      for (const file of files) {
+        promiseArr.push(
+          lintRecursively(`${path === "." ? "" : `${path}/`}${file}`)
+        );
       }
+
+      Promise.all(promiseArr).then(resolve).catch(reject);
+    } else if (
+      config.excludeFiles.some((ignoredFile) => path.endsWith(ignoredFile))
+    ) {
+      console.log(`Excluded: ${path}`);
+      return resolve([]);
     } else if (config.extensions.some((ext) => path.endsWith(ext))) {
       lintFile(path)
         .then((lintRes) => resolve([lintRes]))
@@ -149,7 +149,33 @@ function lintRecursively(path) {
  * @returns {Promise<LintResult[]>}
  */
 function lintGlob(files) {
-  const promiseArr = files.map(file => lintFile(file));
+  const promiseArr = files
+    .filter((file) => {
+      if (args.globOnly) {
+        return true;
+      }
+
+      if (
+        config.excludeFiles.some((ignoredFile) => file.endsWith(ignoredFile))
+      ) {
+        return false;
+      }
+
+      const excludedFrom = allExcludedDirs.filter((ignoredDirectory) =>
+        file.includes(ignoredDirectory)
+      );
+
+      if (!excludedFrom.length) {
+        return true;
+      }
+
+      return config.includeDirs.some((includedDirectory) =>
+        new RegExp(
+          `(${excludedFrom.join("|")}).*${includedDirectory}[\/\]`
+        ).test(file)
+      );
+    })
+    .map((file) => lintFile(file));
 
   if (!promiseArr.length) {
     console.log(`No markdown files found with glob pattern "${args.path}".`);
@@ -649,6 +675,7 @@ function getArguments() {
         : true,
     config: argv.config,
     fix: argv.fix !== undefined ? argv.fix : false,
+    globOnly: argv.globOnly !== undefined ? argv.globOnly : false,
     mandatory:
       argv.mandatory !== undefined
         ? argv.mandatory
