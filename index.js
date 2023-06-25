@@ -63,31 +63,27 @@ const warningMessages = {
 function lintNonRecursively(path) {
   return new Promise((resolve, reject) => {
     if (lstatSync(path).isDirectory()) {
-      try {
-        const files = readdirSync(path, "utf8");
+      const files = readdirSync(path, "utf8");
 
-        const promiseArr = [];
-        for (const file of files) {
-          if (config.extensions.some((ext) => file.endsWith(ext))) {
-            promiseArr.push(
-              lintFile(`${path === "." ? "" : `${path}/`}${file}`)
-            );
-          }
+      const promiseArr = [];
+      for (const file of files) {
+        if (config.extensions.some((ext) => file.endsWith(ext))) {
+          promiseArr.push(lintFile(`${path === "." ? "" : `${path}/`}${file}`));
         }
-
-        if (!promiseArr.length) {
-          console.log(`No markdown files found in ${path}.`);
-          return resolve([]);
-        }
-
-        Promise.all(promiseArr).then(resolve).catch(reject);
-      } catch (error) {
-        reject(error);
       }
+
+      if (!promiseArr.length) {
+        console.log(`No markdown files found in ${path}.`);
+        return resolve([]);
+      }
+
+      Promise.all(promiseArr).then(resolve).catch(reject);
     } else if (
-      config.extensions.some((ext) => path.endsWith(ext)) &&
-      !config.excludeFiles.some((ignoredFile) => path.endsWith(ignoredFile))
+      config.excludeFiles.some((ignoredFile) => path.endsWith(ignoredFile))
     ) {
+      console.log(`Excluded: ${path}`);
+      return resolve([]);
+    } else if (config.extensions.some((ext) => path.endsWith(ext))) {
       lintFile(path)
         .then((lintRes) => resolve([lintRes]))
         .catch(reject);
@@ -122,24 +118,22 @@ function lintRecursively(path) {
 
       config = getConfig(args, path);
 
-      try {
-        const files = readdirSync(path, "utf8");
+      const files = readdirSync(path, "utf8");
 
-        const promiseArr = [];
-        for (const file of files) {
-          promiseArr.push(
-            lintRecursively(`${path === "." ? "" : `${path}/`}${file}`)
-          );
-        }
-
-        Promise.all(promiseArr).then(resolve).catch(reject);
-      } catch (error) {
-        reject(error);
+      const promiseArr = [];
+      for (const file of files) {
+        promiseArr.push(
+          lintRecursively(`${path === "." ? "" : `${path}/`}${file}`)
+        );
       }
+
+      Promise.all(promiseArr).then(resolve).catch(reject);
     } else if (
-      config.extensions.some((ext) => path.endsWith(ext)) &&
-      !config.excludeFiles.some((ignoredFile) => path.endsWith(ignoredFile))
+      config.excludeFiles.some((ignoredFile) => path.endsWith(ignoredFile))
     ) {
+      console.log(`Excluded: ${path}`);
+      return resolve([]);
+    } else if (config.extensions.some((ext) => path.endsWith(ext))) {
       lintFile(path)
         .then((lintRes) => resolve([lintRes]))
         .catch(reject);

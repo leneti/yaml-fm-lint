@@ -501,6 +501,67 @@ describe("yaml-fm-lint", () => {
       });
     });
 
+    it("should not lint excluded files: non-recursive", () => {
+      const mockLog = jest.fn();
+      const exclude = "testQuotes.md";
+      console.log = mockLog;
+      const { main } = require("../index");
+      const args = { ...mockArgs, path: "examples/testQuotes.md" };
+      const config = { ...mockConfig, excludeFiles: [exclude] };
+
+      return new Promise((resolve, reject) => {
+        main(args, config)
+          .then(() => {
+            expect(mockLog).toHaveBeenCalledWith(
+              expect.stringMatching(new RegExp(`excluded.*${exclude}`, "i"))
+            );
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("should not lint excluded files: recursive", () => {
+      const mockLog = jest.fn();
+      const exclude = "testQuotes.md";
+      console.log = mockLog;
+      const { main } = require("../index");
+      const args = {
+        ...mockArgs,
+        path: "examples/testQuotes.md",
+        recursive: true,
+      };
+      const config = { ...mockConfig, excludeFiles: [exclude] };
+
+      return new Promise((resolve, reject) => {
+        main(args, config)
+          .then(() => {
+            expect(mockLog).toHaveBeenCalledWith(
+              expect.stringMatching(new RegExp(`excluded.*${exclude}`, "i"))
+            );
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("should return error when no directory found", () => {
+      const mockLog = jest.fn();
+      console.log = mockLog;
+
+      const { main } = require("../index");
+      const args = { ...mockArgs, path: "notExamples" };
+
+      return new Promise((resolve, reject) => {
+        main(args, mockConfig)
+          .then(({ errorNumber }) => {
+            expect(errorNumber).toBe(1);
+            resolve();
+          })
+          .catch(reject);
+      });
+    });
+
     it("should not lint files with extensions not in the config: non-recursive", () => {
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testPassing.md" };
