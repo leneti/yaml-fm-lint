@@ -9,13 +9,7 @@
  * @typedef {string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined} Affected
  */
 
-const {
-  readFileSync,
-  lstatSync,
-  readdirSync,
-  writeFileSync,
-  existsSync,
-} = require("fs");
+const { readFileSync, lstatSync, readdirSync, writeFileSync, existsSync } = require("fs");
 const chalk = require("chalk");
 const { load, dump } = require("js-yaml");
 const path = require("path");
@@ -46,14 +40,17 @@ const errorMessages = {
   trailingSpaces: "there must be no trailing spaces",
   brackets: "there must be no brackets",
   curlyBraces: "there must be no curly braces",
-  indentation:
-    "lines cannot be indented more than 2 spaces from the previous line",
+  indentation: "lines cannot be indented more than 2 spaces from the previous line",
   trailingCommas: "there must be no trailing commas",
 };
 const warningMessages = {
   repeatingSpaces: "possibly unintended whitespace",
   warnCommas: "possibly unintended commas",
 };
+
+function removeSlashes(str) {
+  return str.replace(/\/|\\/g, "");
+}
 
 /**
  * Lints the front matter of all files in a directory non-recursively.
@@ -79,7 +76,9 @@ function lintNonRecursively(path) {
 
       Promise.all(promiseArr).then(resolve).catch(reject);
     } else if (
-      config.excludeFiles.some((ignoredFile) => path.endsWith(ignoredFile))
+      config.excludeFiles.some((ignoredFile) =>
+        removeSlashes(path).endsWith(removeSlashes(ignoredFile))
+      )
     ) {
       console.log(`Excluded: ${path}`);
       return resolve([]);
@@ -107,10 +106,10 @@ function lintRecursively(path) {
     if (lstatSync(path).isDirectory()) {
       if (
         allExcludedDirs.some((ignoredDirectory) =>
-          path.endsWith(ignoredDirectory)
+          removeSlashes(path).endsWith(removeSlashes(ignoredDirectory))
         ) &&
         !config.includeDirs.some((includedDirectory) =>
-          path.endsWith(includedDirectory)
+          removeSlashes(path).endsWith(removeSlashes(includedDirectory))
         )
       ) {
         return resolve([]);
@@ -122,14 +121,14 @@ function lintRecursively(path) {
 
       const promiseArr = [];
       for (const file of files) {
-        promiseArr.push(
-          lintRecursively(`${path === "." ? "" : `${path}/`}${file}`)
-        );
+        promiseArr.push(lintRecursively(`${path === "." ? "" : `${path}/`}${file}`));
       }
 
       Promise.all(promiseArr).then(resolve).catch(reject);
     } else if (
-      config.excludeFiles.some((ignoredFile) => path.endsWith(ignoredFile))
+      config.excludeFiles.some((ignoredFile) =>
+        removeSlashes(path).endsWith(removeSlashes(ignoredFile))
+      )
     ) {
       console.log(`Excluded: ${path}`);
       return resolve([]);
@@ -156,13 +155,16 @@ function lintGlob(files) {
       }
 
       if (
-        config.excludeFiles.some((ignoredFile) => file.endsWith(ignoredFile))
+        config.excludeFiles.some((ignoredFile) =>
+          removeSlashes(file).endsWith(removeSlashes(ignoredFile))
+        )
       ) {
+        console.log(`Excluded: ${file}`);
         return false;
       }
 
       const excludedFrom = allExcludedDirs.filter((ignoredDirectory) =>
-        file.includes(ignoredDirectory)
+        removeSlashes(file).includes(removeSlashes(ignoredDirectory))
       );
 
       if (!excludedFrom.length) {
@@ -170,12 +172,10 @@ function lintGlob(files) {
       }
 
       return config.includeDirs.some((includedDirectory) =>
-        new RegExp(
-          `(${excludedFrom.join("|")}).*${includedDirectory}[\/\]`
-        ).test(file)
+        new RegExp(`(${excludedFrom.join("|")}).*${includedDirectory}[\/\]`).test(file)
       );
     })
-    .map((file) => lintFile(file));
+    .map(lintFile);
 
   if (!promiseArr.length) {
     console.log(`No markdown files found with glob pattern "${args.path}".`);
@@ -387,10 +387,7 @@ function lintLineByLine(fmLines, filePath) {
     {}
   );
 
-  const oneLineErrors = [
-    errorMessages.blankLines,
-    errorMessages.missingAttributes,
-  ];
+  const oneLineErrors = [errorMessages.blankLines, errorMessages.missingAttributes];
 
   for (let i = 1; i < fmLines.length - 1; i++) {
     let line = fmLines[i];
@@ -419,8 +416,7 @@ function lintLineByLine(fmLines, filePath) {
 
       skip = config.disabledAttributes.includes(atr);
 
-      const atrIndex =
-        basicErrors[errorMessages.missingAttributes].indexOf(atr);
+      const atrIndex = basicErrors[errorMessages.missingAttributes].indexOf(atr);
       if (atrIndex > -1) {
         basicErrors[errorMessages.missingAttributes].splice(atrIndex, 1);
       }
@@ -659,48 +655,22 @@ function getArguments() {
 
   if (!pathRead) {
     console.log(
-      `${chalk.red(
-        "Invalid arguments:"
-      )} No path argument found. Please specify a path.`
+      `${chalk.red("Invalid arguments:")} No path argument found. Please specify a path.`
     );
     process.exitCode = 9;
   }
 
   return {
-    colored:
-      argv.colored !== undefined
-        ? argv.colored
-        : argv.c !== undefined
-        ? argv.c
-        : true,
+    colored: argv.colored !== undefined ? argv.colored : argv.c !== undefined ? argv.c : true,
     config: argv.config,
     fix: argv.fix !== undefined ? argv.fix : false,
     globOnly: argv.globOnly !== undefined ? argv.globOnly : false,
-    mandatory:
-      argv.mandatory !== undefined
-        ? argv.mandatory
-        : argv.m !== undefined
-        ? argv.m
-        : true,
-    oneline:
-      argv.oneline !== undefined
-        ? argv.oneline
-        : argv.o !== undefined
-        ? argv.o
-        : false,
+    mandatory: argv.mandatory !== undefined ? argv.mandatory : argv.m !== undefined ? argv.m : true,
+    oneline: argv.oneline !== undefined ? argv.oneline : argv.o !== undefined ? argv.o : false,
     path: argv.path,
-    quiet:
-      argv.quiet !== undefined
-        ? argv.quiet
-        : argv.q !== undefined
-        ? argv.q
-        : false,
+    quiet: argv.quiet !== undefined ? argv.quiet : argv.q !== undefined ? argv.q : false,
     recursive:
-      argv.recursive !== undefined
-        ? argv.recursive
-        : argv.r !== undefined
-        ? argv.r
-        : false,
+      argv.recursive !== undefined ? argv.recursive : argv.r !== undefined ? argv.r : false,
     slash: argv.backslash || argv.bs ? "back" : "forward",
   };
 }
@@ -715,9 +685,7 @@ function getConfig(a, dir = cwd) {
   let conf =
     dir === cwd
       ? {
-          ...JSON.parse(
-            readFileSync(`${__dirname.replace(/\\/g, "/")}/config/default.json`)
-          ),
+          ...JSON.parse(readFileSync(`${__dirname.replace(/\\/g, "/")}/config/default.json`)),
         }
       : config;
 
@@ -761,9 +729,7 @@ function main(a, c) {
     let lintPromise;
 
     if (args.path.includes("*")) {
-      lintPromise = lintGlob(
-        glob.sync(args.path, { ignore: "node_modules/**/*" })
-      );
+      lintPromise = lintGlob(glob.sync(args.path, { ignore: "node_modules/**/*" }));
     } else if (args.recursive) {
       lintPromise = lintRecursively(args.path);
     } else {
@@ -802,14 +768,8 @@ function run() {
         if (warningNumber) {
           console.log(
             args.colored
-              ? chalk.yellow(
-                  `⚠ ${warningNumber} warning${
-                    warningNumber > 1 ? "s" : ""
-                  } found.`
-                )
-              : `⚠ ${warningNumber} warning${
-                  warningNumber > 1 ? "s" : ""
-                } found.`
+              ? chalk.yellow(`⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`)
+              : `⚠ ${warningNumber} warning${warningNumber > 1 ? "s" : ""} found.`
           );
         }
         if (errorNumber) {
@@ -817,9 +777,7 @@ function run() {
           console.log(
             args.colored
               ? chalk.red(
-                  `✘ ${errorNumber} error${
-                    errorNumber === 1 ? "" : "s"
-                  } found.${
+                  `✘ ${errorNumber} error${errorNumber === 1 ? "" : "s"} found.${
                     fixableErrors > 0
                       ? ` ${fixableErrors} error${
                           fixableErrors === 1 ? "" : "s"

@@ -66,9 +66,7 @@ describe("yaml-fm-lint", () => {
             expect(console.log).toHaveBeenCalledWith(
               expect.stringMatching(
                 new RegExp(
-                  `${
-                    errorMessages.missingAttributes
-                  }.+${mockConfig.requiredAttributes.join(".+")}`
+                  `${errorMessages.missingAttributes}.+${mockConfig.requiredAttributes.join(".+")}`
                 )
               )
             );
@@ -301,10 +299,7 @@ describe("yaml-fm-lint", () => {
       const { run } = require("../index");
       const { writeFileSync, unlinkSync, readFileSync } = require("fs");
 
-      writeFileSync(
-        ".yaml-fm-lint.js",
-        readFileSync("examples/customConfig.js")
-      );
+      writeFileSync(".yaml-fm-lint.js", readFileSync("examples/customConfig.js"));
 
       return new Promise((resolve, reject) => {
         run()
@@ -391,9 +386,7 @@ describe("yaml-fm-lint", () => {
         run()
           .then(() => {
             expect(console.time).toHaveBeenCalled();
-            expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/valid front matter/)
-            );
+            expect(console.log).toHaveBeenCalledWith(expect.stringMatching(/valid front matter/));
             expect(console.timeEnd).toHaveBeenCalled();
           })
           .then(resolve)
@@ -502,8 +495,8 @@ describe("yaml-fm-lint", () => {
     });
 
     it("should not lint excluded files: non-recursive", () => {
-      const mockLog = jest.fn();
       const exclude = "testQuotes.md";
+      const mockLog = jest.fn().mockName("console.log");
       console.log = mockLog;
       const { main } = require("../index");
       const args = { ...mockArgs, path: "examples/testQuotes.md" };
@@ -522,8 +515,8 @@ describe("yaml-fm-lint", () => {
     });
 
     it("should not lint excluded files: recursive", () => {
-      const mockLog = jest.fn();
       const exclude = "testQuotes.md";
+      const mockLog = jest.fn().mockName("console.log");
       console.log = mockLog;
       const { main } = require("../index");
       const args = {
@@ -538,6 +531,32 @@ describe("yaml-fm-lint", () => {
           .then(() => {
             expect(mockLog).toHaveBeenCalledWith(
               expect.stringMatching(new RegExp(`excluded.*${exclude}`, "i"))
+            );
+          })
+          .then(resolve)
+          .catch(reject);
+      });
+    });
+
+    it("should not lint excluded files: glob", () => {
+      const mockLog = jest.fn().mockName("console.log");
+      console.log = mockLog;
+      const { main } = require("../index");
+      const args = {
+        ...mockArgs,
+        path: "examples/glob/*.{md,mdx}",
+      };
+      const config = {
+        ...mockConfig,
+        excludeFiles: ["examples/glob/testQuotes.md", "examples\\glob\\testBlankLines.md"],
+      };
+
+      return new Promise((resolve, reject) => {
+        main(args, config)
+          .then(() => {
+            expect(mockLog).toHaveBeenCalledWith(expect.stringMatching(/excluded.*testQuotes/i));
+            expect(mockLog).toHaveBeenCalledWith(
+              expect.stringMatching(/excluded.*testBlankLines/i)
             );
           })
           .then(resolve)
@@ -839,9 +858,7 @@ describe("yaml-fm-lint", () => {
           .then(({ warningNumber, errorNumber }) => {
             expect(warningNumber).toBe(2);
             expect(errorNumber).toBe(0);
-            expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/2 warnings found/)
-            );
+            expect(console.log).toHaveBeenCalledWith(expect.stringMatching(/2 warnings found/));
           })
           .then(resolve)
           .catch(reject);
@@ -863,9 +880,7 @@ describe("yaml-fm-lint", () => {
         run()
           .then(({ args }) => {
             expect(args.colored).toBe(true);
-            expect(console.log).toHaveBeenCalledWith(
-              expect.stringMatching(/chalk.green/)
-            );
+            expect(console.log).toHaveBeenCalledWith(expect.stringMatching(/chalk.green/));
           })
           .then(resolve)
           .catch(reject);
@@ -881,20 +896,13 @@ describe("yaml-fm-lint", () => {
         yellow: jest.fn((msg) => `chalk.yellow ${msg}`),
       }));
 
-      process.argv = [
-        "node",
-        "index.js",
-        "examples/testPassing.md",
-        "--colored=false",
-      ];
+      process.argv = ["node", "index.js", "examples/testPassing.md", "--colored=false"];
 
       return new Promise((resolve, reject) => {
         run()
           .then(({ args }) => {
             expect(args.colored).toBe(false);
-            expect(console.log).toHaveBeenCalledWith(
-              expect.not.stringMatching(/chalk.green/)
-            );
+            expect(console.log).toHaveBeenCalledWith(expect.not.stringMatching(/chalk.green/));
           })
           .then(resolve)
           .catch(reject);
