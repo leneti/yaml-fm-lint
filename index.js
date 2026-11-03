@@ -9,12 +9,27 @@
  * @typedef {string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined} Affected
  */
 
-const { readFileSync, lstatSync, readdirSync, writeFileSync, existsSync } = require("fs");
-const chalk = require("chalk");
-const { load, dump } = require("js-yaml");
-const path = require("path");
-const glob = require("glob");
-const { lintLog } = require("./errors.js");
+import { readFileSync, lstatSync, readdirSync, writeFileSync, existsSync } from "fs";
+import path from "path";
+import { globSync } from "glob";
+import jsYaml from "js-yaml";
+import chalk from "chalk";
+import { lintLog } from "./errors.js";
+import { createRequire } from "module";
+
+const { load, dump } = jsYaml;
+const requireConfig = createRequire(import.meta.url);
+
+/**
+ * Loads a user `.js` config. Works for CommonJS configs and, through
+ * `require(esm)`, for ESM configs (whose default export is unwrapped).
+ * @param {string} absPath absolute path to the config file
+ * @returns {object}
+ */
+function loadJsConfig(absPath) {
+  const mod = requireConfig(absPath);
+  return mod[Symbol.toStringTag] === "Module" && "default" in mod ? mod.default : mod;
+}
 
 const cwd = process.cwd().replace(/\\/g, "/");
 
@@ -685,14 +700,14 @@ function getConfig(a, dir = cwd) {
   let conf =
     dir === cwd
       ? {
-          ...JSON.parse(readFileSync(`${__dirname.replace(/\\/g, "/")}/config/default.json`)),
+          ...JSON.parse(readFileSync(`${import.meta.dirname.replace(/\\/g, "/")}/config/default.json`)),
         }
       : config;
 
   if (existsSync(`${dir}/.yaml-fm-lint.js`)) {
     conf = {
       ...conf,
-      ...require(path.resolve(cwd, `${dir}/.yaml-fm-lint.js`)),
+      ...loadJsConfig(path.resolve(cwd, `${dir}/.yaml-fm-lint.js`)),
     };
   } else if (existsSync(`${dir}/.yaml-fm-lint.json`)) {
     conf = {
@@ -705,7 +720,7 @@ function getConfig(a, dir = cwd) {
     conf = {
       ...conf,
       ...(a.config.endsWith(".js")
-        ? require(`${cwd}/${a.config}`)
+        ? loadJsConfig(`${cwd}/${a.config}`)
         : JSON.parse(readFileSync(a.config))),
     };
   }
@@ -729,7 +744,7 @@ function main(a, c) {
     let lintPromise;
 
     if (args.path.includes("*")) {
-      lintPromise = lintGlob(glob.sync(args.path, { ignore: "node_modules/**/*" }));
+      lintPromise = lintGlob(globSync(args.path, { ignore: "node_modules/**/*" }));
     } else if (args.recursive) {
       lintPromise = lintRecursively(args.path);
     } else {
@@ -807,13 +822,4 @@ function run() {
   });
 }
 
-module.exports = {
-  run,
-  main,
-  lintFile,
-  errorMessages,
-  warningMessages,
-};
-
-// Run if invoked as a CLI
-if (require.main === module) run();
+export { run, main, lintFile, errorMessages, warningMessages };

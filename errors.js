@@ -1,4 +1,4 @@
-const chalk = require("chalk");
+import chalk from "chalk";
 
 /**
  * @param {string[]} lines - the lines of the front matter
@@ -101,4 +101,4 @@ function lintLog({
   );
 }
 
-module.exports = { lintLog };
+export { lintLog };
