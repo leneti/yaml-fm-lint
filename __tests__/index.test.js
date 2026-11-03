@@ -661,6 +661,26 @@ describe("yaml-fm-lint", () => {
       expect(errorNumber).not.toBe(0);
       expect(warningNumber).not.toBe(0);
     });
+
+    it("includedDirPattern escapes regex metacharacters", async () => {
+      const { includedDirPattern } = await import("../index.js");
+      expect(() => includedDirPattern(["glob"], "c++")).not.toThrow();
+      expect(includedDirPattern(["glob"], "c++").test("examples/glob/c++/a.md")).toBe(true);
+      expect(includedDirPattern(["glob"], "docs.v2").test("examples/glob/docsXv2/a.md")).toBe(false);
+    });
+
+    it("includedDirPattern matches backslash paths", async () => {
+      const { includedDirPattern } = await import("../index.js");
+      expect(includedDirPattern(["glob"], "keep").test("examples\\glob\\keep\\a.md")).toBe(true);
+      expect(includedDirPattern(["glob"], "keep").test("examples/glob/keep/a.md")).toBe(true);
+    });
+
+    it("glob lint does not crash on includeDirs with regex metacharacters", async () => {
+      const { main } = await import("../index.js");
+      const config = { ...mockConfig, excludeDirs: ["glob"], includeDirs: ["c++"] };
+      const { errorNumber } = await main({ ...mockArgs, path: "examples/glob/*.md" }, config);
+      expect(errorNumber).toBe(0);
+    });
   });
 
   describe("lintFile() tests: ", () => {

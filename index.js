@@ -158,6 +158,21 @@ function lintRecursively(path) {
 }
 
 /**
+ * Builds a RegExp that matches a file inside an included directory of an excluded directory.
+ * Config strings are escaped so regex metacharacters are matched literally.
+ * The final character class matches both "/" and "\" path separators.
+ * @param {string[]} excludedFrom excluded directory names the file is under
+ * @param {string} includedDirectory directory name to keep inside an excluded one
+ * @returns {RegExp}
+ */
+function includedDirPattern(excludedFrom, includedDirectory) {
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `(${excludedFrom.map(esc).join("|")}).*${esc(includedDirectory)}[\\\\/]`
+  );
+}
+
+/**
  * Lints files found with the provided glob pattern.
  * @param {string[]} files array of file paths
  * @returns {Promise<LintResult[]>}
@@ -187,7 +202,7 @@ function lintGlob(files) {
       }
 
       return config.includeDirs.some((includedDirectory) =>
-        new RegExp(`(${excludedFrom.join("|")}).*${includedDirectory}[\/\]`).test(file)
+        includedDirPattern(excludedFrom, includedDirectory).test(file)
       );
     })
     .map(lintFile);
@@ -822,4 +837,11 @@ function run() {
   });
 }
 
-export { run, main, lintFile, errorMessages, warningMessages };
+export {
+  run,
+  main,
+  lintFile,
+  errorMessages,
+  warningMessages,
+  includedDirPattern,
+};
