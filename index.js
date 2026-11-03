@@ -9,13 +9,14 @@
  * @typedef {string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined} Affected
  */
 
-import { readFileSync, lstatSync, readdirSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, lstatSync, readdirSync, writeFileSync, existsSync, realpathSync } from "fs";
 import path from "path";
 import { globSync } from "glob";
 import jsYaml from "js-yaml";
 import chalk from "chalk";
 import { lintLog } from "./errors.js";
 import { createRequire } from "module";
+import { fileURLToPath } from "url";
 
 const { load, dump } = jsYaml;
 const requireConfig = createRequire(import.meta.url);
@@ -845,3 +846,9 @@ export {
   warningMessages,
   includedDirPattern,
 };
+
+// Keeps `node index.js` / `node .` working as in 1.7.1 (run only when this file is the entry point).
+try {
+  const self = realpathSync(fileURLToPath(import.meta.url));
+  if (realpathSync(requireConfig.resolve(path.resolve(process.argv[1]))) === self) run();
+} catch {}

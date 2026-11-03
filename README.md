@@ -41,7 +41,7 @@ There is also a [VS Code extension](https://marketplace.visualstudio.com/items?i
 
 ## Install
 
-Requirements: Node.js 22.12 or newer. Since 1.8.0 the package is ESM; `require("yaml-fm-lint")` still works on Node ≥ 22.12.
+Requirements: Node.js 22.12 or newer. Since 1.8.0 the package is ESM; `require("yaml-fm-lint")` still works on Node ≥ 22.12. On early Node 22.x releases it may print an ExperimentalWarning about loading an ES module with `require()`; it is harmless and newer 22.x releases don't print it.
 
 You can either install the package as a devDependency with
 
@@ -155,13 +155,15 @@ Config path specified in CLI arguments will never be overriden.
 | extraExcludeDirs   | `[]`                                                                                       | Additional array of directories to exclude from linting                                                                             |
 | excludeFiles       | `[]`                                                                                       | Array of file names or file paths to exclude from linting                                                                           |
 | extensions         | `[".md"]`                                                                                  | Array of extensions of files to parse                                                                                               |
-| includeDirs        | `[]`                                                                                       | Array of directories to include in linting                                                                                          |
+| includeDirs        | `[]`                                                                                       | Array of directories to include in linting (since 1.8.0 entries are matched literally, not as regular expressions)                 |
 | requiredAttributes | `[]`                                                                                       | Array of attributes that must be present in the yaml front matter                                                                   |
 | mandatory          | `true`                                                                                     | If set to false will show warning instead of error if no front matter is found                                                      |
 
 ### `.yaml-fm-lint.js`
 
 You will have to default export the config object.
+
+Since 1.8.0, ESM configs using `export default { ... }` are accepted. In a project with `"type": "module"` the file must use `export default`, since `module.exports` there is an error. CommonJS configs work as before.
 
 #### Custom linters
 

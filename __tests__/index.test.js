@@ -765,5 +765,19 @@ describe("yaml-fm-lint", () => {
       expect(lint("examples/testPassing.md").status).toBe(0);
       expect(lint("examples/testQuotes.md").status).toBe(1);
     });
+
+    it("cli.js prints the summary only once", async () => {
+      const { spawnSync } = await import("child_process");
+      const r = spawnSync(process.execPath, ["cli.js", "examples/testQuotes.md", "--colored=false"], { encoding: "utf8" });
+      expect(r.stdout.split("✘").length - 1).toBe(1);
+    });
+
+    it("direct node invocation (node index.js / node .) lints and sets the exit code", async () => {
+      const { spawnSync } = await import("child_process");
+      const lint = (...args) => spawnSync(process.execPath, args, { encoding: "utf8" }).status;
+      expect(lint("index.js", "examples/testQuotes.md")).toBe(1);
+      expect(lint("index.js", "examples/testPassing.md")).toBe(0);
+      expect(lint(".", "examples/testQuotes.md")).toBe(1);
+    });
   });
 });
