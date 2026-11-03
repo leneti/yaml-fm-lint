@@ -41,6 +41,8 @@ There is also a [VS Code extension](https://marketplace.visualstudio.com/items?i
 
 ## Install
 
+Requirements: Node.js 22.12 or newer. Since 1.8.0 the package is ESM; `require("yaml-fm-lint")` still works on Node ≥ 22.12.
+
 You can either install the package as a devDependency with
 
 ```sh
