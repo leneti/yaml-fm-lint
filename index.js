@@ -9,12 +9,28 @@
  * @typedef {string[] | number[] | { row: number, col: number, colStart?: number, colEnd?: number }[] | undefined} Affected
  */
 
-const { readFileSync, lstatSync, readdirSync, writeFileSync, existsSync } = require("fs");
-const chalk = require("chalk");
-const { load, dump } = require("js-yaml");
-const path = require("path");
-const glob = require("glob");
-const { lintLog } = require("./errors.js");
+import { readFileSync, lstatSync, readdirSync, writeFileSync, existsSync, realpathSync } from "fs";
+import path from "path";
+import { globSync } from "glob";
+import jsYaml from "js-yaml";
+import chalk from "chalk";
+import { lintLog } from "./errors.js";
+import { createRequire } from "module";
+import { fileURLToPath } from "url";
+
+const { load, dump } = jsYaml;
+const requireConfig = createRequire(import.meta.url);
+
+/**
+ * Loads a user `.js` config. Works for CommonJS configs and, through
+ * `require(esm)`, for ESM configs (whose default export is unwrapped).
+ * @param {string} absPath absolute path to the config file
+ * @returns {object}
+ */
+function loadJsConfig(absPath) {
+  const mod = requireConfig(absPath);
+  return mod[Symbol.toStringTag] === "Module" && "default" in mod ? mod.default : mod;
+}
 
 const cwd = process.cwd().replace(/\\/g, "/");
 
@@ -143,6 +159,21 @@ function lintRecursively(path) {
 }
 
 /**
+ * Builds a RegExp that matches a file inside an included directory of an excluded directory.
+ * Config strings are escaped so regex metacharacters are matched literally.
+ * The final character class matches both "/" and "\" path separators.
+ * @param {string[]} excludedFrom excluded directory names the file is under
+ * @param {string} includedDirectory directory name to keep inside an excluded one
+ * @returns {RegExp}
+ */
+function includedDirPattern(excludedFrom, includedDirectory) {
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `(${excludedFrom.map(esc).join("|")}).*${esc(includedDirectory)}[\\\\/]`
+  );
+}
+
+/**
  * Lints files found with the provided glob pattern.
  * @param {string[]} files array of file paths
  * @returns {Promise<LintResult[]>}
@@ -172,7 +203,7 @@ function lintGlob(files) {
       }
 
       return config.includeDirs.some((includedDirectory) =>
-        new RegExp(`(${excludedFrom.join("|")}).*${includedDirectory}[\/\]`).test(file)
+        includedDirPattern(excludedFrom, includedDirectory).test(file)
       );
     })
     .map(lintFile);
@@ -685,14 +716,14 @@ function getConfig(a, dir = cwd) {
   let conf =
     dir === cwd
       ? {
-          ...JSON.parse(readFileSync(`${__dirname.replace(/\\/g, "/")}/config/default.json`)),
+          ...JSON.parse(readFileSync(`${import.meta.dirname.replace(/\\/g, "/")}/config/default.json`)),
         }
       : config;
 
   if (existsSync(`${dir}/.yaml-fm-lint.js`)) {
     conf = {
       ...conf,
-      ...require(path.resolve(cwd, `${dir}/.yaml-fm-lint.js`)),
+      ...loadJsConfig(path.resolve(cwd, `${dir}/.yaml-fm-lint.js`)),
     };
   } else if (existsSync(`${dir}/.yaml-fm-lint.json`)) {
     conf = {
@@ -705,7 +736,7 @@ function getConfig(a, dir = cwd) {
     conf = {
       ...conf,
       ...(a.config.endsWith(".js")
-        ? require(`${cwd}/${a.config}`)
+        ? loadJsConfig(`${cwd}/${a.config}`)
         : JSON.parse(readFileSync(a.config))),
     };
   }
@@ -729,7 +760,7 @@ function main(a, c) {
     let lintPromise;
 
     if (args.path.includes("*")) {
-      lintPromise = lintGlob(glob.sync(args.path, { ignore: "node_modules/**/*" }));
+      lintPromise = lintGlob(globSync(args.path, { ignore: "node_modules/**/*" }));
     } else if (args.recursive) {
       lintPromise = lintRecursively(args.path);
     } else {
@@ -807,13 +838,17 @@ function run() {
   });
 }
 
-module.exports = {
+export {
   run,
   main,
   lintFile,
   errorMessages,
   warningMessages,
+  includedDirPattern,
 };
 
-// Run if invoked as a CLI
-if (require.main === module) run();
+// Keeps `node index.js` / `node .` working as in 1.7.1 (run only when this file is the entry point).
+try {
+  const self = realpathSync(fileURLToPath(import.meta.url));
+  if (realpathSync(requireConfig.resolve(path.resolve(process.argv[1]))) === self) run();
+} catch {}
