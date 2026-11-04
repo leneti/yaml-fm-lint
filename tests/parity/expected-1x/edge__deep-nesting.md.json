@@ -1,0 +1,13 @@
+{
+  "fixture": "edge/deep-nesting.md",
+  "version": "1.7.1",
+  "errors": {
+    "customError": {
+      "message": "nesting exceeded maxDepth (100)",
+      "row": 101,
+      "col": 199
+    }
+  },
+  "warnings": {},
+  "crashed": null
+}

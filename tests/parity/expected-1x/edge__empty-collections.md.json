@@ -1,0 +1,38 @@
+{
+  "fixture": "edge/empty-collections.md",
+  "version": "1.7.1",
+  "errors": {
+    "missing required attributes": [],
+    "there must be no empty lines": [],
+    "there must be no whitespace before colons": [],
+    "there must be no quotes in the front matter": [],
+    "there must be no trailing spaces": [],
+    "there must be no brackets": [
+      {
+        "row": 3,
+        "col": 8
+      },
+      {
+        "row": 3,
+        "col": 9
+      }
+    ],
+    "there must be no curly braces": [
+      {
+        "row": 4,
+        "col": 8
+      },
+      {
+        "row": 4,
+        "col": 9
+      }
+    ],
+    "lines cannot be indented more than 2 spaces from the previous line": [],
+    "there must be no trailing commas": []
+  },
+  "warnings": {
+    "possibly unintended whitespace": [],
+    "possibly unintended commas": []
+  },
+  "crashed": null
+}

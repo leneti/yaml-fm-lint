@@ -1,0 +1,39 @@
+{
+  "fixture": "1x/testDisabledRuleConfig.md",
+  "version": "1.7.1",
+  "errors": {
+    "missing required attributes": [],
+    "there must be no empty lines": [],
+    "there must be no whitespace before colons": [],
+    "there must be no quotes in the front matter": [
+      {
+        "row": 3,
+        "col": 23
+      }
+    ],
+    "there must be no trailing spaces": [],
+    "there must be no brackets": [],
+    "there must be no curly braces": [],
+    "lines cannot be indented more than 2 spaces from the previous line": [],
+    "there must be no trailing commas": [
+      {
+        "row": 6,
+        "col": 10
+      },
+      {
+        "row": 7,
+        "col": 10
+      }
+    ]
+  },
+  "warnings": {
+    "possibly unintended whitespace": [],
+    "possibly unintended commas": [
+      {
+        "row": 3,
+        "col": 17
+      }
+    ]
+  },
+  "crashed": null
+}

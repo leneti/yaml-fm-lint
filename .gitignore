@@ -1,5 +1,5 @@
+target/
+.llms/
+bench/corpus/
+bench/.tools/
 node_modules/
-coverage/
-.vscode/
-/.yaml-fm-lint.json
-/.yaml-fm-lint.js

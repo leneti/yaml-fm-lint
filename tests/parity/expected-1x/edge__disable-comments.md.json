@@ -1,0 +1,36 @@
+{
+  "fixture": "edge/disable-comments.md",
+  "version": "1.7.1",
+  "errors": {
+    "missing required attributes": [],
+    "there must be no empty lines": [],
+    "there must be no whitespace before colons": [],
+    "there must be no quotes in the front matter": [
+      {
+        "row": 8,
+        "col": 10
+      },
+      {
+        "row": 8,
+        "col": 32
+      }
+    ],
+    "there must be no trailing spaces": [
+      {
+        "row": 4,
+        "col": 20,
+        "colStart": 18,
+        "colEnd": 20
+      }
+    ],
+    "there must be no brackets": [],
+    "there must be no curly braces": [],
+    "lines cannot be indented more than 2 spaces from the previous line": [],
+    "there must be no trailing commas": []
+  },
+  "warnings": {
+    "possibly unintended whitespace": [],
+    "possibly unintended commas": []
+  },
+  "crashed": null
+}

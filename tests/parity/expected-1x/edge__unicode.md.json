@@ -1,0 +1,36 @@
+{
+  "fixture": "edge/unicode.md",
+  "version": "1.7.1",
+  "errors": {
+    "missing required attributes": [],
+    "there must be no empty lines": [],
+    "there must be no whitespace before colons": [],
+    "there must be no quotes in the front matter": [
+      {
+        "row": 2,
+        "col": 9
+      },
+      {
+        "row": 2,
+        "col": 20
+      }
+    ],
+    "there must be no trailing spaces": [
+      {
+        "row": 3,
+        "col": 11,
+        "colStart": 9,
+        "colEnd": 11
+      }
+    ],
+    "there must be no brackets": [],
+    "there must be no curly braces": [],
+    "lines cannot be indented more than 2 spaces from the previous line": [],
+    "there must be no trailing commas": []
+  },
+  "warnings": {
+    "possibly unintended whitespace": [],
+    "possibly unintended commas": []
+  },
+  "crashed": null
+}

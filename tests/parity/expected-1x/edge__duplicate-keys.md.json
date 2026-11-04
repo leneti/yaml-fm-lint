@@ -1,0 +1,13 @@
+{
+  "fixture": "edge/duplicate-keys.md",
+  "version": "1.7.1",
+  "errors": {
+    "customError": {
+      "message": "duplicated mapping key",
+      "row": 3,
+      "col": 1
+    }
+  },
+  "warnings": {},
+  "crashed": null
+}

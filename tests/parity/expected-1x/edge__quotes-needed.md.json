@@ -1,0 +1,93 @@
+{
+  "fixture": "edge/quotes-needed.md",
+  "version": "1.7.1",
+  "errors": {
+    "missing required attributes": [],
+    "there must be no empty lines": [],
+    "there must be no whitespace before colons": [],
+    "there must be no quotes in the front matter": [
+      {
+        "row": 2,
+        "col": 10
+      },
+      {
+        "row": 2,
+        "col": 18
+      },
+      {
+        "row": 3,
+        "col": 9
+      },
+      {
+        "row": 3,
+        "col": 14
+      },
+      {
+        "row": 4,
+        "col": 8
+      },
+      {
+        "row": 5,
+        "col": 11
+      },
+      {
+        "row": 5,
+        "col": 15
+      },
+      {
+        "row": 6,
+        "col": 11
+      },
+      {
+        "row": 6,
+        "col": 16
+      },
+      {
+        "row": 7,
+        "col": 11
+      },
+      {
+        "row": 7,
+        "col": 15
+      },
+      {
+        "row": 8,
+        "col": 8
+      },
+      {
+        "row": 8,
+        "col": 14
+      },
+      {
+        "row": 9,
+        "col": 14
+      },
+      {
+        "row": 9,
+        "col": 17
+      },
+      {
+        "row": 9,
+        "col": 18
+      },
+      {
+        "row": 9,
+        "col": 20
+      },
+      {
+        "row": 10,
+        "col": 11
+      }
+    ],
+    "there must be no trailing spaces": [],
+    "there must be no brackets": [],
+    "there must be no curly braces": [],
+    "lines cannot be indented more than 2 spaces from the previous line": [],
+    "there must be no trailing commas": []
+  },
+  "warnings": {
+    "possibly unintended whitespace": [],
+    "possibly unintended commas": []
+  },
+  "crashed": null
+}
