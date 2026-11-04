@@ -36,3 +36,20 @@ jobs:
       - run: node scripts/check-pack.mjs
       - run: npm audit --omit=dev
       - run: npm publish
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # Skipped if the release already exists (e.g. a re-run). GitHub marks the
+      # highest version as Latest, so 1.x releases after 2.0 won't take it over.
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --generate-notes

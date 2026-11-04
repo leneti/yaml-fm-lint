@@ -14,7 +14,7 @@
 
 [![Package size](https://img.shields.io/bundlephobia/min/yaml-fm-lint?label=size)](https://bundlephobia.com/package/yaml-fm-lint)
 [![NPM version](https://img.shields.io/npm/v/yaml-fm-lint?logo=npm&color=%23CB3837)](https://www.npmjs.com/package/yaml-fm-lint)
-[![VS Code extension](https://img.shields.io/visual-studio-marketplace/v/leneti.yaml-fm-lint?color=success&label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=leneti.yaml-fm-lint)
+[![Visual Studio Marketplace Version](https://vsmarketplacebadges.dev/version/leneti.yaml-fm-lint.svg)](https://marketplace.visualstudio.com/items?itemName=leneti.yaml-fm-lint)
 
   </p>
 </div>
@@ -146,12 +146,12 @@ Config path specified in CLI arguments will never be overriden.
 
 ### `.yaml-fm-lint.json`
 
-[Default config file](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json)
+[Default config file](https://github.com/leneti/yaml-fm-lint/blob/v1/config/default.json)
 
 | Property name      | default                                                                                    | description                                                                                                                         |
 | ------------------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
 | disabledAttributes | `[]`                                                                                       | Array of attributes to exclude from linting                                                                                         |
-| excludeDirs        | [See default config](https://github.com/leneti/yaml-fm-lint/blob/main/config/default.json) | An array of directories to exclude from linting (🛑You should not overwrite this in your config unless you know what you are doing) |
+| excludeDirs        | [See default config](https://github.com/leneti/yaml-fm-lint/blob/v1/config/default.json) | An array of directories to exclude from linting (🛑You should not overwrite this in your config unless you know what you are doing) |
 | extraExcludeDirs   | `[]`                                                                                       | Additional array of directories to exclude from linting                                                                             |
 | excludeFiles       | `[]`                                                                                       | Array of file names or file paths to exclude from linting                                                                           |
 | extensions         | `[".md"]`                                                                                  | Array of extensions of files to parse                                                                                               |
