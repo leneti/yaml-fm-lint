@@ -1,0 +1,100 @@
+{
+  "fixture": "edge/nested-flow.md",
+  "version": "1.7.1",
+  "errors": {
+    "missing required attributes": [],
+    "there must be no empty lines": [],
+    "there must be no whitespace before colons": [],
+    "there must be no quotes in the front matter": [],
+    "there must be no trailing spaces": [],
+    "there must be no brackets": [
+      {
+        "row": 4,
+        "col": 11
+      },
+      {
+        "row": 4,
+        "col": 21
+      },
+      {
+        "row": 4,
+        "col": 27
+      },
+      {
+        "row": 4,
+        "col": 32
+      },
+      {
+        "row": 6,
+        "col": 8
+      },
+      {
+        "row": 8,
+        "col": 4
+      },
+      {
+        "row": 8,
+        "col": 9
+      },
+      {
+        "row": 9,
+        "col": 2
+      }
+    ],
+    "there must be no curly braces": [
+      {
+        "row": 3,
+        "col": 8
+      },
+      {
+        "row": 4,
+        "col": 7
+      },
+      {
+        "row": 4,
+        "col": 15
+      },
+      {
+        "row": 4,
+        "col": 20
+      },
+      {
+        "row": 4,
+        "col": 33
+      },
+      {
+        "row": 5,
+        "col": 2
+      }
+    ],
+    "lines cannot be indented more than 2 spaces from the previous line": [],
+    "there must be no trailing commas": [
+      {
+        "row": 7,
+        "col": 5
+      }
+    ]
+  },
+  "warnings": {
+    "possibly unintended whitespace": [],
+    "possibly unintended commas": [
+      {
+        "row": 4,
+        "col": 13
+      },
+      {
+        "row": 4,
+        "col": 22
+      },
+      {
+        "row": 4,
+        "col": 29
+      },
+      {
+        "row": 8,
+        "col": 6
+      }
+    ]
+  },
+  "crashed": null
+}

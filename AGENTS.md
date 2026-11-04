@@ -23,9 +23,10 @@ yaml-fm-lint/
 │  ├─ core/   -> `yaml-fm-lint-core` (lib; no I/O of any kind)
 │  ├─ cli/    -> `yaml-fm-lint` (bin)
 │  └─ wasm/   -> `yaml-fm-lint-wasm` (planned)
-├─ xtask/                  # `cargo xtask <command>`; no commands yet
+├─ xtask/                  # `cargo xtask <command>`; commands: parity-record
 ├─ tests/fixtures/1x/      # markdown fixtures carried over from 1.x
-├─ tests/parity/           # (planned) recorded 1.x results
+├─ tests/fixtures/edge/    # edge-case fixtures (CRLF, BOM, unicode, ...); see its README
+├─ tests/parity/expected-1x/  # recorded 1.7.1 results, one JSON per fixture
 ├─ deny.toml, renovate.json, CHANGELOG.md, SECURITY.md   # (planned)
 ├─ npm/                    # (planned) launcher and platform packages
 ├─ editors/vscode/         # (planned)
@@ -44,7 +45,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 cargo +1.88 check -p yaml-fm-lint-core -p yaml-fm-lint --locked   # MSRV
 cargo deny check                                                   # advisories, bans, licences, sources
-cargo xtask <command>                                              # none yet
+cargo xtask parity-record                                          # run ONCE; needs node + npm; results are committed
 ```
 
 Workflow checks (Docker; run after editing anything under `.github/`):
@@ -54,6 +55,11 @@ docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color=false
 docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/zizmorcore/zizmor:1.32.0 --offline .github/workflows/
 npx --yes --package renovate@44.216.0 renovate-config-validator renovate.json
 ```
+
+`cargo xtask parity-record` installs 1.7.1 into `target/parity-1x` and records
+what it reports for every fixture. It is run once and the JSON in
+`tests/parity/expected-1x/` is committed; re-run it only when fixtures change.
+Fixtures are `-text` in `.gitattributes`, so never normalise their line endings.
 
 All of them must pass before you commit. `Cargo.lock` is committed.
 

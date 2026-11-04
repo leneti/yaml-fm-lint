@@ -1,0 +1,13 @@
+{
+  "fixture": "1x/testBadFormat.md",
+  "version": "1.7.1",
+  "errors": {
+    "customError": {
+      "message": "bad indentation of a mapping entry",
+      "row": 4,
+      "col": 3
+    }
+  },
+  "warnings": {},
+  "crashed": null
+}

@@ -1,0 +1,9 @@
+{
+  "fixture": "1x/testNoYaml.md",
+  "version": "1.7.1",
+  "errors": {
+    "noFrontMatter": true
+  },
+  "warnings": {},
+  "crashed": null
+}

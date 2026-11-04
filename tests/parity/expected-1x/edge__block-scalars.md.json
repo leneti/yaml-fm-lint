@@ -1,0 +1,38 @@
+{
+  "fixture": "edge/block-scalars.md",
+  "version": "1.7.1",
+  "errors": {
+    "missing required attributes": [],
+    "there must be no empty lines": [
+      4,
+      9,
+      17,
+      19
+    ],
+    "there must be no whitespace before colons": [],
+    "there must be no quotes in the front matter": [],
+    "there must be no trailing spaces": [
+      {
+        "row": 5,
+        "col": 32,
+        "colStart": 30,
+        "colEnd": 32
+      },
+      {
+        "row": 10,
+        "col": 14,
+        "colStart": 12,
+        "colEnd": 14
+      }
+    ],
+    "there must be no brackets": [],
+    "there must be no curly braces": [],
+    "lines cannot be indented more than 2 spaces from the previous line": [],
+    "there must be no trailing commas": []
+  },
+  "warnings": {
+    "possibly unintended whitespace": [],
+    "possibly unintended commas": []
+  },
+  "crashed": null
+}

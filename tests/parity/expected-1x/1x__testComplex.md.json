@@ -1,0 +1,412 @@
+{
+  "fixture": "1x/testComplex.md",
+  "version": "1.7.1",
+  "errors": {
+    "missing required attributes": [],
+    "there must be no empty lines": [
+      2,
+      4,
+      67,
+      68
+    ],
+    "there must be no whitespace before colons": [
+      {
+        "row": 3,
+        "col": 7,
+        "colStart": 5,
+        "colEnd": 6
+      },
+      {
+        "row": 6,
+        "col": 9,
+        "colStart": 3,
+        "colEnd": 8
+      },
+      {
+        "row": 29,
+        "col": 24,
+        "colStart": 22,
+        "colEnd": 23
+      },
+      {
+        "row": 54,
+        "col": 20,
+        "colStart": 18,
+        "colEnd": 19
+      }
+    ],
+    "there must be no quotes in the front matter": [
+      {
+        "row": 5,
+        "col": 2
+      },
+      {
+        "row": 5,
+        "col": 7
+      },
+      {
+        "row": 6,
+        "col": 12
+      },
+      {
+        "row": 6,
+        "col": 18
+      },
+      {
+        "row": 15,
+        "col": 12
+      },
+      {
+        "row": 15,
+        "col": 17
+      },
+      {
+        "row": 15,
+        "col": 20
+      },
+      {
+        "row": 15,
+        "col": 25
+      },
+      {
+        "row": 15,
+        "col": 28
+      },
+      {
+        "row": 15,
+        "col": 33
+      },
+      {
+        "row": 29,
+        "col": 27
+      },
+      {
+        "row": 29,
+        "col": 48
+      },
+      {
+        "row": 29,
+        "col": 56
+      },
+      {
+        "row": 29,
+        "col": 58
+      },
+      {
+        "row": 30,
+        "col": 26
+      },
+      {
+        "row": 30,
+        "col": 59
+      },
+      {
+        "row": 30,
+        "col": 67
+      },
+      {
+        "row": 30,
+        "col": 69
+      },
+      {
+        "row": 34,
+        "col": 11
+      },
+      {
+        "row": 34,
+        "col": 15
+      },
+      {
+        "row": 37,
+        "col": 11
+      },
+      {
+        "row": 37,
+        "col": 17
+      },
+      {
+        "row": 66,
+        "col": 46
+      },
+      {
+        "row": 66,
+        "col": 50
+      },
+      {
+        "row": 66,
+        "col": 59
+      },
+      {
+        "row": 66,
+        "col": 64
+      },
+      {
+        "row": 66,
+        "col": 129
+      },
+      {
+        "row": 66,
+        "col": 135
+      },
+      {
+        "row": 66,
+        "col": 143
+      },
+      {
+        "row": 66,
+        "col": 147
+      },
+      {
+        "row": 66,
+        "col": 155
+      },
+      {
+        "row": 66,
+        "col": 161
+      }
+    ],
+    "there must be no trailing spaces": [
+      {
+        "row": 5,
+        "col": 28,
+        "colStart": 23,
+        "colEnd": 28
+      },
+      {
+        "row": 51,
+        "col": 18,
+        "colStart": 16,
+        "colEnd": 18
+      },
+      {
+        "row": 57,
+        "col": 7,
+        "colStart": 5,
+        "colEnd": 7
+      },
+      {
+        "row": 63,
+        "col": 11,
+        "colStart": 9,
+        "colEnd": 11
+      }
+    ],
+    "there must be no brackets": [
+      {
+        "row": 15,
+        "col": 11
+      },
+      {
+        "row": 15,
+        "col": 34
+      },
+      {
+        "row": 17,
+        "col": 4
+      },
+      {
+        "row": 23,
+        "col": 4
+      }
+    ],
+    "there must be no curly braces": [
+      {
+        "row": 29,
+        "col": 17
+      },
+      {
+        "row": 29,
+        "col": 60
+      },
+      {
+        "row": 30,
+        "col": 17
+      },
+      {
+        "row": 30,
+        "col": 71
+      },
+      {
+        "row": 66,
+        "col": 9
+      },
+      {
+        "row": 66,
+        "col": 37
+      },
+      {
+        "row": 66,
+        "col": 72
+      },
+      {
+        "row": 66,
+        "col": 121
+      },
+      {
+        "row": 66,
+        "col": 162
+      },
+      {
+        "row": 66,
+        "col": 163
+      },
+      {
+        "row": 66,
+        "col": 165
+      },
+      {
+        "row": 66,
+        "col": 167
+      }
+    ],
+    "lines cannot be indented more than 2 spaces from the previous line": [
+      {
+        "row": 29,
+        "col": 14,
+        "colStart": 0,
+        "colEnd": 13
+      },
+      {
+        "row": 40,
+        "col": 7,
+        "colStart": 0,
+        "colEnd": 6
+      },
+      {
+        "row": 45,
+        "col": 9,
+        "colStart": 0,
+        "colEnd": 8
+      }
+    ],
+    "there must be no trailing commas": [
+      {
+        "row": 12,
+        "col": 11
+      },
+      {
+        "row": 13,
+        "col": 9
+      },
+      {
+        "row": 18,
+        "col": 19
+      },
+      {
+        "row": 19,
+        "col": 32
+      },
+      {
+        "row": 20,
+        "col": 35
+      },
+      {
+        "row": 21,
+        "col": 35
+      },
+      {
+        "row": 22,
+        "col": 50
+      },
+      {
+        "row": 32,
+        "col": 11
+      },
+      {
+        "row": 33,
+        "col": 17
+      }
+    ]
+  },
+  "warnings": {
+    "possibly unintended whitespace": [
+      {
+        "row": 3,
+        "col": 18,
+        "colStart": 15,
+        "colEnd": 17
+      },
+      {
+        "row": 5,
+        "col": 17,
+        "colStart": 13,
+        "colEnd": 16
+      },
+      {
+        "row": 9,
+        "col": 16,
+        "colStart": 13,
+        "colEnd": 15
+      },
+      {
+        "row": 10,
+        "col": 8,
+        "colStart": 4,
+        "colEnd": 7
+      }
+    ],
+    "possibly unintended commas": [
+      {
+        "row": 9,
+        "col": 25
+      },
+      {
+        "row": 15,
+        "col": 18
+      },
+      {
+        "row": 15,
+        "col": 26
+      },
+      {
+        "row": 29,
+        "col": 49
+      },
+      {
+        "row": 30,
+        "col": 39
+      },
+      {
+        "row": 30,
+        "col": 60
+      },
+      {
+        "row": 66,
+        "col": 16
+      },
+      {
+        "row": 66,
+        "col": 29
+      },
+      {
+        "row": 66,
+        "col": 51
+      },
+      {
+        "row": 66,
+        "col": 65
+      },
+      {
+        "row": 66,
+        "col": 86
+      },
+      {
+        "row": 66,
+        "col": 100
+      },
+      {
+        "row": 66,
+        "col": 112
+      },
+      {
+        "row": 66,
+        "col": 136
+      },
+      {
+        "row": 66,
+        "col": 148
+      }
+    ]
+  },
+  "crashed": null
+}

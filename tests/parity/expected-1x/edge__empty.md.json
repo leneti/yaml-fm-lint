@@ -1,0 +1,20 @@
+{
+  "fixture": "edge/empty.md",
+  "version": "1.7.1",
+  "errors": {
+    "missing required attributes": [],
+    "there must be no empty lines": [],
+    "there must be no whitespace before colons": [],
+    "there must be no quotes in the front matter": [],
+    "there must be no trailing spaces": [],
+    "there must be no brackets": [],
+    "there must be no curly braces": [],
+    "lines cannot be indented more than 2 spaces from the previous line": [],
+    "there must be no trailing commas": []
+  },
+  "warnings": {
+    "possibly unintended whitespace": [],
+    "possibly unintended commas": []
+  },
+  "crashed": null
+}

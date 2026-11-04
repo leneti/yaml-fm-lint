@@ -1,0 +1,6 @@
+---
+---
+
+# Heading
+
+Body text.
