@@ -118,3 +118,12 @@ owner's explicit go-ahead at that moment.
 Non-trivial work keeps a ledger under `.llms/<topic>/` (a `status.md` with
 goal, decisions, done, next, blockers). `.llms/` is git-ignored: never commit
 it and never store secrets in it.
+
+## Benchmarks
+
+`bash bench/baseline.sh` (from the repo root) records the 1.7.1 and 1.8.0
+baselines: it installs both versions, generates the data, runs a checked run
+against the generator's manifest, then times four scenarios into
+`bench/results/*.json`. Pass scenario names (`one-file`, `10k`, `100k`,
+`fix-10k`) to run only some. Results and machine details live in
+`bench/RESULTS.md`; README performance claims cite only that file.
