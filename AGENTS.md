@@ -23,7 +23,7 @@ yaml-fm-lint/
 │  ├─ core/   -> `yaml-fm-lint-core` (lib; no I/O of any kind)
 │  ├─ cli/    -> `yaml-fm-lint` (bin)
 │  └─ wasm/   -> `yaml-fm-lint-wasm` (planned)
-├─ xtask/                  # `cargo xtask <command>`; commands: parity-record
+├─ xtask/                  # `cargo xtask <command>`; commands: parity-record, bench-corpus
 ├─ tests/fixtures/1x/      # markdown fixtures carried over from 1.x
 ├─ tests/fixtures/edge/    # edge-case fixtures (CRLF, BOM, unicode, ...); see its README
 ├─ tests/parity/expected-1x/  # recorded 1.7.1 results, one JSON per fixture
@@ -46,6 +46,7 @@ cargo fmt --all --check
 cargo +1.88 check -p yaml-fm-lint-core -p yaml-fm-lint --locked   # MSRV
 cargo deny check                                                   # advisories, bans, licences, sources
 cargo xtask parity-record                                          # run ONCE; needs node + npm; results are committed
+cargo xtask bench-corpus --files 10000 --seed 1 --out bench/corpus/10k   # deterministic benchmark data (bench/corpus/ is git-ignored)
 ```
 
 Workflow checks (Docker; run after editing anything under `.github/`):
