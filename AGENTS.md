@@ -43,7 +43,16 @@ cargo test --workspace --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 cargo +1.88 check -p yaml-fm-lint-core -p yaml-fm-lint --locked   # MSRV
+cargo deny check                                                   # advisories, bans, licences, sources
 cargo xtask <command>                                              # none yet
+```
+
+Workflow checks (Docker; run after editing anything under `.github/`):
+
+```sh
+docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color=false
+docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/zizmorcore/zizmor:1.32.0 --offline .github/workflows/
+npx --yes --package renovate@44.216.0 renovate-config-validator renovate.json
 ```
 
 All of them must pass before you commit. `Cargo.lock` is committed.
@@ -78,6 +87,18 @@ All of them must pass before you commit. `Cargo.lock` is committed.
   `permissions: contents: read`, no `pull_request_target`,
   `persist-credentials: false` on checkout, allowed licences only (MIT,
   Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-3.0, Zlib).
+
+## Dependency updates (Renovate)
+
+`renovate.json` auto-merges only dev-only minor/patch updates and GitHub
+Actions digest bumps; runtime dependencies and every major update need a
+manual merge. Renovate must never change the workspace `rust-version` (the
+MSRV, 1.88). The MSRV is a deliberate policy: it is raised by hand, only when
+a dependency needs a newer compiler. Renovate's cargo manager (44.216.0) does
+not read `rust-version` at all, so no rule is needed today; if a future
+Renovate version starts reporting it, add a `packageRule` disabling that
+dependency type. `rust-toolchain.toml` (the pinned stable toolchain) is bumped
+by Renovate's separate `rust-toolchain` manager, which is intended.
 
 ## Release rules
 

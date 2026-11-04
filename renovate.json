@@ -1,0 +1,40 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "minimumReleaseAge": "3 days",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Bump the version requirement in Cargo.toml, not just Cargo.lock.",
+      "matchManagers": ["cargo"],
+      "rangeStrategy": "bump"
+    },
+    {
+      "description": "Runtime dependencies and all major updates are merged by hand.",
+      "matchDepTypes": ["dependencies", "workspace.dependencies", "build-dependencies"],
+      "automerge": false
+    },
+    {
+      "description": "Dev-only minor and patch updates merge themselves once CI passes.",
+      "matchDepTypes": ["devDependencies", "dev-dependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "GitHub Actions digest bumps merge themselves once CI passes.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Major updates are never auto-merged (must come last).",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
+}
