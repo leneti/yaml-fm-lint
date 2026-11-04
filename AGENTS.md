@@ -27,12 +27,14 @@ yaml-fm-lint/
 ├─ tests/fixtures/1x/      # markdown fixtures carried over from 1.x
 ├─ tests/fixtures/edge/    # edge-case fixtures (CRLF, BOM, unicode, ...); see its README
 ├─ tests/parity/expected-1x/  # recorded 1.7.1 results, one JSON per fixture
-├─ deny.toml, renovate.json, CHANGELOG.md, SECURITY.md   # (planned)
+├─ deny.toml, renovate.json   # cargo-deny policy; Renovate config
+├─ .github/workflows/ci.yml, .gitattributes, .gitignore
+├─ CHANGELOG.md, SECURITY.md  # (planned)
 ├─ npm/                    # (planned) launcher and platform packages
 ├─ editors/vscode/         # (planned)
 ├─ schemas/, docs/         # (planned) generated
 ├─ fuzz/                   # (planned) cargo-fuzz targets
-└─ bench/                  # (planned) hyperfine scripts, RESULTS.md
+└─ bench/                  # baseline.sh (hyperfine), RESULTS.md, results/*.json
 ```
 
 ## Commands
@@ -45,9 +47,20 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 cargo +1.88 check -p yaml-fm-lint-core -p yaml-fm-lint --locked   # MSRV
 cargo deny check                                                   # advisories, bans, licences, sources
-cargo xtask parity-record                                          # run ONCE; needs node + npm; results are committed
-cargo xtask bench-corpus --files 10000 --seed 1 --out bench/corpus/10k   # deterministic benchmark data (bench/corpus/ is git-ignored)
 ```
+
+All of them must pass before you commit. `Cargo.lock` is committed.
+
+Other xtask commands (not part of the pre-commit checks):
+
+```sh
+cargo xtask parity-record   # run ONCE; needs node + npm; Linux/macOS only; results are committed
+cargo xtask bench-corpus --files 1000 --seed 1 --out target/corpus-demo   # deterministic demo data in a throwaway folder
+```
+
+Do not point `bench-corpus` at `bench/corpus/10k` or `bench/corpus/100k`:
+`bench/baseline.sh` owns those folders (seed 42) and refuses to run on any
+other seed or file count. `bench/corpus/` is git-ignored.
 
 Workflow checks (Docker; run after editing anything under `.github/`):
 
@@ -60,9 +73,8 @@ npx --yes --package renovate@44.216.0 renovate-config-validator renovate.json
 `cargo xtask parity-record` installs 1.7.1 into `target/parity-1x` and records
 what it reports for every fixture. It is run once and the JSON in
 `tests/parity/expected-1x/` is committed; re-run it only when fixtures change.
-Fixtures are `-text` in `.gitattributes`, so never normalise their line endings.
-
-All of them must pass before you commit. `Cargo.lock` is committed.
+Fixtures and parity records are `-text` in `.gitattributes`, so never
+normalise their line endings.
 
 ## Code rules
 
@@ -92,14 +104,17 @@ All of them must pass before you commit. `Cargo.lock` is committed.
   write atomically and never write through symlinks.
 - Supply chain: pin GitHub Actions to full commit SHAs, top-level
   `permissions: contents: read`, no `pull_request_target`,
-  `persist-credentials: false` on checkout, allowed licences only (MIT,
+  `persist-credentials: false` on checkout, no install scripts (npm installs
+  use `--ignore-scripts`), allowed licences only (MIT,
   Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-3.0, Zlib).
 
 ## Dependency updates (Renovate)
 
 `renovate.json` auto-merges only dev-only minor/patch updates and GitHub
-Actions digest bumps; runtime dependencies and every major update need a
-manual merge. Renovate must never change the workspace `rust-version` (the
+Actions minor, patch and digest updates (actions are SHA-pinned with a
+`# vX.Y.Z` comment, so Renovate reports a bump such as v7.0.1 to v7.0.2 as
+minor or patch, not as a digest change); runtime dependencies and every major
+update need a manual merge. Renovate must never change the workspace `rust-version` (the
 MSRV, 1.88). The MSRV is a deliberate policy: it is raised by hand, only when
 a dependency needs a newer compiler. Renovate's cargo manager (44.216.0) does
 not read `rust-version` at all, so no rule is needed today; if a future

@@ -25,9 +25,9 @@
       "platformAutomerge": true
     },
     {
-      "description": "GitHub Actions digest bumps merge themselves once CI passes.",
+      "description": "GitHub Actions minor, patch and digest updates merge themselves once CI passes (pinned actions show a patch bump as a version change, not a digest change).",
       "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["digest"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true,
       "platformAutomerge": true
     },

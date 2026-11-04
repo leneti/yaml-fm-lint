@@ -6,7 +6,7 @@
     <b>yaml-fm-lint</b>
   </p>
   <p>
-     <i>NodeJS linter for YAML front matter in markdown files</i>
+     <i>A linter for YAML front matter in markdown files</i>
   </p>
   <p>
 

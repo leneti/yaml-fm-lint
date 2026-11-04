@@ -187,33 +187,50 @@ fn record_one(root: &Path, pkg_dir: &Path, fixture_rel: &str) -> Recorded {
     }
 }
 
+/// Fails if every fixture crashed: that means the environment is broken (for
+/// example a damaged npm install), not that 1.7.1 crashed on all of them.
+fn check_not_all_crashed(crashed: usize, total: usize) -> Result<()> {
+    if total > 0 && crashed == total {
+        bail!(
+            "all {total} fixtures crashed, so the environment looks broken; \
+             delete target/parity-1x and retry (no records were written)"
+        );
+    }
+    Ok(())
+}
+
 /// Runs `cargo xtask parity-record`.
 pub fn record() -> Result<()> {
     let root = repo_root()?;
     let pkg_dir = root.join("target").join("parity-1x");
     let out_dir = root.join("tests").join("parity").join("expected-1x");
     install_1x(&pkg_dir)?;
-    fs::create_dir_all(&out_dir)?;
 
     let fixtures = list_fixtures(&root.join("tests").join("fixtures"))?;
-    let mut crashed_count = 0;
-    let mut wanted = Vec::new();
+
+    // Run every fixture first and write only afterwards, so a broken
+    // environment cannot overwrite good records.
+    let mut results = Vec::new();
     for fixture_rel in &fixtures {
         let recorded = record_one(&root, &pkg_dir, fixture_rel);
         if recorded.crashed {
-            crashed_count += 1;
             println!("crashed: {fixture_rel}");
         }
-        let name = record_file_name(fixture_rel);
-        fs::write(out_dir.join(&name), recorded.json)?;
-        wanted.push(name);
+        results.push((record_file_name(fixture_rel), recorded));
+    }
+    let crashed_count = results.iter().filter(|(_, r)| r.crashed).count();
+    check_not_all_crashed(crashed_count, results.len())?;
+
+    fs::create_dir_all(&out_dir)?;
+    for (name, recorded) in &results {
+        fs::write(out_dir.join(name), &recorded.json)?;
     }
 
     // Remove records whose fixture is gone.
     for entry in fs::read_dir(&out_dir)? {
         let entry = entry?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name.ends_with(".json") && !wanted.contains(&name) {
+        if name.ends_with(".json") && !results.iter().any(|(wanted, _)| *wanted == name) {
             fs::remove_file(entry.path())?;
         }
     }
@@ -223,4 +240,25 @@ pub fn record() -> Result<()> {
         fixtures.len()
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_not_all_crashed;
+
+    #[test]
+    fn all_crashed_is_an_error() {
+        assert!(check_not_all_crashed(3, 3).is_err());
+    }
+
+    #[test]
+    fn some_crashed_is_fine() {
+        assert!(check_not_all_crashed(2, 3).is_ok());
+        assert!(check_not_all_crashed(0, 3).is_ok());
+    }
+
+    #[test]
+    fn no_fixtures_is_fine() {
+        assert!(check_not_all_crashed(0, 0).is_ok());
+    }
 }

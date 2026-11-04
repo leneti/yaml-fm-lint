@@ -27,7 +27,11 @@ fn fixture_files() -> Vec<PathBuf> {
 #[test]
 fn fixture_line_endings_are_preserved() {
     let files = fixture_files();
-    assert_eq!(files.len(), 36, "expected 19 + 17 fixtures");
+    assert_eq!(
+        files.len(),
+        36,
+        "fixture count changed: update this count and re-run `cargo xtask parity-record`"
+    );
     for path in files {
         let bytes = fs::read(&path).unwrap();
         if path.file_name().is_some_and(|n| n == "crlf.md") {

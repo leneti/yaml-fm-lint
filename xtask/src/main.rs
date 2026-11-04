@@ -7,28 +7,23 @@ use xtask::{corpus, parity};
 const COMMANDS: &[&str] = &["parity-record", "bench-corpus"];
 
 fn main() -> ExitCode {
-    match std::env::args().nth(1).as_deref() {
-        Some("parity-record") => match parity::record() {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(err) => {
-                eprintln!("error: {err:#}");
-                ExitCode::FAILURE
-            }
-        },
+    let result = match std::env::args().nth(1).as_deref() {
+        Some("parity-record") => parity::record(),
         Some("bench-corpus") => {
             let args: Vec<String> = std::env::args().skip(2).collect();
-            match corpus::run(&args) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(err) => {
-                    eprintln!("error: {err:#}");
-                    ExitCode::FAILURE
-                }
-            }
+            corpus::run(&args)
         }
         _ => {
             eprintln!("usage: cargo xtask <command>");
             eprintln!("available commands: {}", COMMANDS.join(", "));
-            ExitCode::from(2)
+            return ExitCode::from(2);
+        }
+    };
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("error: {err:#}");
+            ExitCode::FAILURE
         }
     }
 }

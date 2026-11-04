@@ -13,13 +13,13 @@ Baselines for yaml-fm-lint 1.7.1 and 1.8.0, recorded before any 2.0 core code ex
 | Kernel | 7.0.0-38-generic |
 | Node | v22.20.0 |
 | hyperfine | 2.0.0 |
-| Load average before the run | 0.37 (2026-11-04T22:41Z; 1 min, machine otherwise idle) |
+| Load average before the run | 0.37, 1.73, 1.66 (1, 5 and 15 min; `uptime` at 2026-11-04T22:41:11Z) |
 
-The published numbers are from the idle run. An earlier run on a busy machine was discarded.
+The 5- and 15-minute load averages reflect the build and smoke work that had just finished, not concurrent load during the run. The published numbers are from the idle run. An earlier run on a busy machine was discarded.
 
 ## Data
 
-- Generator: `cargo xtask bench-corpus`, commit `ce84030`, seed `42`.
+- Generator: `cargo xtask bench-corpus`, source `xtask/src/corpus.rs` at git blob `abc4eb987fe480baa60a95a7d4bd42779711a75e` (check with `git hash-object xtask/src/corpus.rs`), seed `42`.
 - 10k set: 10,000 files, 1,032 with deliberate errors. 100k set: 100,000 files, 9,998 with deliberate errors.
 - Before any timing, the script runs both versions once on the 10k set with `--oneline` and checks that the number of distinct paths flagged (1,032) equals the length of `error_files` in `manifest.json`. Both versions passed (1,032 = 1,032).
 - A one-off manual check on the 100k set (not part of the script) also matched: both versions flagged 9,998 distinct paths, equal to the 9,998 `error_files`, out of 100,000 `.md` files.

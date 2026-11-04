@@ -19,10 +19,27 @@ done
 [ -f bench/.tools/1.7.1/node_modules/yaml-fm-lint/index.js ] || { echo "missing 1.7.1 entry point" >&2; exit 1; }
 [ -f bench/.tools/1.8.0/node_modules/yaml-fm-lint/cli.js ] || { echo "missing 1.8.0 entry point" >&2; exit 1; }
 
-# Generate the data sets (skipped if present).
+# Generate the data sets. An existing set is reused only if its manifest says
+# it was made with seed 42 and the expected number of files.
+manifest_field() { # manifest_field <manifest.json> <seed|files>
+  if command -v jq >/dev/null; then
+    jq -r ".$2" "$1"
+  else
+    node -e 'console.log(require(require("path").resolve(process.argv[1]))[process.argv[2]])' "$1" "$2"
+  fi
+}
 for n in 10 100; do
-  if [ ! -f "bench/corpus/${n}k/manifest.json" ]; then
-    cargo xtask bench-corpus --files "${n}000" --seed 42 --out "bench/corpus/${n}k"
+  dir="bench/corpus/${n}k"
+  if [ -f "$dir/manifest.json" ]; then
+    seed=$(manifest_field "$dir/manifest.json" seed)
+    files=$(manifest_field "$dir/manifest.json" files)
+    if [ "$seed" != "42" ] || [ "$files" != "${n}000" ]; then
+      echo "$dir was generated with seed $seed and $files files, but the baseline needs seed 42 and ${n}000 files." >&2
+      echo "Delete $dir and run this script again." >&2
+      exit 1
+    fi
+  else
+    cargo xtask bench-corpus --files "${n}000" --seed 42 --out "$dir"
   fi
 done
 
