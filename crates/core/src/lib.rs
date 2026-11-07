@@ -6,6 +6,7 @@ mod config;
 mod diagnostic;
 mod edit;
 mod error;
+mod line_index;
 mod rule_id;
 
 pub use config::{Config, Level};
@@ -13,4 +14,5 @@ pub use diagnostic::{
     Applicability, DataEffect, Diagnostic, Fix, PathStep, Severity, TextEdit, TextRange,
 };
 pub use error::{ConfigError, ConfigErrorKind, FixError};
+pub use line_index::{LineIndex, Position};
 pub use rule_id::RuleId;
