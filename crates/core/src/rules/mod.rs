@@ -8,6 +8,7 @@ pub(crate) mod no_trailing_commas;
 pub(crate) mod no_trailing_spaces;
 pub(crate) mod require_front_matter;
 pub(crate) mod required_keys;
+pub(crate) mod single_space_after_colon;
 pub(crate) mod yaml_syntax;
 
 use crate::RuleId;
@@ -20,4 +21,8 @@ pub(crate) const RULES: &[(RuleId, RuleFn)] = &[
     (RuleId::NoTrailingSpaces, no_trailing_spaces::check),
     (RuleId::NoBlankLines, no_blank_lines::check),
     (RuleId::NoSpaceBeforeColon, no_space_before_colon::check),
+    (
+        RuleId::SingleSpaceAfterColon,
+        single_space_after_colon::check,
+    ),
 ];
