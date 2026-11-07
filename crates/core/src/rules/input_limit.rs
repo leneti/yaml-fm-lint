@@ -35,3 +35,6 @@ pub(crate) const TOO_DEEP: &str = "nesting is deeper than 128 levels";
 
 /// Aliases expand to more than `data::MAX_EXPANDED_NODES` nodes.
 pub(crate) const TOO_MANY_NODES: &str = "aliases expand to more than 100,000 nodes";
+
+/// Aliases expand to more than `data::MAX_ALIAS_BYTES` bytes of text.
+pub(crate) const TOO_MUCH_TEXT: &str = "aliases expand to more than 16 MiB of text";

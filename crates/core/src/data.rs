@@ -13,6 +13,9 @@ use crate::{PathStep, RuleId, TextRange};
 /// The most nodes aliases may add to the tree (the "billion laughs" guard).
 pub(crate) const MAX_EXPANDED_NODES: usize = 100_000;
 
+/// The most text (summed scalar lengths, keys included) aliases may add to the tree.
+pub(crate) const MAX_ALIAS_BYTES: usize = 16 * 1024 * 1024;
+
 /// A YAML value. Mappings keep source order and may have any value as a key.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Data {
@@ -134,6 +137,8 @@ struct Builder<'a> {
     alias_depth: usize,
     /// Nodes added by alias expansion so far.
     expanded: usize,
+    /// Bytes of scalar text added by alias expansion so far.
+    expanded_bytes: usize,
     result: Option<Data>,
 }
 
@@ -158,6 +163,12 @@ impl<'a> Builder<'a> {
         }
         match &node.kind {
             NodeKind::Scalar { value, style } => {
+                if self.alias_depth > 0 {
+                    self.expanded_bytes += value.len();
+                    if self.expanded_bytes > MAX_ALIAS_BYTES {
+                        return Err(issue(RuleId::InputLimit, at, input_limit::TOO_MUCH_TEXT));
+                    }
+                }
                 let plain = *style == Style::Plain && !node.tagged_str;
                 let data = if plain {
                     resolve_plain(value)
@@ -217,9 +228,8 @@ impl<'a> Builder<'a> {
 ///
 /// An alias takes the latest anchor defined before it (anchors are numbered per definition,
 /// so that is the one it names); an anchor is usable once its node is complete. Aliases may
-/// add at most [`MAX_EXPANDED_NODES`] nodes in all, and nest at most [`MAX_DEPTH`] levels.
+/// add at most [`MAX_EXPANDED_NODES`] nodes and [`MAX_ALIAS_BYTES`] bytes of text in all, and nest at most [`MAX_DEPTH`] levels.
 /// The walk uses an explicit stack, so depth never reaches the call stack.
-#[allow(dead_code)] // the result is used once the schema check lands
 pub(crate) fn build(root: &Node) -> Result<Data, SyntaxIssue> {
     let mut b = Builder {
         anchors: HashMap::new(),
@@ -227,6 +237,7 @@ pub(crate) fn build(root: &Node) -> Result<Data, SyntaxIssue> {
         alias: None,
         alias_depth: 0,
         expanded: 0,
+        expanded_bytes: 0,
         result: None,
     };
     b.enter(root, false)?;
@@ -482,9 +493,6 @@ mod tests {
 
     #[test]
     fn alias_bomb_points_at_the_alias() {
-        let source = wrap("a0: &a0 [x]\na1: &a1 [*a0, *a0, *a0]\nbig: [*a1, *a1, *a1]\n");
-        // Small: fine.
-        data_of(&source);
         let source = wrap(&bomb());
         let Extraction::Found(fm) = extract(&source) else {
             panic!()
@@ -493,6 +501,48 @@ mod tests {
         let issue = build(&root).unwrap_err();
         assert_eq!(issue.rule, RuleId::InputLimit);
         assert_eq!(&source[issue.range.start..issue.range.end], "*a4");
+    }
+
+    fn big_string_aliased(times: usize) -> String {
+        let aliases = vec!["*s"; times].join(", ");
+        wrap(&format!(
+            "a: &s \"{}\"\nb: [{aliases}]\n",
+            "x".repeat(64 * 1024)
+        ))
+    }
+
+    #[test]
+    fn alias_text_is_limited() {
+        let started = std::time::Instant::now();
+        let source = big_string_aliased(300);
+        let lines = lint_all(&source, Config::default());
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(
+            lines[0].ends_with("input-limit aliases expand to more than 16 MiB of text"),
+            "{lines:?}"
+        );
+        assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
+
+        let Extraction::Found(fm) = extract(&source) else {
+            panic!()
+        };
+        let root = parse(&source, &fm).expect("parses");
+        let issue = build(&root).unwrap_err();
+        assert_eq!(issue.rule, RuleId::InputLimit);
+        // The 257th alias is the first to cross 16 MiB.
+        assert_eq!(&source[issue.range.start..issue.range.end], "*s");
+    }
+
+    #[test]
+    fn alias_text_under_the_limit_builds() {
+        let source = big_string_aliased(200);
+        let Data::Map(pairs) = data_of(&source) else {
+            panic!()
+        };
+        let Data::Seq(items) = &pairs[1].1 else {
+            panic!()
+        };
+        assert_eq!(items.len(), 200);
     }
 
     #[test]
