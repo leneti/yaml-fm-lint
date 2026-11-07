@@ -1,6 +1,7 @@
 //! The rule context and the rule runner.
 
 use crate::config::{Config, Level};
+use crate::disable::collect;
 use crate::document::Document;
 use crate::extract::FrontMatter;
 use crate::rules::RULES;
@@ -66,8 +67,25 @@ pub(crate) fn severity(level: Level) -> Option<Severity> {
 }
 
 /// Runs every rule that is not off, in source order.
+///
+/// Findings covered by a disable comment are dropped; bad disable comments are added last.
 pub(crate) fn run(ctx: &Context<'_>) -> Vec<Diagnostic> {
-    run_rules(ctx, RULES)
+    let (disables, invalid) = collect(ctx.source, ctx.doc);
+    let mut diagnostics = run_rules(ctx, RULES);
+    diagnostics.retain(|d| {
+        !ctx.doc
+            .line_index(d.range.start)
+            .is_some_and(|line| disables.covers(d.rule, line))
+    });
+    diagnostics.extend(invalid.into_iter().map(|finding| Diagnostic {
+        rule: RuleId::InvalidDisableComment,
+        severity: Severity::Warning,
+        message: finding.message,
+        range: finding.range,
+        fix: finding.fix,
+    }));
+    diagnostics.sort_by_key(|d| (d.range.start, d.rule.as_str()));
+    diagnostics
 }
 
 fn run_rules(ctx: &Context<'_>, rules: &[(RuleId, RuleFn)]) -> Vec<Diagnostic> {

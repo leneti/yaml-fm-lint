@@ -5,6 +5,7 @@
 mod config;
 mod data;
 mod diagnostic;
+mod disable;
 mod document;
 mod edit;
 mod error;
