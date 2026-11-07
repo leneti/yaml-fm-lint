@@ -5,7 +5,7 @@ use crate::TextEdit;
 /// Applies sorted, non-overlapping edits to `text`.
 ///
 /// Returns `None` if the edits are unsorted, overlap, go out of bounds or split a character.
-#[allow(dead_code)] // first used by the fix loop (Task 6/11); remove then
+#[allow(dead_code)] // only the test helpers call it until `Linter::fix` (Task 11); remove then
 pub(crate) fn apply_edits(text: &str, edits: &[TextEdit]) -> Option<String> {
     let mut out = String::with_capacity(text.len());
     let mut cursor = 0;

@@ -1,6 +1,11 @@
 //! Helpers shared by the tests.
 
-use crate::{Config, LineIndex, Linter, TextRange};
+use crate::data::build;
+use crate::document::Document;
+use crate::edit::apply_edits;
+use crate::extract::{Extraction, FrontMatter, extract};
+use crate::parse::parse;
+use crate::{Applicability, Config, LineIndex, Linter, RuleId, TextEdit, TextRange};
 
 /// A range as `L:C-L:C`: 1-based line, 1-based character column, end exclusive.
 pub(crate) fn show(source: &str, range: TextRange) -> String {
@@ -36,6 +41,75 @@ pub(crate) fn wrap(fm: &str) -> String {
         "\n"
     };
     format!("---\n{fm}{newline}---\nBody.\n")
+}
+
+/// The diagnostics of `rule` for `source` as `L:C-L:C message`.
+#[allow(dead_code)] // first caller lands with the rules
+pub(crate) fn lint_src(rule: RuleId, source: &str, config: Config) -> Vec<String> {
+    let linter = Linter::new(config, None).expect("valid config");
+    linter
+        .lint(source)
+        .diagnostics
+        .iter()
+        .filter(|d| d.rule == rule)
+        .map(|d| format!("{} {}", show(source, d.range), d.message))
+        .collect()
+}
+
+/// The diagnostics of `rule` for front-matter text, wrapped by [`wrap`].
+#[allow(dead_code)] // first caller lands with the rules
+pub(crate) fn lint_rule(rule: RuleId, fm: &str, config: Config) -> Vec<String> {
+    lint_src(rule, &wrap(fm), config)
+}
+
+/// `source` with every `Automatic` fix applied once.
+///
+/// Stand-in for `Linter::fix` until Task 11: a fix that overlaps an earlier one is skipped.
+#[allow(dead_code)] // first caller lands with the rules
+pub(crate) fn fix_src(source: &str, config: Config) -> String {
+    let linter = Linter::new(config, None).expect("valid config");
+    let mut fixes: Vec<Vec<TextEdit>> = linter
+        .lint(source)
+        .diagnostics
+        .into_iter()
+        .filter_map(|d| d.fix)
+        .filter(|fix| fix.applicability == Applicability::Automatic)
+        .map(|fix| fix.edits)
+        .filter(|edits| !edits.is_empty())
+        .collect();
+    fixes.sort_by_key(|edits| edits.first().map(|e| e.range.start));
+    let mut cursor = 0;
+    let mut edits = Vec::new();
+    for fix in fixes {
+        let start = fix.first().map_or(0, |e| e.range.start);
+        if start >= cursor {
+            cursor = fix.last().map_or(cursor, |e| e.range.end);
+            edits.extend(fix);
+        }
+    }
+    apply_edits(source, &edits).expect("fix edits apply")
+}
+
+/// The front-matter text (without delimiters) after the fixes; the body must be unchanged.
+#[allow(dead_code)] // first caller lands with the rules
+pub(crate) fn fix_fm(fm: &str, config: Config) -> String {
+    let fixed = fix_src(&wrap(fm), config);
+    fixed
+        .strip_prefix("---\n")
+        .and_then(|rest| rest.strip_suffix("---\nBody.\n"))
+        .expect("delimiters and body unchanged")
+        .to_string()
+}
+
+/// Parses `source` into its front matter and a [`Document`].
+pub(crate) fn document(source: &str, ignore_keys: &[String]) -> (FrontMatter, Document) {
+    let Extraction::Found(fm) = extract(source) else {
+        panic!("no front matter in {source:?}");
+    };
+    let root = parse(source, &fm).expect("parses");
+    let data = build(&root).expect("builds");
+    let doc = Document::new(source, &fm, root, data, ignore_keys);
+    (fm, doc)
 }
 
 #[cfg(test)]

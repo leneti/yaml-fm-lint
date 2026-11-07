@@ -1,12 +1,12 @@
 //! The linter: configuration plus the lint pipeline.
 
 use crate::data::build;
+use crate::document::Document;
 use crate::extract::{Extraction, extract, start_offset};
+use crate::lint::{Context, run, severity};
 use crate::parse::parse;
 use crate::rules::{input_limit, require_front_matter};
-use crate::{
-    Config, ConfigError, ConfigErrorKind, Diagnostic, FixError, Level, RuleId, Severity, TextRange,
-};
+use crate::{Config, ConfigError, ConfigErrorKind, Diagnostic, FixError, RuleId, TextRange};
 
 /// Lints and fixes front matter according to a [`Config`].
 #[derive(Debug, Clone)]
@@ -71,7 +71,7 @@ impl Linter {
             start: offset,
             end: offset,
         };
-        let (front_matter, diagnostic) = match extract(source) {
+        let (front_matter, diagnostics) = match extract(source) {
             Extraction::Missing => (
                 None,
                 self.diagnostic(
@@ -92,34 +92,40 @@ impl Linter {
                 None,
                 self.diagnostic(RuleId::InputLimit, input_limit::TOO_LARGE, open),
             ),
-            Extraction::Found(fm) => (
-                Some(TextRange {
+            Extraction::Found(fm) => {
+                let range = TextRange {
                     start: fm.open.start,
                     end: fm.end,
-                }),
+                };
                 // A syntax error or exceeded limit stops linting; no other rule runs.
-                parse(source, &fm)
-                    .and_then(|root| build(&root))
-                    .err()
-                    .and_then(|issue| self.diagnostic(issue.rule, &issue.message, issue.range)),
-            ),
+                let parsed = parse(source, &fm).and_then(|root| {
+                    let data = build(&root)?;
+                    Ok((root, data))
+                });
+                let diagnostics = match parsed {
+                    Err(issue) => self.diagnostic(issue.rule, &issue.message, issue.range),
+                    Ok((root, data)) => {
+                        let doc = Document::new(source, &fm, root, data, &self.config.ignore_keys);
+                        return LintReport {
+                            front_matter: Some(range),
+                            diagnostics: run(&Context::new(source, &fm, &doc, &self.config)),
+                        };
+                    }
+                };
+                (Some(range), diagnostics)
+            }
         };
         LintReport {
             front_matter,
-            diagnostics: diagnostic.into_iter().collect(),
+            diagnostics: diagnostics.into_iter().collect(),
         }
     }
 
     /// A diagnostic for `rule` at its configured severity, or `None` if the rule is off.
     fn diagnostic(&self, rule: RuleId, message: &str, range: TextRange) -> Option<Diagnostic> {
-        let severity = match self.config.level(rule) {
-            Level::Off => return None,
-            Level::Warn => Severity::Warning,
-            Level::Error => Severity::Error,
-        };
         Some(Diagnostic {
             rule,
-            severity,
+            severity: severity(self.config.level(rule))?,
             message: message.to_string(),
             range,
             fix: None,

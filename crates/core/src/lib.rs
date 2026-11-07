@@ -5,10 +5,12 @@
 mod config;
 mod data;
 mod diagnostic;
+mod document;
 mod edit;
 mod error;
 mod extract;
 mod line_index;
+mod lint;
 mod linter;
 mod parse;
 mod rule_id;
