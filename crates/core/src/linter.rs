@@ -6,7 +6,7 @@ use crate::extract::{Extraction, extract, start_offset};
 use crate::lint::{Context, run, severity};
 use crate::parse::parse;
 use crate::rules::{input_limit, require_front_matter};
-use crate::{Config, ConfigError, ConfigErrorKind, Diagnostic, FixError, RuleId, TextRange};
+use crate::{Config, ConfigError, ConfigErrorKind, Diagnostic, RuleId, TextRange};
 
 /// Lints and fixes front matter according to a [`Config`].
 #[derive(Debug, Clone)]
@@ -131,16 +131,6 @@ impl Linter {
             fix: None,
         })
     }
-
-    /// Fixes what can be fixed in `source`.
-    pub fn fix(&self, source: &str) -> Result<FixOutcome, FixError> {
-        Ok(FixOutcome {
-            output: source.to_string(),
-            applied: 0,
-            refused: Vec::new(),
-            remaining: self.lint(source).diagnostics,
-        })
-    }
 }
 
 #[cfg(test)]
@@ -206,16 +196,6 @@ mod tests {
         let report = linter.lint("\u{FEFF}---\na: 1\n---\nbody");
         assert_eq!(report.front_matter, Some(TextRange { start: 3, end: 16 }));
         assert!(report.diagnostics.is_empty());
-    }
-
-    #[test]
-    fn fix_changes_nothing_yet() {
-        let linter = Linter::new(Config::default(), None).unwrap();
-        let outcome = linter.fix("hello\n").unwrap();
-        assert_eq!(outcome.output, "hello\n");
-        assert_eq!(outcome.applied, 0);
-        assert!(outcome.refused.is_empty());
-        assert_eq!(outcome.remaining.len(), 1);
     }
 
     #[rstest]

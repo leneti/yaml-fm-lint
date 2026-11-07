@@ -2,10 +2,9 @@
 
 use crate::data::build;
 use crate::document::Document;
-use crate::edit::apply_edits;
 use crate::extract::{Extraction, FrontMatter, extract};
 use crate::parse::parse;
-use crate::{Applicability, Config, LineIndex, Linter, RuleId, TextEdit, TextRange};
+use crate::{Config, LineIndex, Linter, RuleId, TextRange};
 
 /// A range as `L:C-L:C`: 1-based line, 1-based character column, end exclusive.
 pub(crate) fn show(source: &str, range: TextRange) -> String {
@@ -60,31 +59,20 @@ pub(crate) fn lint_rule(rule: RuleId, fm: &str, config: Config) -> Vec<String> {
     lint_src(rule, &wrap(fm), config)
 }
 
-/// `source` with every `Automatic` fix applied once.
-///
-/// Stand-in for `Linter::fix` until Task 11: a fix that overlaps an earlier one is skipped.
+/// What follows the closing delimiter's line (the body), if `source` has front matter.
+fn body(source: &str) -> Option<&str> {
+    match extract(source) {
+        Extraction::Found(fm) => source.get(fm.end..),
+        _ => None,
+    }
+}
+
+/// `source` after `Linter::fix`; the body must be unchanged.
 pub(crate) fn fix_src(source: &str, config: Config) -> String {
     let linter = Linter::new(config, None).expect("valid config");
-    let mut fixes: Vec<Vec<TextEdit>> = linter
-        .lint(source)
-        .diagnostics
-        .into_iter()
-        .filter_map(|d| d.fix)
-        .filter(|fix| fix.applicability == Applicability::Automatic)
-        .map(|fix| fix.edits)
-        .filter(|edits| !edits.is_empty())
-        .collect();
-    fixes.sort_by_key(|edits| edits.first().map(|e| e.range.start));
-    let mut cursor = 0;
-    let mut edits = Vec::new();
-    for fix in fixes {
-        let start = fix.first().map_or(0, |e| e.range.start);
-        if start >= cursor {
-            cursor = fix.last().map_or(cursor, |e| e.range.end);
-            edits.extend(fix);
-        }
-    }
-    apply_edits(source, &edits).expect("fix edits apply")
+    let output = linter.fix(source).expect("fixable").output;
+    assert_eq!(body(&output), body(source), "the fix changed the body");
+    output
 }
 
 /// The front-matter text (without delimiters) after the fixes; the body must be unchanged.

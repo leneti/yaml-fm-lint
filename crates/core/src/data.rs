@@ -37,7 +37,6 @@ pub(crate) enum Data {
 
 /// Structural equality: floats compare by bits (so `0.0 != -0.0`) except that any NaN equals
 /// any NaN, and mappings compare in source order.
-#[allow(dead_code)] // first caller lands with the fix verification
 pub(crate) fn data_eq(a: &Data, b: &Data) -> bool {
     match (a, b) {
         (Data::Null, Data::Null) => true,
@@ -282,6 +281,16 @@ pub(crate) fn lookup<'a>(data: &'a Data, path: &[PathStep]) -> Option<&'a Data> 
         (Data::Seq(items), PathStep::Item(i)) => items.get(*i),
         (Data::Map(pairs), PathStep::Key(i)) => pairs.get(*i).map(|(k, _)| k),
         (Data::Map(pairs), PathStep::Value(i)) => pairs.get(*i).map(|(_, v)| v),
+        _ => None,
+    })
+}
+
+/// Like [`lookup`], to replace the value.
+pub(crate) fn lookup_mut<'a>(data: &'a mut Data, path: &[PathStep]) -> Option<&'a mut Data> {
+    path.iter().try_fold(data, |data, step| match (data, step) {
+        (Data::Seq(items), PathStep::Item(i)) => items.get_mut(*i),
+        (Data::Map(pairs), PathStep::Key(i)) => pairs.get_mut(*i).map(|(k, _)| k),
+        (Data::Map(pairs), PathStep::Value(i)) => pairs.get_mut(*i).map(|(_, v)| v),
         _ => None,
     })
 }

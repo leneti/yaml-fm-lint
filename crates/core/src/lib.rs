@@ -10,6 +10,7 @@ mod document;
 mod edit;
 mod error;
 mod extract;
+mod fix;
 mod line_index;
 mod lint;
 mod linter;
