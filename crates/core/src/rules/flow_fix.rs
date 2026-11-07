@@ -20,7 +20,11 @@ fn block_lines(source: &str, node: &Node) -> Option<Vec<String>> {
     items
         .iter()
         .map(|item| {
-            if !matches!(item.kind, NodeKind::Scalar { .. }) {
+            // An item's range leaves out its anchor and tag, which the rewrite would drop.
+            if !matches!(item.kind, NodeKind::Scalar { .. })
+                || item.anchor.is_some()
+                || item.has_tag
+            {
                 return None;
             }
             let text = source.get(item.range.start..item.range.end)?;
@@ -34,7 +38,7 @@ fn block_lines(source: &str, node: &Node) -> Option<Vec<String>> {
 /// The collection must be the value of a block mapping entry or an item of a block sequence,
 /// outside any flow collection, with no anchor, tag or comment on it. A value moves to
 /// the lines below its key, indented by the `indentation` size; an item uses the compact form
-/// (its first line stays after the parent's `- `). Lines use the file's line ending.
+/// (its first line stays after the parent's `- `, the rest line up with it). Lines use the file's line ending.
 pub(crate) fn flow_to_block(ctx: &Context<'_>, r: &NodeRef<'_>) -> Option<Fix> {
     let node = r.node;
     if r.in_flow || node.anchor.is_some() || node.has_tag {
@@ -57,11 +61,7 @@ pub(crate) fn flow_to_block(ctx: &Context<'_>, r: &NodeRef<'_>) -> Option<Fix> {
         (Role::Item, _, Some(parent))
             if matches!(parent.kind, NodeKind::Sequence { flow: false, .. }) =>
         {
-            (
-                node.range.start,
-                column(ctx, parent.range.start)? + 2,
-                false,
-            )
+            (node.range.start, column(ctx, node.range.start)?, false)
         }
         _ => return None,
     };

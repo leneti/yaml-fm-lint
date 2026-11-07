@@ -73,6 +73,7 @@ mod tests {
     #[case::non_ascii_key("é: [a]\n", &["2:4-2:7"], "é:\n  - a\n")]
     #[case::nested_key("a:\n  b: [x]\n", &["3:6-3:9"], "a:\n  b:\n    - x\n")]
     #[case::compact_key("l:\n  - k: [x]\n", &["3:8-3:11"], "l:\n  - k:\n      - x\n")]
+    #[case::wide_dash("l:\n  -   [a, b]\n", &["3:7-3:13"], "l:\n  -   - a\n      - b\n")]
     #[case::value_on_next_line("a:\n  [x, y]\n", &["3:3-3:9"], "a:\n  - x\n  - y\n")]
     fn flagged_and_fixed(#[case] fm: &str, #[case] want: &[&str], #[case] fixed: &str) {
         assert_eq!(lint_rule(RULE, fm, Config::default()), with_message(want));
@@ -89,6 +90,8 @@ mod tests {
     #[case::comment_before_value("a: # c\n  [x]\n", &["3:3-3:6"])]
     #[case::anchor("a: &s [x]\n", &["2:7-2:10"])]
     #[case::tag("a: !!seq [x]\n", &["2:10-2:13"])]
+    #[case::item_tag("k: [!foo a, b]\n", &["2:4-2:15"])]
+    #[case::item_anchor("k: [&x a, b]\n", &["2:4-2:13"])]
     #[case::multi_line_item("a: [\"x\n  y\", z]\n", &["2:4-3:9"])]
     #[case::in_flow_mapping("a: {b: [x]}\n", &["2:8-2:11"])]
     fn flagged_without_fix(#[case] fm: &str, #[case] want: &[&str]) {
@@ -127,6 +130,19 @@ mod tests {
         assert_eq!(
             fix_src(source, Config::default()),
             "---\r\ntags:\r\n  - a\r\n  - b\r\n---\r\n"
+        );
+    }
+
+    #[test]
+    fn crlf_item_and_multi_line_value() {
+        let source = "---\r\nk:\r\n  - [a, b]\r\nz: [\r\n  p,\r\n  q\r\n]\r\n---\r\n";
+        assert_eq!(
+            lint_src(RULE, source, Config::default()),
+            with_message(&["3:5-3:11", "4:4-7:2"])
+        );
+        assert_eq!(
+            fix_src(source, Config::default()),
+            "---\r\nk:\r\n  - - a\r\n    - b\r\nz:\r\n  - p\r\n  - q\r\n---\r\n"
         );
     }
 }
