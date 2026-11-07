@@ -12,7 +12,7 @@ use saphyr_parser::{Event, Parser, ScalarStyle, Span, Tag};
 use crate::extract::FrontMatter;
 use crate::rules::{input_limit, yaml_syntax};
 use crate::tree::{Entry, Node, NodeKind, Style};
-use crate::{PathStep, RuleId, TextRange};
+use crate::{RuleId, TextRange};
 
 /// The deepest allowed nesting of collections; the root mapping is level 1.
 pub(crate) const MAX_DEPTH: usize = 128;
@@ -90,7 +90,6 @@ pub(crate) fn parse(source: &str, fm: &FrontMatter) -> Result<Node, SyntaxIssue>
             anchor: None,
             tagged_str: false,
             has_tag: false,
-            path: Vec::new(),
         });
     };
     if matches!(root.kind, NodeKind::Mapping { .. }) {
@@ -157,7 +156,6 @@ enum Body {
 
 /// A collection that is still open.
 struct Frame {
-    path: Vec<PathStep>,
     props: Props,
     /// In flow context: `[...]`, `{...}`, or inside either.
     flow: bool,
@@ -209,22 +207,12 @@ impl Builder<'_> {
         }
     }
 
-    /// The path of the node that comes next in the open collection.
-    fn next_path(&self) -> Vec<PathStep> {
-        let Some(frame) = self.frames.last() else {
-            return Vec::new();
-        };
-        let step = match &frame.body {
-            Body::Sequence { items, .. } => PathStep::Item(items.len()),
-            Body::Mapping { entries, key, .. } if key.is_some() => PathStep::Value(entries.len()),
-            Body::Mapping { entries, .. } => PathStep::Key(entries.len()),
-        };
-        let mut path = frame.path.clone();
-        path.push(step);
-        path
-    }
-
     // Source-text helpers.
+
+    /// YAML whitespace and line breaks; NBSP, U+2028 and U+0085 are content.
+    fn is_blank(c: char) -> bool {
+        matches!(c, ' ' | '\t' | '\r' | '\n')
+    }
 
     /// After whitespace, line ends and comments.
     fn skip_blank(&self, mut pos: usize) -> usize {
@@ -234,7 +222,7 @@ impl Builder<'_> {
                     .text(pos, self.hi)
                     .find('\n')
                     .map_or(self.hi, |i| pos + i);
-            } else if c.is_whitespace() {
+            } else if Self::is_blank(c) {
                 pos += c.len_utf8();
             } else {
                 break;
@@ -247,7 +235,7 @@ impl Builder<'_> {
     fn skip_props(&self, mut pos: usize) -> usize {
         while matches!(self.char_at(pos), Some('&' | '!')) {
             let token = self.text(pos, self.hi);
-            pos += token.find(char::is_whitespace).unwrap_or(token.len());
+            pos += token.find(Self::is_blank).unwrap_or(token.len());
             pos = self.skip_blank(pos);
         }
         pos
@@ -302,7 +290,7 @@ impl Builder<'_> {
         let q = self
             .last_significant(key_start, false)
             .filter(|&i| self.char_at(i) == Some('?'))?;
-        if !self.char_at(q + 1)?.is_whitespace() {
+        if !Self::is_blank(self.char_at(q + 1)?) {
             return None;
         }
         // Not the end of a plain scalar such as `what?`: a `?` indicator starts its line or
@@ -374,6 +362,11 @@ impl Builder<'_> {
     /// start of the line after the scalar and its trailing blank lines; those blank lines
     /// are only kept with `+` chomping.
     fn block_end(&self, header: usize, mut end: usize) -> usize {
+        // Saphyr may end at the next token on an indented line; cut back to the line start.
+        let line_start = self.line_start(end);
+        if line_start > header && self.text(line_start, end).trim().is_empty() {
+            end = line_start;
+        }
         let header_line = self.text(header, self.hi).lines().next().unwrap_or("");
         if header_line
             .split_whitespace()
@@ -404,7 +397,6 @@ impl Builder<'_> {
             anchor: props.anchor,
             tagged_str: props.tagged_str,
             has_tag: props.has_tag,
-            path: self.next_path(),
         }
     }
 
@@ -463,6 +455,7 @@ impl Builder<'_> {
                     Style::Literal
                 };
                 let end = self.block_end(header, end);
+                raw = header;
                 (style, TextRange { start: header, end })
             }
         };
@@ -500,13 +493,16 @@ impl Builder<'_> {
         }
         let hint = self.byte(span.start.index());
         let open = if mapping { '{' } else { '[' };
-        let bracket = span
-            .end
-            .index()
-            .checked_sub(1)
-            .filter(|_| !span.is_empty())
-            .map(|last| self.byte(last))
-            .filter(|&at| self.char_at(at) == Some(open));
+        // The bracket is the first thing after the properties; the start span covers it (and
+        // any spaces after it). A block collection's span ends before its first key or item.
+        let first_char = if props.any() {
+            self.skip_props(hint)
+        } else {
+            hint
+        };
+        let bracket = (self.byte(span.end.index()) > first_char
+            && self.char_at(first_char) == Some(open))
+        .then_some(first_char);
         let flow = bracket.is_some() || self.frames.last().is_some_and(|f| f.flow);
         let body = if mapping {
             Body::Mapping {
@@ -521,9 +517,7 @@ impl Builder<'_> {
                 first: None,
             }
         };
-        let path = self.next_path();
         self.frames.push(Frame {
-            path,
             props,
             flow,
             bracket,
@@ -557,9 +551,13 @@ impl Builder<'_> {
         };
         let range = match frame.bracket {
             Some(start) => {
-                let closer = self.byte(end_span.start.index());
-                let end = if matches!(self.char_at(closer), Some(']' | '}')) {
-                    closer + 1
+                // The closer follows the last child, an optional `,` and blanks.
+                let mut at = self.skip_blank(last_end.unwrap_or(start + 1));
+                if self.char_at(at) == Some(',') {
+                    at = self.skip_blank(at + 1);
+                }
+                let end = if matches!(self.char_at(at), Some(']' | '}')) {
+                    at + 1
                 } else {
                     self.byte(end_span.end.index())
                 };
@@ -578,14 +576,12 @@ impl Builder<'_> {
         } else {
             range.start
         };
-        // The frame is popped, so `next_path` would be the next sibling's; use the frame's own.
         let node = Node {
             kind,
             range,
             anchor: frame.props.anchor,
             tagged_str: frame.props.tagged_str,
             has_tag: frame.props.has_tag,
-            path: frame.path,
         };
         self.attach(Built { node, raw })
     }
@@ -626,7 +622,6 @@ impl Builder<'_> {
                     NodeKind::Scalar { value, .. } => (true, value.clone()),
                     _ => (false, self.text(range.start, range.end).to_string()),
                 };
-                let message = format!("duplicate key `{}`", name.1);
                 if let Some(Frame {
                     body:
                         Body::Mapping {
@@ -635,13 +630,14 @@ impl Builder<'_> {
                     ..
                 }) = self.frames.last_mut()
                 {
-                    if !seen.insert(name) {
+                    if seen.contains(&name) {
                         return Err(SyntaxIssue {
                             rule: RuleId::YamlSyntax,
                             range,
-                            message,
+                            message: format!("duplicate key `{}`", name.1),
                         });
                     }
+                    seen.insert(name);
                     first.get_or_insert(question.unwrap_or(built.raw));
                     *key = Some(Pending {
                         key: built.node,
@@ -675,14 +671,23 @@ mod tests {
     use super::*;
     use crate::extract::{Extraction, extract};
     use crate::testing::{lint_all, show, wrap};
-    use crate::tree::{Entry, NodeKind, Style};
+    use crate::tree::{Entry, NodeKind, Style, walk};
     use crate::{Config, PathStep};
 
     fn parse_source(source: &str) -> Result<Node, SyntaxIssue> {
         let Extraction::Found(fm) = extract(source) else {
             panic!("no front matter in {source:?}");
         };
-        parse(source, &fm)
+        let root = parse(source, &fm);
+        if let Ok(root) = &root {
+            // Every range is ordered and inside the content, on character boundaries.
+            walk(root, &mut |node, _| {
+                let TextRange { start, end } = node.range;
+                assert!(fm.content.start <= start && start <= end && end <= fm.content.end);
+                assert!(source.get(start..end).is_some(), "{:?}", node.range);
+            });
+        }
+        root
     }
 
     /// The root of the front matter `fm` (wrapped as a whole file) and that file.
@@ -736,7 +741,6 @@ mod tests {
             "2:6-2:7"
         );
         assert_eq!(shown(&source, &root), "2:1-2:12");
-        assert!(root.path.is_empty());
     }
 
     #[test]
@@ -903,10 +907,27 @@ mod tests {
     #[test]
     fn paths() {
         let (_, root) = root_of("a:\n  - x\n  - y\n");
-        let seq = &entry(&root, "a").value;
-        assert_eq!(seq.path, [PathStep::Value(0)]);
-        assert_eq!(items(seq)[1].path, [PathStep::Value(0), PathStep::Item(1)]);
-        assert_eq!(entries(&root)[0].key.path, [PathStep::Key(0)]);
+        let mut seen = Vec::new();
+        walk(&root, &mut |node, path| {
+            let text = match &node.kind {
+                NodeKind::Scalar { value, .. } => value.clone(),
+                _ => "*".to_string(),
+            };
+            seen.push((text, path.to_vec()));
+        });
+        let k = PathStep::Key;
+        let v = PathStep::Value;
+        let i = PathStep::Item;
+        assert_eq!(
+            seen,
+            [
+                ("*".to_string(), vec![]),
+                ("a".to_string(), vec![k(0)]),
+                ("*".to_string(), vec![v(0)]),
+                ("x".to_string(), vec![v(0), i(0)]),
+                ("y".to_string(), vec![v(0), i(1)]),
+            ]
+        );
     }
 
     #[test]
@@ -1103,5 +1124,129 @@ mod tests {
         );
         let item = &items(&entry(&root, "b").value)[0];
         assert!(entries(item)[0].explicit);
+    }
+
+    /// The source text covered by the value of `key` in `fm`.
+    fn value_text(fm: &str, key: &str) -> String {
+        let (source, root) = root_of(fm);
+        let range = entry(&root, key).value.range;
+        source[range.start..range.end].to_string()
+    }
+
+    #[test]
+    fn flow_collections_with_inner_spaces() {
+        for (fm, key, expected) in [
+            ("a: [ x, y ]\nb: 1\n", "a", "[ x, y ]"),
+            ("a: { k: v }\nb: 1\n", "a", "{ k: v }"),
+            ("a: { }\nb: 1\n", "a", "{ }"),
+            ("a: [ ]\nb: 1\n", "a", "[ ]"),
+            ("a: [  ]\nb: 1\n", "a", "[  ]"),
+            ("a: { k: [ 1, 2 ] }\nb: 1\n", "a", "{ k: [ 1, 2 ] }"),
+            ("a: &q [ 1 ]\nb: 1\n", "a", "[ 1 ]"),
+            ("a: !!seq [ 2 ]\nb: 1\n", "a", "[ 2 ]"),
+            ("a:\n  - [ 1, 2 ]\n  - x\n", "a", "- [ 1, 2 ]\n  - x"),
+            ("a: {k: v,}\nb: 1\n", "a", "{k: v,}"),
+            ("a: {k: v, }\nb: 1\n", "a", "{k: v, }"),
+            ("a: [x, y, ]\nb: 1\n", "a", "[x, y, ]"),
+            ("a: [x,\n  y # c\n  ]\nb: 1\n", "a", "[x,\n  y # c\n  ]"),
+            ("a: {k: |-,}\nb: 1\n", "a", "{k: |-,}"),
+        ] {
+            assert_eq!(value_text(fm, key), expected, "{fm:?}");
+        }
+        let (_, root) = root_of("a: [ x, y ]\n");
+        assert!(matches!(
+            entry(&root, "a").value.kind,
+            NodeKind::Sequence { flow: true, .. }
+        ));
+        let (_, root) = root_of("a: { k: v }\n");
+        assert!(matches!(
+            entry(&root, "a").value.kind,
+            NodeKind::Mapping { flow: true, .. }
+        ));
+    }
+
+    #[test]
+    fn block_scalar_end_when_saphyr_ends_on_an_indented_token() {
+        for (fm, key, expected) in [
+            ("a:\n  b: |\n    x\n  c: 1\n", "b", "|\n    x\n"),
+            ("a:\n  b: |+\n    x\n\n  c: 1\n", "b", "|+\n    x\n\n"),
+            ("a:\n  b: >\n    x\n  c: 1\n", "b", ">\n    x\n"),
+            ("a:\n  b: |-\n    x\n\n  c: 1\n", "b", "|-\n    x\n"),
+            ("a:\n  - k: |\n      x\n    l: 1\n", "k", "|\n      x\n"),
+            (
+                "a:\n  - k: |+\n      x\n\n    l: 1\n",
+                "k",
+                "|+\n      x\n\n",
+            ),
+            ("a:\n  b: |\n    x\n\n # c\n", "b", "|\n    x\n"),
+            ("a:\n  b: |+\n    x\n\n # c\n", "b", "|+\n    x\n\n"),
+            ("a:\n  b: >-\n    x\n\n # c\nz: 1\n", "b", ">-\n    x\n"),
+        ] {
+            let (source, root) = root_of(fm);
+            let mut found = None;
+            walk(&root, &mut |node, _| {
+                if let NodeKind::Mapping { entries, .. } = &node.kind {
+                    for e in entries {
+                        if matches!(&e.key.kind, NodeKind::Scalar { value, .. } if value == key) {
+                            found = Some(e.value.range);
+                        }
+                    }
+                }
+            });
+            let range = found.expect("key found");
+            assert_eq!(&source[range.start..range.end], expected, "{fm:?}");
+        }
+    }
+
+    #[test]
+    fn block_scalar_as_first_sequence_item_or_key() {
+        assert_eq!(value_text("a:\n- |\n  x\n- b\n", "a"), "- |\n  x\n- b");
+        let (source, root) = root_of("a:\n- |\n  x\n- b\n");
+        let seq = &items(&entry(&root, "a").value);
+        let r = seq[0].range;
+        assert_eq!(&source[r.start..r.end], "|\n  x\n");
+        // a root sequence of a block scalar: the error is at the dash
+        assert_eq!(
+            lint("---\n- |\n  x\n---\n"),
+            ["2:1-4:1 yaml-syntax front matter must be a key/value mapping"]
+        );
+        let (source, root) = root_of("? |\n  k\n: v\n");
+        let e = &entries(&root)[0];
+        assert!(e.explicit);
+        assert_eq!(&source[e.key.range.start..e.key.range.end], "|\n  k\n");
+        assert_eq!(&source[root.range.start..root.range.end], "? |\n  k\n: v");
+    }
+
+    #[test]
+    fn nbsp_is_content_not_whitespace() {
+        let (source, root) = root_of("a: &x \u{a0}\nb: \u{85}\n");
+        let r = entry(&root, "a").value.range;
+        assert_eq!(&source[r.start..r.end], "\u{a0}");
+        let r = entry(&root, "b").value.range;
+        assert_eq!(&source[r.start..r.end], "\u{85}");
+    }
+
+    #[test]
+    fn tab_after_colon_is_yaml_syntax() {
+        // Ruling T4b: saphyr rejects a tab after `:`; that is a known parser limitation.
+        let diagnostics = lint("---\na:\t1\n---\n");
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
+        assert!(diagnostics[0].contains(" yaml-syntax "), "{diagnostics:?}");
+    }
+
+    #[test]
+    fn deep_flow_shape_parses_without_per_node_paths() {
+        // 127 open flow sequences (128 levels with the root), about 400 KB of scalars.
+        let body = "a,".repeat(200_000);
+        let fm = format!("a: {}{body}{}\n", "[".repeat(127), "]".repeat(127));
+        let start = std::time::Instant::now();
+        let (_, root) = root_of(&fm);
+        let mut count = 0;
+        walk(&root, &mut |_, path| {
+            count += 1;
+            assert!(path.len() <= 128);
+        });
+        assert!(count > 200_000);
+        assert!(start.elapsed().as_secs() < 5, "{:?}", start.elapsed());
     }
 }
