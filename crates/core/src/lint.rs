@@ -8,7 +8,6 @@ use crate::rules::RULES;
 use crate::{Diagnostic, Fix, RuleId, Severity, TextRange};
 
 /// What a rule looks at.
-#[allow(dead_code)] // read by the rules
 pub(crate) struct Context<'a> {
     /// The whole source file.
     pub source: &'a str,
@@ -19,6 +18,7 @@ pub(crate) struct Context<'a> {
     /// The configuration.
     pub config: &'a Config,
     /// The first line ending in `source`, `"\n"` if there is none.
+    #[allow(dead_code)] // read by the fixing rules
     pub line_ending: &'static str,
 }
 
