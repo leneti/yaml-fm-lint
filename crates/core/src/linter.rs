@@ -1,6 +1,7 @@
 //! The linter: configuration plus the lint pipeline.
 
 use crate::extract::{Extraction, extract, start_offset};
+use crate::parse::parse;
 use crate::rules::{input_limit, require_front_matter};
 use crate::{
     Config, ConfigError, ConfigErrorKind, Diagnostic, FixError, Level, RuleId, Severity, TextRange,
@@ -95,7 +96,10 @@ impl Linter {
                     start: fm.open.start,
                     end: fm.end,
                 }),
-                None,
+                // A syntax error or exceeded limit stops linting; no other rule runs.
+                parse(source, &fm)
+                    .err()
+                    .and_then(|issue| self.diagnostic(issue.rule, &issue.message, issue.range)),
             ),
         };
         LintReport {

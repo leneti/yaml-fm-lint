@@ -28,3 +28,9 @@
 //! # Fix
 //!
 //! No fix.
+
+/// The root of the front matter is not a mapping.
+pub(crate) const NOT_A_MAPPING: &str = "front matter must be a key/value mapping";
+
+/// The front matter has more than one YAML document.
+pub(crate) const SECOND_DOCUMENT: &str = "front matter must contain a single YAML document";

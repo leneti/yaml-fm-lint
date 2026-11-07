@@ -29,3 +29,6 @@
 
 /// No closing `---` within `MAX_FRONT_MATTER_BYTES` of content.
 pub(crate) const TOO_LARGE: &str = "front matter is larger than 1 MiB (1,048,576 bytes)";
+
+/// Collections nest deeper than `parse::MAX_DEPTH`.
+pub(crate) const TOO_DEEP: &str = "nesting is deeper than 128 levels";

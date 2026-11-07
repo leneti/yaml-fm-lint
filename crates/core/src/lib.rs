@@ -9,10 +9,12 @@ mod error;
 mod extract;
 mod line_index;
 mod linter;
+mod parse;
 mod rule_id;
 mod rules;
 #[cfg(test)]
 mod testing;
+mod tree;
 
 pub use config::{Config, Level};
 pub use diagnostic::{
