@@ -16,7 +16,7 @@ anyhow = "1"
 yaml-fm-lint-core = { path = "../core" }
 
 [dev-dependencies]
-assert_cmd = "2"
+assert_cmd = "2.2.2"
 predicates = "3"
 
 [lints]
