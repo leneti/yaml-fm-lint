@@ -18,7 +18,6 @@ pub(crate) struct Context<'a> {
     /// The configuration.
     pub config: &'a Config,
     /// The first line ending in `source`, `"\n"` if there is none.
-    #[allow(dead_code)] // read by the fixing rules
     pub line_ending: &'static str,
 }
 

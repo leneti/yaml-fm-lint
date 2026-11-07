@@ -669,10 +669,11 @@ impl Builder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Level;
     use crate::extract::{Extraction, extract};
     use crate::testing::{lint_all, show, wrap};
     use crate::tree::{Entry, NodeKind, Style, walk};
-    use crate::{Config, PathStep};
+    use crate::{Config, PathStep, RuleId};
 
     fn parse_source(source: &str) -> Result<Node, SyntaxIssue> {
         let Extraction::Found(fm) = extract(source) else {
@@ -978,7 +979,10 @@ mod tests {
     }
 
     fn lint(source: &str) -> Vec<String> {
-        lint_all(source, Config::default())
+        // These tests are about parsing, not about style.
+        let mut config = Config::default();
+        config.rules.insert(RuleId::NoFlowSequence, Level::Off);
+        lint_all(source, config)
     }
 
     #[test]

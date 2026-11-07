@@ -1,9 +1,11 @@
 //! The lint rules, one module per rule.
 
+pub(crate) mod flow_fix;
 pub(crate) mod input_limit;
 pub(crate) mod invalid_disable_comment;
 pub(crate) mod no_blank_lines;
 pub(crate) mod no_commas;
+pub(crate) mod no_flow_sequence;
 pub(crate) mod no_quotes;
 pub(crate) mod no_space_before_colon;
 pub(crate) mod no_trailing_commas;
@@ -29,4 +31,5 @@ pub(crate) const RULES: &[(RuleId, RuleFn)] = &[
     ),
     (RuleId::NoQuotes, no_quotes::check),
     (RuleId::NoCommas, no_commas::check),
+    (RuleId::NoFlowSequence, no_flow_sequence::check),
 ];

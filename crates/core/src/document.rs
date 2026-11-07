@@ -59,10 +59,8 @@ pub(crate) struct NodeRef<'a> {
     /// It is inside a flow collection (the collection itself is not).
     pub in_flow: bool,
     /// The mapping entry of a key or value.
-    #[allow(dead_code)] // read by later rules
     pub entry: Option<&'a Entry>,
     /// The collection that holds it.
-    #[allow(dead_code)] // read by later rules
     pub parent: Option<&'a Node>,
 }
 

@@ -266,7 +266,8 @@ mod tests {
     #[case::key("\"k\": v\n", &["2:1-2:4"], "k: v\n")]
     #[case::apostrophe("a: 'it''s'\n", &["2:4-2:11"], "a: it's\n")]
     #[case::comma_text("a: \"a, b\"\n", &["2:4-2:10"], "a: a, b\n")]
-    #[case::in_flow("l: [\"x\", y]\n", &["2:5-2:8"], "l: [x, y]\n")]
+    // The comment keeps `no-flow-sequence` from rewriting the list.
+    #[case::in_flow("l: [\"x\", y] # c\n", &["2:5-2:8"], "l: [x, y] # c\n")]
     #[case::escape("a: \"caf\\u00e9\"\n", &["2:4-2:15"], "a: café\n")]
     #[case::item("l:\n  - 'x'\n", &["3:5-3:8"], "l:\n  - x\n")]
     #[case::two("a: 'x'\nb: \"z\"\n", &["2:4-2:7", "3:4-3:7"], "a: x\nb: z\n")]

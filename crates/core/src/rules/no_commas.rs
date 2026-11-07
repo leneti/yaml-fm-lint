@@ -69,6 +69,7 @@ pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
 mod tests {
     use rstest::rstest;
 
+    use crate::config::Level;
     use crate::testing::{fix_fm, lint_rule};
     use crate::{Config, RuleId};
 
@@ -91,6 +92,8 @@ mod tests {
     #[test]
     fn no_fix() {
         let fm = "a: x, y\nb: [x, y]\n";
-        assert_eq!(fix_fm(fm, Config::default()), fm);
+        let mut config = Config::default();
+        config.rules.insert(RuleId::NoFlowSequence, Level::Off);
+        assert_eq!(fix_fm(fm, config), fm);
     }
 }
