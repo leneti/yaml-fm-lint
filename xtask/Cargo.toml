@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.104"
-serde_json = "1"
+serde_json = "1.0.154"
 
 [dev-dependencies]
 tempfile = "3"
