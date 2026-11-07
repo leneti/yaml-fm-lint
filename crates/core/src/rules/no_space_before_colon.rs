@@ -86,7 +86,7 @@ mod tests {
     #[case::one_space("a : 1\n", &["2:2-2:3 whitespace before \":\""], "a: 1\n")]
     #[case::two("a  : 1\n", &["2:2-2:4 whitespace before \":\""], "a: 1\n")]
     #[case::flow("m: {a : 1}\n", &["2:6-2:7 whitespace before \":\""], "m: {a: 1}\n")]
-    #[case::quoted_key("\"a\" : 1\n", &["2:4-2:5 whitespace before \":\""], "\"a\": 1\n")]
+    #[case::quoted_key("\"a: b\" : 1\n", &["2:7-2:8 whitespace before \":\""], "\"a: b\": 1\n")]
     #[case::explicit_key("? a\n: 1\n", &[], "? a\n: 1\n")]
     fn front_matter(#[case] fm: &str, #[case] want: &[&str], #[case] fixed: &str) {
         assert_eq!(lint_rule(RULE, fm, Config::default()), want);

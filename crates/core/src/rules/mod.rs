@@ -3,6 +3,7 @@
 pub(crate) mod input_limit;
 pub(crate) mod invalid_disable_comment;
 pub(crate) mod no_blank_lines;
+pub(crate) mod no_quotes;
 pub(crate) mod no_space_before_colon;
 pub(crate) mod no_trailing_commas;
 pub(crate) mod no_trailing_spaces;
@@ -25,4 +26,5 @@ pub(crate) const RULES: &[(RuleId, RuleFn)] = &[
         RuleId::SingleSpaceAfterColon,
         single_space_after_colon::check,
     ),
+    (RuleId::NoQuotes, no_quotes::check),
 ];

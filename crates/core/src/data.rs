@@ -275,7 +275,6 @@ pub(crate) fn build(root: &Node) -> Result<Data, SyntaxIssue> {
 }
 
 /// The value at `path` (as handed out by [`crate::tree::walk`]), if there is one.
-#[allow(dead_code)] // first caller lands with the schema check
 pub(crate) fn lookup<'a>(data: &'a Data, path: &[PathStep]) -> Option<&'a Data> {
     path.iter().try_fold(data, |data, step| match (data, step) {
         (Data::Seq(items), PathStep::Item(i)) => items.get(*i),

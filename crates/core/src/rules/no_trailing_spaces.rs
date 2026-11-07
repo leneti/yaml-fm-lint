@@ -81,8 +81,8 @@ mod tests {
     #[case::comment_line("# c  \n", &["2:4-2:6 trailing whitespace"], "# c\n")]
     #[case::after_emoji("emoji: 😀 \n", &["2:9-2:10 trailing whitespace"], "emoji: 😀\n")]
     #[case::block_text("a: |\n  x  \n", &[], "a: |\n  x  \n")]
-    #[case::multi_line_quoted("a: \"x  \n  y\"\n", &[], "a: \"x  \n  y\"\n")]
-    #[case::after_closing_quote("a: \"x\n  y\" \n", &["3:5-3:6 trailing whitespace"], "a: \"x\n  y\"\n")]
+    #[case::multi_line_quoted("a: \"x:  \n  y\"\n", &[], "a: \"x:  \n  y\"\n")]
+    #[case::after_closing_quote("a: \"x:\n  y\" \n", &["3:5-3:6 trailing whitespace"], "a: \"x:\n  y\"\n")]
     fn front_matter(#[case] fm: &str, #[case] want: &[&str], #[case] fixed: &str) {
         assert_eq!(lint_rule(RULE, fm, Config::default()), want);
         assert_eq!(fix_fm(fm, Config::default()), fixed);
