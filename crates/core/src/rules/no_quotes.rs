@@ -11,7 +11,7 @@
 //!
 //! ```yaml
 //! title: "Hello"
-//! 'tag': it''s
+//! 'tag': 'it''s'
 //! ```
 //!
 //! Good:
@@ -32,7 +32,7 @@
 
 use std::sync::LazyLock;
 
-use regex::RegexSet;
+use regex::{Regex, RegexSet};
 
 use crate::data::{Data, build, lookup};
 use crate::edit::apply_edits;
@@ -75,6 +75,22 @@ static YAML_1_1_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     #[allow(clippy::expect_used)]
     RegexSet::new(YAML_1_1).expect("valid YAML 1.1 regexes")
 });
+
+/// Numbers with `,` separators, which Ruby's Psych (Jekyll's reader) reads as numbers.
+static COMMA_NUMBER: LazyLock<Regex> = LazyLock::new(|| {
+    // The pattern is a constant, checked by the tests.
+    #[allow(clippy::expect_used)]
+    Regex::new(r"^[-+]?(0b[01_,]+|0x[0-9a-fA-F_,]+|[0-9][0-9_,]*(\.[0-9_,]*)?([eE][-+]?[0-9]+)?)$")
+        .expect("valid comma-number regex")
+});
+
+/// Characters that are control, non-printable or line breaks to some YAML reader (ruling T15a),
+/// so a scalar holding one keeps its quotes and escapes.
+fn unsafe_char(c: char) -> bool {
+    c < ' '
+        || ('\u{7f}'..='\u{9f}').contains(&c)
+        || matches!(c, '\u{2028}' | '\u{2029}' | '\u{fffe}' | '\u{ffff}')
+}
 
 /// A quoted scalar that may be written plain.
 struct Candidate {
@@ -137,8 +153,9 @@ fn candidates(ctx: &Context<'_>) -> Vec<Candidate> {
             || value.is_empty()
             || value.starts_with(' ')
             || value.ends_with(' ')
-            || value.chars().any(|c| c < ' ' || c == '\u{7f}')
+            || value.chars().any(unsafe_char)
             || YAML_1_1_SET.is_match(value)
+            || (value.contains(',') && COMMA_NUMBER.is_match(value))
             || never_plain(value, r.in_flow)
         {
             return;
@@ -205,10 +222,14 @@ fn verify<'a>(
 
 /// Flags quoted scalars that stay the same string when written plain.
 pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
+    check_with_budget(ctx, MAX_REPARSE_BYTES)
+}
+
+/// [`check`] with a parse budget in bytes, so a test can run it out.
+fn check_with_budget(ctx: &Context<'_>, mut budget: usize) -> Vec<Finding> {
     let cands = candidates(ctx);
     let refs: Vec<&Candidate> = cands.iter().collect();
     let mut ok = Vec::new();
-    let mut budget = MAX_REPARSE_BYTES;
     verify(ctx, &refs, &mut budget, &mut ok);
     ok.sort_by_key(|c| c.range.start);
     ok.into_iter()
@@ -231,6 +252,8 @@ pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
 mod tests {
     use rstest::rstest;
 
+    use super::check_with_budget;
+    use crate::lint::Context;
     use crate::testing::{fix_fm, lint_rule};
     use crate::{Config, RuleId};
 
@@ -242,6 +265,7 @@ mod tests {
     #[case::single("a: 'world'\n", &["2:4-2:11"], "a: world\n")]
     #[case::key("\"k\": v\n", &["2:1-2:4"], "k: v\n")]
     #[case::apostrophe("a: 'it''s'\n", &["2:4-2:11"], "a: it's\n")]
+    #[case::comma_text("a: \"a, b\"\n", &["2:4-2:10"], "a: a, b\n")]
     #[case::in_flow("l: [\"x\", y]\n", &["2:5-2:8"], "l: [x, y]\n")]
     #[case::escape("a: \"caf\\u00e9\"\n", &["2:4-2:15"], "a: café\n")]
     #[case::item("l:\n  - 'x'\n", &["3:5-3:8"], "l:\n  - x\n")]
@@ -284,6 +308,14 @@ mod tests {
     #[case::float("\"1e3\"")]
     #[case::newline("\"a\\nb\"")]
     #[case::control("\"\\u0001\"")]
+    #[case::c1_control("\"\\u0080\"")]
+    #[case::next_line("\"\\u0085\"")]
+    #[case::line_separator("\"\\u2028\"")]
+    #[case::paragraph_separator("\"\\u2029\"")]
+    #[case::non_character("\"\\ufffe\"")]
+    #[case::comma_int("\"1,000\"")]
+    #[case::comma_float("\"1,000.5\"")]
+    #[case::comma_binary("\"0b1,0\"")]
     #[case::document_end("\"...\"")]
     fn needed(#[case] quoted: &str) {
         let fm = format!("a: {quoted}\n");
@@ -323,10 +355,25 @@ mod tests {
         );
     }
 
-    // More bad candidates than the parse budget: nothing panics and the bad ones are never
-    // flagged; the good ones that follow them are all found by the first batch.
+    // Unquoting `b:` breaks the file (`b: b:`), so the batch does not parse and is halved.
+    // Whatever the budget cannot reach is not flagged.
     #[test]
-    fn many_bad_candidates_stay_bounded() {
+    fn unchecked_candidates_are_not_flagged_when_the_budget_runs_out() {
+        let source = crate::testing::wrap("a: 'x'\nb: 'b:'\nc: 'z'\n");
+        let (fm, doc) = crate::testing::document(&source, &[]);
+        let config = Config::default();
+        let ctx = Context::new(&source, &fm, &doc, &config);
+        assert_eq!(check_with_budget(&ctx, usize::MAX).len(), 2);
+        // The batch, then the first half: `a` is found, `c` is never reached.
+        assert_eq!(check_with_budget(&ctx, 2 * fm.end).len(), 1);
+        assert!(check_with_budget(&ctx, fm.end).is_empty());
+        assert!(check_with_budget(&ctx, fm.end - 1).is_empty());
+    }
+
+    // Many bad candidates: nothing panics, the bad ones are never flagged, and the good
+    // ones are all found by the first batch.
+    #[test]
+    fn many_bad_candidates_stay_correct() {
         let mut fm = String::new();
         for i in 0..300 {
             fm.push_str(&format!("a{i}: \"1e3\"\nb{i}: 'x'\n"));
