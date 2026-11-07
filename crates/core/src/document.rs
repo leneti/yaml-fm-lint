@@ -51,7 +51,6 @@ pub(crate) enum Role {
 
 /// A node with its surroundings.
 #[derive(Debug, Clone, Copy)]
-#[allow(dead_code)] // read by the rules
 pub(crate) struct NodeRef<'a> {
     /// The node.
     pub node: &'a Node,
@@ -60,8 +59,10 @@ pub(crate) struct NodeRef<'a> {
     /// It is inside a flow collection (the collection itself is not).
     pub in_flow: bool,
     /// The mapping entry of a key or value.
+    #[allow(dead_code)] // read by later rules
     pub entry: Option<&'a Entry>,
     /// The collection that holds it.
+    #[allow(dead_code)] // read by later rules
     pub parent: Option<&'a Node>,
 }
 
@@ -267,7 +268,6 @@ impl Document {
     }
 
     /// Every node, in pre-order with keys before values.
-    #[allow(dead_code)] // first caller lands with the rules
     pub(crate) fn nodes(&self) -> Vec<NodeRef<'_>> {
         node_refs(&self.root)
     }

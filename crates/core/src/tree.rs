@@ -79,7 +79,6 @@ struct Cursor<'a> {
 /// node with its path from the root. A key's path ends in `Key(i)`, its value's in `Value(i)`.
 ///
 /// One shared path stack and an explicit cursor stack: memory is O(depth), not O(nodes * depth).
-#[allow(dead_code)] // first caller lands with the rules
 pub(crate) fn walk<'a>(root: &'a Node, f: &mut impl FnMut(&'a Node, &[PathStep])) {
     let mut path = Vec::new();
     f(root, &path);
