@@ -1,7 +1,8 @@
 //! The fix engine: applies automatic fixes, and keeps only those that provably leave the
 //! front-matter data unchanged (spec §5.6).
 
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::ops::Bound;
 
 use crate::data::{Data, build, data_eq, lookup_mut, resolve_plain};
 use crate::edit::apply_edits;
@@ -15,8 +16,14 @@ use crate::{
 /// The most fix passes `fix` runs; a pass applies the fixes that don't overlap.
 pub(crate) const MAX_FIX_PASSES: usize = 10;
 
+/// The most verifications (each parses the output) one `fix` call may run.
+pub(crate) const MAX_FIX_VERIFIES: usize = 64;
+
 /// Appended to the message of a finding whose fix was refused.
 const REFUSED_NOTE: &str = " (fix refused: would change data)";
+
+/// Appended to the message of a finding whose fix was never verified: the budget ran out.
+const SKIPPED_NOTE: &str = " (fix skipped: too many refused fixes)";
 
 /// A diagnostic and its automatic fix.
 type Candidate = (Diagnostic, Fix);
@@ -24,7 +31,7 @@ type Candidate = (Diagnostic, Fix);
 /// The diagnostics with an `Automatic` fix, minus those whose `(rule, range)` was refused.
 pub(crate) fn candidates(
     diagnostics: &[Diagnostic],
-    refused: &[(RuleId, TextRange)],
+    refused: &BTreeSet<(RuleId, TextRange)>,
 ) -> Vec<Candidate> {
     diagnostics
         .iter()
@@ -45,83 +52,99 @@ fn overlaps(a: TextRange, b: TextRange) -> bool {
 /// Splits `fixes` into those to apply in one pass and those skipped for overlapping.
 ///
 /// Fixes are taken in the order of their first edit; one is skipped if any of its edits
-/// overlaps an edit already taken.
+/// overlaps an edit already taken, or if its own edits overlap each other.
 pub(crate) fn select(mut fixes: Vec<Candidate>) -> (Vec<Candidate>, Vec<Candidate>) {
     fixes.sort_by_key(|(_, fix)| fix.edits.first().map(|e| e.range.start));
-    // Start to end of the edits taken; they never overlap, so a start is unique and a
-    // range can only clash with its neighbours.
-    let mut taken: BTreeMap<usize, usize> = BTreeMap::new();
-    let clashes = |taken: &BTreeMap<usize, usize>, r: TextRange| {
-        let before = taken.range(..=r.start).next_back();
-        let after = taken.range(r.start.saturating_add(1)..).next();
-        [before, after]
+    // The `(start, end)` of the edits taken. They don't overlap each other (a zero-length
+    // insert may share its start with the edit after it, within one fix), so a range can
+    // only clash with its neighbours in this order.
+    let mut taken: BTreeSet<(usize, usize)> = BTreeSet::new();
+    let clashes = |taken: &BTreeSet<(usize, usize)>, r: TextRange| {
+        let same_start = taken.range((r.start, 0)..=(r.start, usize::MAX)).next();
+        let before = taken.range(..(r.start, 0)).next_back();
+        let after_start = (Bound::Excluded((r.start, usize::MAX)), Bound::Unbounded);
+        let after = taken.range(after_start).next();
+        [same_start, before, after]
             .into_iter()
             .flatten()
-            .any(|(&start, &end)| overlaps(TextRange { start, end }, r))
+            .any(|&(start, end)| overlaps(TextRange { start, end }, r))
     };
     let (mut chosen, mut skipped) = (Vec::new(), Vec::new());
     for candidate in fixes {
-        if candidate.1.edits.iter().any(|e| clashes(&taken, e.range)) {
+        let edits = &candidate.1.edits;
+        let own_edits_overlap = edits
+            .windows(2)
+            .any(|w| matches!(w, [a, b] if b.range.start < a.range.end));
+        if own_edits_overlap || edits.iter().any(|e| clashes(&taken, e.range)) {
             skipped.push(candidate);
         } else {
-            taken.extend(
-                candidate
-                    .1
-                    .edits
-                    .iter()
-                    .map(|e| (e.range.start, e.range.end)),
-            );
+            taken.extend(edits.iter().map(|e| (e.range.start, e.range.end)));
             chosen.push(candidate);
         }
     }
     (chosen, skipped)
 }
 
-/// The data of `input` with every effect applied; `None` if it does not parse or a path is gone.
-fn expected_data(input: &str, fm: &FrontMatter, effects: &[DataEffect]) -> Option<Data> {
-    let mut data = build(&parse(input, fm).ok()?).ok()?;
-    for effect in effects {
-        if let DataEffect::ChangesScalar { path, new_plain } = effect {
-            *lookup_mut(&mut data, path)? = resolve_plain(new_plain);
-        }
+/// An input text, parsed once, to check outputs against.
+struct Baseline<'a> {
+    text: &'a str,
+    fm: FrontMatter,
+    data: Data,
+}
+
+impl<'a> Baseline<'a> {
+    /// `None` if `text` has no complete front matter or it does not parse.
+    fn new(text: &'a str) -> Option<Baseline<'a>> {
+        let Extraction::Found(fm) = extract(text) else {
+            return None;
+        };
+        let data = build(&parse(text, &fm).ok()?).ok()?;
+        Some(Baseline { text, fm, data })
     }
-    Some(data)
+
+    /// Whether `output` is the text with the front matter changed only as `effects` say.
+    ///
+    /// Everything outside the front matter's lines must be byte-identical: the BOM, the
+    /// opening delimiter's line ending, and everything after the closing delimiter's text
+    /// (its line ending and the body). The data must be the same, apart from the effects.
+    fn check<'e>(&self, output: &str, effects: impl Iterator<Item = &'e DataEffect>) -> bool {
+        let Extraction::Found(after) = extract(output) else {
+            return false;
+        };
+        let before = &self.fm;
+        let same = |a: Option<&str>, b: Option<&str>| a.is_some() && a == b;
+        if before.bom != after.bom
+            || !same(
+                self.text.get(before.open.end..before.content.start),
+                output.get(after.open.end..after.content.start),
+            )
+            || !same(
+                self.text.get(before.close.end..),
+                output.get(after.close.end..),
+            )
+        {
+            return false;
+        }
+        let mut expected = self.data.clone();
+        for effect in effects {
+            if let DataEffect::ChangesScalar { path, new_plain } = effect {
+                let Some(slot) = lookup_mut(&mut expected, path) else {
+                    return false;
+                };
+                *slot = resolve_plain(new_plain);
+            }
+        }
+        parse(output, &after)
+            .ok()
+            .and_then(|root| build(&root).ok())
+            .is_some_and(|data| data_eq(&data, &expected))
+    }
 }
 
 /// Whether `output` is `input` with the front matter changed only as `effects` say.
-///
-/// Everything outside the front matter's lines must be byte-identical: the BOM, the opening
-/// delimiter's line ending, and everything after the closing delimiter's text (its line
-/// ending and the body). The data must be the same, apart from the effects.
+#[cfg_attr(not(test), allow(dead_code))] // the engine uses `Baseline` to parse `input` once
 pub(crate) fn verify(input: &str, output: &str, effects: &[DataEffect]) -> bool {
-    let (Extraction::Found(before), Extraction::Found(after)) = (extract(input), extract(output))
-    else {
-        return false;
-    };
-    let same = |a: Option<&str>, b: Option<&str>| a.is_some() && a == b;
-    if before.bom != after.bom
-        || !same(
-            input.get(before.open.end..before.content.start),
-            output.get(after.open.end..after.content.start),
-        )
-        || !same(input.get(before.close.end..), output.get(after.close.end..))
-    {
-        return false;
-    }
-    let Some(expected) = expected_data(input, &before, effects) else {
-        return false;
-    };
-    parse(output, &after)
-        .ok()
-        .and_then(|root| build(&root).ok())
-        .is_some_and(|data| data_eq(&data, &expected))
-}
-
-/// The edits of the fixes, sorted for `apply_edits`.
-fn sorted_edits<'a>(fixes: impl Iterator<Item = &'a Fix>) -> Vec<TextEdit> {
-    let mut edits: Vec<TextEdit> = fixes.flat_map(|fix| fix.edits.iter().cloned()).collect();
-    edits.sort_by_key(|e| (e.range.start, e.range.end));
-    edits
+    Baseline::new(input).is_some_and(|base| base.check(output, effects.iter()))
 }
 
 /// What one pass did.
@@ -134,70 +157,135 @@ struct Pass {
     applied: usize,
     /// The fixes that were refused.
     refused: Vec<Diagnostic>,
+    /// The verification budget ran out before every fix was decided.
+    exhausted: bool,
 }
 
-/// Applies `chosen` to `text` if the result verifies; otherwise one fix at a time.
-fn run_pass(text: &str, chosen: &[Candidate]) -> Pass {
-    let effects: Vec<DataEffect> = chosen.iter().map(|(_, f)| f.data_effect.clone()).collect();
-    let edits = sorted_edits(chosen.iter().map(|(_, fix)| fix));
-    if let Some(output) = apply_edits(text, &edits).filter(|o| verify(text, o, &effects)) {
-        return Pass {
-            output,
-            edits,
-            applied: chosen.len(),
-            refused: Vec::new(),
-        };
+/// The result of checking some fixes on top of those already accepted.
+enum Attempt {
+    Verified {
+        output: String,
+        edits: Vec<TextEdit>,
+    },
+    Failed,
+    OutOfBudget,
+}
+
+/// Verifies the accepted edits and effects plus the fixes `next`; costs one verification.
+fn attempt(
+    base: &Baseline<'_>,
+    accepted: (&[TextEdit], &[&DataEffect]),
+    next: &[Candidate],
+    budget: &mut usize,
+) -> Attempt {
+    let Some(left) = budget.checked_sub(1) else {
+        return Attempt::OutOfBudget;
+    };
+    *budget = left;
+    let mut edits = accepted.0.to_vec();
+    edits.extend(next.iter().flat_map(|(_, fix)| fix.edits.iter().cloned()));
+    edits.sort_by_key(|e| (e.range.start, e.range.end));
+    let effects = (accepted.1.iter().copied()).chain(next.iter().map(|(_, fix)| &fix.data_effect));
+    match apply_edits(base.text, &edits).filter(|output| base.check(output, effects)) {
+        Some(output) => Attempt::Verified { output, edits },
+        None => Attempt::Failed,
     }
-    // Some fix would change the data: find which, so the pass still makes progress. Edits
-    // are applied to `text` together (same result as shifting each later one by the earlier
-    // deltas), and each fix is checked against the effects accepted so far.
+}
+
+/// Applies `chosen` to `text` if the result verifies. Otherwise it accepts the longest
+/// prefix that verifies (found by bisection), refuses the fix after it, and goes on with
+/// the rest, so the pass always makes progress without verifying every fix on its own.
+fn run_pass(text: &str, chosen: &[Candidate], budget: &mut usize) -> Pass {
     let mut pass = Pass {
         output: text.to_string(),
         edits: Vec::new(),
         applied: 0,
         refused: Vec::new(),
+        exhausted: false,
     };
-    let mut effects = Vec::new();
-    for (diagnostic, fix) in chosen {
-        let mut trial = pass.edits.clone();
-        trial.extend(fix.edits.iter().cloned());
-        trial.sort_by_key(|e| (e.range.start, e.range.end));
-        effects.push(fix.data_effect.clone());
-        match apply_edits(text, &trial).filter(|o| verify(text, o, &effects)) {
-            Some(output) => {
-                pass.output = output;
-                pass.edits = trial;
-                pass.applied += 1;
+    // `text` is the input of the previous pass or the original, which both parsed.
+    let Some(base) = Baseline::new(text) else {
+        pass.exhausted = true;
+        return pass;
+    };
+    let mut effects: Vec<&DataEffect> = Vec::new();
+    let mut start = 0;
+    while let Some(rest) = chosen.get(start..).filter(|rest| !rest.is_empty()) {
+        // Invariant: the first `lo` fixes of `rest` verify, the first `hi` don't (or hi = len).
+        let (mut lo, mut hi) = (0, rest.len());
+        let mut best = None;
+        let mut k = hi;
+        loop {
+            let next = rest.get(..k).unwrap_or_default();
+            match attempt(&base, (&pass.edits, &effects), next, budget) {
+                Attempt::OutOfBudget => {
+                    pass.exhausted = true;
+                    break;
+                }
+                Attempt::Verified { output, edits } => {
+                    lo = k;
+                    best = Some((output, edits));
+                }
+                Attempt::Failed => hi = k,
             }
-            None => {
-                effects.pop();
-                pass.refused.push(diagnostic.clone());
+            if hi - lo <= 1 {
+                break;
             }
+            k = lo + (hi - lo) / 2;
         }
+        if let Some((output, edits)) = best {
+            pass.output = output;
+            pass.edits = edits;
+            pass.applied += lo;
+            effects.extend(
+                rest.get(..lo)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|(_, f)| &f.data_effect),
+            );
+        }
+        if pass.exhausted {
+            break;
+        }
+        if let Some((diagnostic, _)) = rest.get(lo).filter(|_| lo < hi) {
+            pass.refused.push(diagnostic.clone());
+        }
+        start += lo + 1;
     }
     pass
 }
 
 /// Carries ranges through `edits` (sorted, non-overlapping): a range an edit overlaps is
 /// dropped, the others move by the edits before them.
-fn shift(ranges: Vec<(RuleId, TextRange)>, edits: &[TextEdit]) -> Vec<(RuleId, TextRange)> {
-    ranges
-        .into_iter()
-        .filter_map(|(rule, range)| {
-            if edits.iter().any(|e| overlaps(e.range, range)) {
-                return None;
-            }
-            let before = || edits.iter().filter(|e| e.range.end <= range.start);
-            let added: usize = before().map(|e| e.new_text.len()).sum();
-            let removed: usize = before().map(|e| e.range.end - e.range.start).sum();
-            let moved = |offset: usize| offset.checked_add(added)?.checked_sub(removed);
-            let range = TextRange {
-                start: moved(range.start)?,
-                end: moved(range.end)?,
-            };
-            Some((rule, range))
-        })
-        .collect()
+fn shift(
+    ranges: &BTreeSet<(RuleId, TextRange)>,
+    edits: &[TextEdit],
+) -> BTreeSet<(RuleId, TextRange)> {
+    let mut by_start: Vec<_> = ranges.iter().collect();
+    by_start.sort_by_key(|(_, range)| *range);
+    let mut kept = BTreeSet::new();
+    // Both lists go by start: `done` edits end at or before the range, the rest start later.
+    let (mut done, mut added, mut removed) = (0, 0, 0);
+    for &(rule, range) in by_start {
+        while let Some(edit) = edits.get(done).filter(|e| e.range.end <= range.start) {
+            added += edit.new_text.len();
+            removed += edit.range.end - edit.range.start;
+            done += 1;
+        }
+        let touches_before = done
+            .checked_sub(1)
+            .and_then(|i| edits.get(i))
+            .is_some_and(|e| e.range.start == range.start);
+        let touches_after = edits.get(done).is_some_and(|e| overlaps(e.range, range));
+        if touches_before || touches_after {
+            continue;
+        }
+        let moved = |offset: usize| offset.checked_add(added)?.checked_sub(removed);
+        if let (Some(start), Some(end)) = (moved(range.start), moved(range.end)) {
+            kept.insert((rule, TextRange { start, end }));
+        }
+    }
+    kept
 }
 
 impl Linter {
@@ -205,7 +293,9 @@ impl Linter {
     ///
     /// Only `Automatic` fixes are applied, in passes of non-overlapping fixes. A fix whose
     /// result would change the data (beyond what the fix declares) or touch anything outside
-    /// the front matter is refused and reported in [`FixOutcome::refused`].
+    /// the front matter is refused and reported in [`FixOutcome::refused`]. At most
+    /// [`MAX_FIX_VERIFIES`] verifications run; if many fixes are refused the budget runs
+    /// out, and the fixes not yet verified are left in `remaining` with a note.
     pub fn fix(&self, source: &str) -> Result<FixOutcome, FixError> {
         let mut report = self.lint(source);
         if report
@@ -218,28 +308,43 @@ impl Linter {
         let mut text = source.to_string();
         let mut applied = 0;
         let mut refused = Vec::new();
-        let mut refused_ranges: Vec<(RuleId, TextRange)> = Vec::new();
+        let mut refused_ranges = BTreeSet::new();
+        let mut budget = MAX_FIX_VERIFIES;
+        let mut exhausted = false;
         for _ in 0..MAX_FIX_PASSES {
             let (chosen, _) = select(candidates(&report.diagnostics, &refused_ranges));
             if chosen.is_empty() {
                 break;
             }
-            let pass = run_pass(&text, &chosen);
+            let pass = run_pass(&text, &chosen, &mut budget);
             applied += pass.applied;
             refused_ranges.extend(pass.refused.iter().map(|d| (d.rule, d.range)));
             refused.extend(pass.refused);
             if !pass.edits.is_empty() {
-                refused_ranges = shift(refused_ranges, &pass.edits);
+                refused_ranges = shift(&refused_ranges, &pass.edits);
                 text = pass.output;
                 report = self.lint(&text);
             }
+            if pass.exhausted {
+                exhausted = true;
+                break;
+            }
         }
+        let unverified: BTreeSet<_> = if exhausted {
+            let fixable = candidates(&report.diagnostics, &refused_ranges);
+            fixable.iter().map(|(d, _)| (d.rule, d.range)).collect()
+        } else {
+            BTreeSet::new()
+        };
         let remaining = report
             .diagnostics
             .into_iter()
             .map(|mut d| {
-                if refused_ranges.contains(&(d.rule, d.range)) {
+                let key = (d.rule, d.range);
+                if refused_ranges.contains(&key) {
                     d.message.push_str(REFUSED_NOTE);
+                } else if unverified.contains(&key) {
+                    d.message.push_str(SKIPPED_NOTE);
                 }
                 d
             })
@@ -364,6 +469,68 @@ mod tests {
         );
     }
 
+    /// `lines` trailing-space lines after `bad` aliased trailing-comma pairs.
+    fn many_fixes(bad: usize, lines: usize) -> String {
+        let pairs = (0..bad).map(|i| format!("a{i}: &a{i} x,\nb{i}: *a{i}\n"));
+        let spaces = (0..lines).map(|i| format!("k{i}: 1 \n"));
+        format!(
+            "---\n{}{}---\nBody \n",
+            pairs.collect::<String>(),
+            spaces.collect::<String>()
+        )
+    }
+
+    #[test]
+    fn one_refusal_among_many_fixes_is_fast() {
+        let source = many_fixes(1, 2000);
+        let started = std::time::Instant::now();
+        let outcome = linter().fix(&source).unwrap();
+        assert!(
+            started.elapsed().as_secs() < 2,
+            "took {:?}",
+            started.elapsed()
+        );
+        assert_eq!(outcome.applied, 2000);
+        assert_eq!(outcome.refused.len(), 1);
+        assert_eq!(outcome.remaining.len(), 1);
+        assert!(outcome.remaining[0].message.ends_with(REFUSED_NOTE));
+        assert!(!outcome.output.contains("1 \n"));
+        assert!(
+            outcome
+                .output
+                .starts_with("---\na0: &a0 x,\nb0: *a0\nk0: 1\n")
+        );
+    }
+
+    #[test]
+    fn exhausted_budget_leaves_a_note_and_safe_output() {
+        let source = many_fixes(100, 50);
+        let started = std::time::Instant::now();
+        let outcome = linter().fix(&source).unwrap();
+        assert!(
+            started.elapsed().as_secs() < 2,
+            "took {:?}",
+            started.elapsed()
+        );
+        // The data is unchanged, and so is everything outside the front matter.
+        assert!(verify(&source, &outcome.output, &[]));
+        let refused = outcome
+            .remaining
+            .iter()
+            .filter(|d| d.message.ends_with(REFUSED_NOTE))
+            .count();
+        let skipped = outcome
+            .remaining
+            .iter()
+            .filter(|d| d.message.ends_with(SKIPPED_NOTE))
+            .count();
+        assert_eq!(refused, outcome.refused.len());
+        assert!(refused > 0 && skipped > 0);
+        // Every fixable problem is accounted for: applied, refused or skipped.
+        assert_eq!(refused + skipped + outcome.applied, 150);
+        assert_eq!(outcome.remaining.len(), refused + skipped);
+    }
+
     #[test]
     fn fix_without_front_matter_changes_nothing() {
         let outcome = linter().fix("hello \n").unwrap();
@@ -392,7 +559,8 @@ mod tests {
         refused.0.fix = Some(refused.1.clone());
         no_fix.0.fix = None;
         let diagnostics = [automatic.0, suggestion.0, refused.0, no_fix.0];
-        let got = candidates(&diagnostics, &[(RuleId::NoTrailingCommas, range(4, 5))]);
+        let refused = BTreeSet::from([(RuleId::NoTrailingCommas, range(4, 5))]);
+        let got = candidates(&diagnostics, &refused);
         assert_eq!(starts(&got), [(0, 1)]);
     }
 
@@ -417,6 +585,23 @@ mod tests {
     }
 
     #[test]
+    fn select_handles_edits_sharing_a_start() {
+        // A fix may insert at a position and replace from it; later fixes still see both.
+        let insert = TextEdit {
+            range: range(5, 5),
+            new_text: "x".to_string(),
+        };
+        let both = candidate(Applicability::Automatic, vec![insert, edit(5, 7)]);
+        let inside = candidate(Applicability::Automatic, vec![edit(6, 8)]);
+        let after = candidate(Applicability::Automatic, vec![edit(7, 9)]);
+        // Its own edits overlap, so it can't be applied at all.
+        let malformed = candidate(Applicability::Automatic, vec![edit(20, 24), edit(22, 26)]);
+        let (chosen, skipped) = select(vec![both, inside, after, malformed]);
+        assert_eq!(starts(&chosen), [(5, 5), (7, 9)]);
+        assert_eq!(starts(&skipped), [(6, 8), (20, 24)]);
+    }
+
+    #[test]
     fn shift_moves_or_drops_refused_ranges() {
         let rule = RuleId::NoTrailingCommas;
         let delete = |start, end| edit(start, end);
@@ -434,7 +619,7 @@ mod tests {
         ];
         // Kept; moved by the first edit; moved by the first two; overlapped by an edit; moved by all.
         let want = [(0, 1), (3, 4), (8, 9), (12, 13)].map(|(s, e)| (rule, range(s, e)));
-        assert_eq!(shift(ranges.to_vec(), &edits), want);
+        assert_eq!(shift(&BTreeSet::from(ranges), &edits), BTreeSet::from(want));
     }
 
     #[test]
