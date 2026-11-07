@@ -6,7 +6,7 @@ use crate::tree::{Node, NodeKind};
 use crate::{Applicability, DataEffect, Fix, TextEdit, TextRange};
 
 /// The column (in characters) of `offset` on its line.
-fn column(ctx: &Context<'_>, offset: usize) -> Option<usize> {
+pub(crate) fn column(ctx: &Context<'_>, offset: usize) -> Option<usize> {
     let line = ctx.doc.lines.get(ctx.doc.line_index(offset)?)?;
     Some(ctx.source.get(line.range.start..offset)?.chars().count())
 }
