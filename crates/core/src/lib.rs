@@ -3,6 +3,7 @@
 #![deny(missing_docs)]
 
 mod config;
+mod data;
 mod diagnostic;
 mod edit;
 mod error;

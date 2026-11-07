@@ -32,3 +32,6 @@ pub(crate) const TOO_LARGE: &str = "front matter is larger than 1 MiB (1,048,576
 
 /// Collections nest deeper than `parse::MAX_DEPTH`.
 pub(crate) const TOO_DEEP: &str = "nesting is deeper than 128 levels";
+
+/// Aliases expand to more than `data::MAX_EXPANDED_NODES` nodes.
+pub(crate) const TOO_MANY_NODES: &str = "aliases expand to more than 100,000 nodes";
