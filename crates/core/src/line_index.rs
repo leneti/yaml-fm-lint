@@ -40,8 +40,17 @@ impl<'a> LineIndex<'a> {
     pub fn line_range(&self, line: usize) -> Option<TextRange> {
         let start = *self.starts.get(line)?;
         let end = match self.starts.get(line + 1) {
-            Some(&next) if self.text[..next - 1].ends_with('\r') => next - 2,
-            Some(&next) => next - 1,
+            Some(&next) => {
+                let newline = next.saturating_sub(1);
+                let cr = newline
+                    .checked_sub(1)
+                    .and_then(|i| self.text.as_bytes().get(i));
+                if cr == Some(&b'\r') {
+                    newline - 1
+                } else {
+                    newline
+                }
+            }
             None => self.text.len(),
         };
         Some(TextRange { start, end })
@@ -57,7 +66,7 @@ impl<'a> LineIndex<'a> {
         let TextRange { start, end } = self
             .line_range(line)
             .unwrap_or(TextRange { start: 0, end: 0 });
-        let before = &self.text[start..offset.min(end)];
+        let before = self.text.get(start..offset.min(end)).unwrap_or_default();
         Position {
             line,
             utf8: before.len(),
@@ -103,6 +112,14 @@ mod tests {
         let idx = LineIndex::new("😀x");
         assert_eq!(idx.position(2), pos(0, 0, 0, 0));
         assert_eq!(idx.position(99), pos(0, 5, 3, 2));
+    }
+
+    #[test]
+    fn offset_on_newline_and_line_range_bounds() {
+        let idx = LineIndex::new("ab\ncd");
+        assert_eq!(idx.position(2), pos(0, 2, 2, 2));
+        assert_eq!(idx.line_range(1), Some(TextRange { start: 3, end: 5 }));
+        assert_eq!(idx.line_range(2), None);
     }
 
     #[test]
