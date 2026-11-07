@@ -153,7 +153,7 @@ mod tests {
     )]
     #[case::bom(
         "\u{FEFF}---\n---\n",
-        "found bom=true open=1:2-1:5 content=\"\" close=2:1-2:4 end=11"
+        "found bom=true open=1:1-1:4 content=\"\" close=2:1-2:4 end=11"
     )]
     #[case::delimiter_trailing_blanks(
         "--- \t\na: 1\n---  \n",

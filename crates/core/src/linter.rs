@@ -167,7 +167,7 @@ mod tests {
     fn lint_no_front_matter_after_bom() {
         assert_eq!(
             lint_all("\u{FEFF}hello\n", Config::default()),
-            ["1:2-1:2 require-front-matter no front matter (the first line must be ---)"]
+            ["1:1-1:1 require-front-matter no front matter (the first line must be ---)"]
         );
     }
 

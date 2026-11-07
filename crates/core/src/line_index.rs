@@ -63,9 +63,13 @@ impl<'a> LineIndex<'a> {
             offset -= 1;
         }
         let line = self.starts.partition_point(|&s| s <= offset) - 1;
-        let TextRange { start, end } = self
+        let TextRange { mut start, end } = self
             .line_range(line)
             .unwrap_or(TextRange { start: 0, end: 0 });
+        // A leading BOM is zero-width: columns on the first line count from after it.
+        if line == 0 && self.text.starts_with('\u{FEFF}') {
+            start = '\u{FEFF}'.len_utf8();
+        }
         let before = self.text.get(start..offset.min(end)).unwrap_or_default();
         Position {
             line,
@@ -120,6 +124,16 @@ mod tests {
         assert_eq!(idx.position(2), pos(0, 2, 2, 2));
         assert_eq!(idx.line_range(1), Some(TextRange { start: 3, end: 5 }));
         assert_eq!(idx.line_range(2), None);
+    }
+
+    #[test]
+    fn bom_is_zero_width() {
+        let idx = LineIndex::new("\u{FEFF}ab\ncd");
+        assert_eq!(idx.position(0), pos(0, 0, 0, 0));
+        assert_eq!(idx.position(3), pos(0, 0, 0, 0));
+        assert_eq!(idx.position(4), pos(0, 1, 1, 1));
+        assert_eq!(idx.position(7), pos(1, 1, 1, 1));
+        assert_eq!(idx.line_range(0), Some(TextRange { start: 0, end: 5 }));
     }
 
     #[test]
