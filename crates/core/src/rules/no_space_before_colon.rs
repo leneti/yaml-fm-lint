@@ -78,7 +78,7 @@ mod tests {
     use rstest::rstest;
 
     use crate::testing::{fix_fm, lint_rule};
-    use crate::{Config, RuleId};
+    use crate::{Config, Level, RuleId};
 
     const RULE: RuleId = RuleId::NoSpaceBeforeColon;
 
@@ -89,7 +89,10 @@ mod tests {
     #[case::quoted_key("\"a: b\" : 1\n", &["2:7-2:8 whitespace before \":\""], "\"a: b\": 1\n")]
     #[case::explicit_key("? a\n: 1\n", &[], "? a\n: 1\n")]
     fn front_matter(#[case] fm: &str, #[case] want: &[&str], #[case] fixed: &str) {
-        assert_eq!(lint_rule(RULE, fm, Config::default()), want);
-        assert_eq!(fix_fm(fm, Config::default()), fixed);
+        // The `flow` row is about the colon, not about `{...}`.
+        let mut config = Config::default();
+        config.rules.insert(RuleId::NoFlowMapping, Level::Off);
+        assert_eq!(lint_rule(RULE, fm, config.clone()), want);
+        assert_eq!(fix_fm(fm, config), fixed);
     }
 }

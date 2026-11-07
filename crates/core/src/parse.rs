@@ -982,6 +982,7 @@ mod tests {
         // These tests are about parsing, not about style.
         let mut config = Config::default();
         config.rules.insert(RuleId::NoFlowSequence, Level::Off);
+        config.rules.insert(RuleId::NoFlowMapping, Level::Off);
         lint_all(source, config)
     }
 

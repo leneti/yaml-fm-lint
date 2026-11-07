@@ -11,26 +11,38 @@ fn column(ctx: &Context<'_>, offset: usize) -> Option<usize> {
     Some(ctx.source.get(line.range.start..offset)?.chars().count())
 }
 
-/// The block lines of a flow collection, one per item; `None` if one cannot be written as a
-/// single line from its source text.
-fn block_lines(source: &str, node: &Node) -> Option<Vec<String>> {
-    let NodeKind::Sequence { items, .. } = &node.kind else {
+/// The source text of a one-line scalar without anchor or tag; `None` for anything else.
+fn scalar_text<'a>(source: &'a str, node: &Node) -> Option<&'a str> {
+    // A node's range leaves out its anchor and tag, which the rewrite would drop.
+    if !matches!(node.kind, NodeKind::Scalar { .. }) || node.anchor.is_some() || node.has_tag {
         return None;
-    };
-    items
-        .iter()
-        .map(|item| {
-            // An item's range leaves out its anchor and tag, which the rewrite would drop.
-            if !matches!(item.kind, NodeKind::Scalar { .. })
-                || item.anchor.is_some()
-                || item.has_tag
-            {
-                return None;
-            }
-            let text = source.get(item.range.start..item.range.end)?;
-            (!text.contains('\n')).then(|| format!("- {text}"))
-        })
-        .collect()
+    }
+    let text = source.get(node.range.start..node.range.end)?;
+    (!text.contains('\n')).then_some(text)
+}
+
+/// The block lines of a flow collection, one per item or entry; `None` if one cannot be
+/// written as a single line from its source text.
+fn block_lines(source: &str, node: &Node) -> Option<Vec<String>> {
+    match &node.kind {
+        NodeKind::Sequence { items, .. } => items
+            .iter()
+            .map(|item| Some(format!("- {}", scalar_text(source, item)?)))
+            .collect(),
+        NodeKind::Mapping { entries, .. } => entries
+            .iter()
+            .map(|entry| {
+                if entry.colon.is_none() || entry.explicit {
+                    return None;
+                }
+                let key = scalar_text(source, &entry.key)?;
+                // A null value has an empty range: `{a: }` becomes `a:`.
+                let value = scalar_text(source, &entry.value)?;
+                Some(format!("{key}: {value}").trim_end().to_string())
+            })
+            .collect(),
+        _ => None,
+    }
 }
 
 /// A fix that rewrites the flow collection `r` in block style, if that is safe.

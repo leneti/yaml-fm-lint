@@ -94,6 +94,7 @@ mod tests {
         let fm = "a: x, y\nb: [x, y]\n";
         let mut config = Config::default();
         config.rules.insert(RuleId::NoFlowSequence, Level::Off);
+        config.rules.insert(RuleId::NoFlowMapping, Level::Off);
         assert_eq!(fix_fm(fm, config), fm);
     }
 }

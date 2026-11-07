@@ -5,6 +5,7 @@ pub(crate) mod input_limit;
 pub(crate) mod invalid_disable_comment;
 pub(crate) mod no_blank_lines;
 pub(crate) mod no_commas;
+pub(crate) mod no_flow_mapping;
 pub(crate) mod no_flow_sequence;
 pub(crate) mod no_quotes;
 pub(crate) mod no_space_before_colon;
@@ -32,4 +33,5 @@ pub(crate) const RULES: &[(RuleId, RuleFn)] = &[
     (RuleId::NoQuotes, no_quotes::check),
     (RuleId::NoCommas, no_commas::check),
     (RuleId::NoFlowSequence, no_flow_sequence::check),
+    (RuleId::NoFlowMapping, no_flow_mapping::check),
 ];
