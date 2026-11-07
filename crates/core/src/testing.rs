@@ -63,7 +63,6 @@ pub(crate) fn lint_rule(rule: RuleId, fm: &str, config: Config) -> Vec<String> {
 /// `source` with every `Automatic` fix applied once.
 ///
 /// Stand-in for `Linter::fix` until Task 11: a fix that overlaps an earlier one is skipped.
-#[allow(dead_code)] // first caller lands with no-trailing-spaces
 pub(crate) fn fix_src(source: &str, config: Config) -> String {
     let linter = Linter::new(config, None).expect("valid config");
     let mut fixes: Vec<Vec<TextEdit>> = linter
@@ -89,7 +88,6 @@ pub(crate) fn fix_src(source: &str, config: Config) -> String {
 }
 
 /// The front-matter text (without delimiters) after the fixes; the body must be unchanged.
-#[allow(dead_code)] // first caller lands with no-trailing-spaces
 pub(crate) fn fix_fm(fm: &str, config: Config) -> String {
     let fixed = fix_src(&wrap(fm), config);
     fixed

@@ -76,7 +76,6 @@ mod tests {
     const DISABLE_COMMENTS: &str = include_str!("../../../tests/fixtures/edge/disable-comments.md");
 
     #[test]
-    #[ignore = "enabled in Task 9"]
     fn fixture_disable_comments() {
         assert_eq!(
             lint_all(DISABLE_COMMENTS, Config::default()),
