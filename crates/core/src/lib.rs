@@ -6,8 +6,13 @@ mod config;
 mod diagnostic;
 mod edit;
 mod error;
+mod extract;
 mod line_index;
+mod linter;
 mod rule_id;
+mod rules;
+#[cfg(test)]
+mod testing;
 
 pub use config::{Config, Level};
 pub use diagnostic::{
@@ -15,4 +20,5 @@ pub use diagnostic::{
 };
 pub use error::{ConfigError, ConfigErrorKind, FixError};
 pub use line_index::{LineIndex, Position};
+pub use linter::{FixOutcome, LintReport, Linter};
 pub use rule_id::RuleId;
