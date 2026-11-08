@@ -28,12 +28,21 @@ fn same_data(input: &Data, output: &Data) -> bool {
             a.len() == b.len()
                 && a.iter()
                     .zip(b)
-                    .all(|((ak, av), (bk, bv))| data_eq(ak, bk) && same_data(av, bv))
+                    .all(|((ak, av), (bk, bv))| same_key(ak, bk) && same_data(av, bv))
         }
         (Data::Str(text), _) if text.ends_with(',') => {
             let kept = text.trim_end_matches(|c: char| c == ',' || c.is_whitespace());
             data_eq(input, output) || data_eq(output, &resolve_plain(kept))
         }
+        _ => data_eq(input, output),
+    }
+}
+
+/// Like [`same_data`] for a mapping key: a scalar key is never changed, but the values inside
+/// a collection used as a key are fixed like any other.
+fn same_key(input: &Data, output: &Data) -> bool {
+    match input {
+        Data::Seq(_) | Data::Map(_) => same_data(input, output),
         _ => data_eq(input, output),
     }
 }
@@ -126,4 +135,18 @@ pub fn check_fix(linter: &Linter, input: &str) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Config;
+
+    /// Found by fuzzing: the trailing comma of a value inside a collection used as a key is dropped.
+    #[test]
+    fn check_fix_allows_trailing_comma_fix_inside_a_collection_key() {
+        let linter = Linter::new(Config::default(), None).expect("the default config is valid");
+        let input = "---\n? - title: Test, tst,\n---\n";
+        assert_eq!(check_fix(&linter, input), Ok(()));
+    }
 }

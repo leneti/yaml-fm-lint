@@ -28,12 +28,12 @@ yaml-fm-lint/
 ├─ tests/fixtures/edge/    # edge-case fixtures (CRLF, BOM, unicode, ...); see its README
 ├─ tests/parity/expected-1x/  # recorded 1.7.1 results, one JSON per fixture
 ├─ deny.toml, renovate.json   # cargo-deny policy; Renovate config
-├─ .github/workflows/ci.yml, .gitattributes, .gitignore
+├─ .github/workflows/ci.yml, fuzz-nightly.yml, .gitattributes, .gitignore
 ├─ CHANGELOG.md, SECURITY.md  # (planned)
 ├─ npm/                    # (planned) launcher and platform packages
 ├─ editors/vscode/         # (planned)
 ├─ schemas/, docs/         # (planned) generated
-├─ fuzz/                   # (planned) cargo-fuzz targets
+├─ fuzz/                   # cargo-fuzz targets (lint, fix); own workspace and Cargo.lock
 └─ bench/                  # baseline.sh (hyperfine), RESULTS.md, results/*.json
 ```
 
@@ -75,6 +75,27 @@ what it reports for every fixture. It is run once and the JSON in
 `tests/parity/expected-1x/` is committed; re-run it only when fixtures change.
 Fixtures and parity records are `-text` in `.gitattributes`, so never
 normalise their line endings.
+
+## Fuzzing and coverage
+
+```sh
+cargo install cargo-llvm-cov@0.9.1 cargo-fuzz@0.13.2 --locked   # once
+rustup component add llvm-tools-preview                        # once
+cargo llvm-cov -p yaml-fm-lint-core --fail-under-lines 80      # coverage gate (CI job `coverage`)
+rustup toolchain install nightly-2026-11-03 --profile minimal  # once; fuzzing needs nightly
+cd fuzz && mkdir -p corpus/lint && cargo +nightly-2026-11-03 fuzz run lint corpus/lint ../tests/fixtures/1x ../tests/fixtures/edge -- -max_total_time=60
+```
+
+Targets: `lint` (every range is in bounds and on character boundaries) and
+`fix` (`invariants::check_fix` holds). A crash is written to `fuzz/artifacts/<target>/`:
+turn it into a regression test in the owning module, then fix the code.
+`libfuzzer-sys` compiles C++, so the machine needs a C++ compiler. The `fuzz`
+job in `ci.yml` runs each target for 60 seconds; `fuzz-nightly.yml` runs them for 15 minutes every night.
+
+The nightly date (`nightly-2026-11-03`) is pinned in `ci.yml`, `fuzz-nightly.yml`
+and here. Renovate cannot track it, so bump it by hand in all three places (and
+`cargo +<new date> fuzz build` to check) when a nightly job breaks, or about once
+a quarter. `fuzz/Cargo.lock` is committed; `fuzz/` is excluded from the root workspace.
 
 ## Snapshot tests
 
