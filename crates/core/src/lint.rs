@@ -17,6 +17,8 @@ pub(crate) struct Context<'a> {
     pub doc: &'a Document,
     /// The configuration.
     pub config: &'a Config,
+    /// The compiled JSON Schema, if one is configured.
+    pub schema: Option<&'a jsonschema::Validator>,
     /// The first line ending in `source`, `"\n"` if there is none.
     pub line_ending: &'static str,
 }
@@ -27,6 +29,7 @@ impl<'a> Context<'a> {
         fm: &'a FrontMatter,
         doc: &'a Document,
         config: &'a Config,
+        schema: Option<&'a jsonschema::Validator>,
     ) -> Context<'a> {
         let crlf = source
             .find('\n')
@@ -37,6 +40,7 @@ impl<'a> Context<'a> {
             fm,
             doc,
             config,
+            schema,
             line_ending: if crlf { "\r\n" } else { "\n" },
         }
     }
@@ -147,7 +151,7 @@ mod tests {
     ) -> Vec<(usize, RuleId, Severity, String)> {
         let source = wrap("raw: 1\nb: 2\n");
         let (fm, doc) = document(&source, &config.ignore_keys);
-        let ctx = Context::new(&source, &fm, &doc, config);
+        let ctx = Context::new(&source, &fm, &doc, config, None);
         run_rules(&ctx, rules)
             .into_iter()
             .map(|d| (d.range.start, d.rule, d.severity, d.message))
@@ -216,7 +220,10 @@ mod tests {
             ("---\na: 1\n---\r\nb\r\n", "\n"),
         ] {
             let (fm, doc) = document(source, &[]);
-            assert_eq!(Context::new(source, &fm, &doc, &config).line_ending, want);
+            assert_eq!(
+                Context::new(source, &fm, &doc, &config, None).line_ending,
+                want
+            );
         }
     }
 }

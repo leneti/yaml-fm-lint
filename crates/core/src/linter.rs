@@ -12,6 +12,7 @@ use crate::{Config, ConfigError, ConfigErrorKind, Diagnostic, RuleId, TextRange}
 #[derive(Debug, Clone)]
 pub struct Linter {
     config: Config,
+    schema: Option<jsonschema::Validator>,
 }
 
 /// The result of [`Linter::lint`].
@@ -47,9 +48,39 @@ fn config_error(pointer: &str, message: String) -> ConfigError {
     }
 }
 
+fn schema_error(file: Option<&String>, message: String) -> ConfigError {
+    ConfigError {
+        kind: ConfigErrorKind::Schema,
+        file: file.cloned(),
+        pointer: None,
+        line: None,
+        column: None,
+        message,
+    }
+}
+
+/// Compiles the JSON Schema text; `file` names it in errors.
+fn compile_schema(
+    source: &str,
+    file: Option<&String>,
+) -> Result<jsonschema::Validator, ConfigError> {
+    let value: serde_json::Value = serde_json::from_str(source).map_err(|e| ConfigError {
+        line: Some(e.line()),
+        column: Some(e.column()),
+        ..schema_error(file, format!("schema is not valid JSON: {e}"))
+    })?;
+    // The draft comes from `$schema` and defaults to 2020-12. External `$ref`s fail here: the
+    // core crate does no I/O.
+    jsonschema::options()
+        .should_validate_formats(true)
+        .with_pattern_options(jsonschema::PatternOptions::regex())
+        .build(&value)
+        .map_err(|e| schema_error(file, format!("invalid schema: {e}")))
+}
+
 impl Linter {
     /// Creates a linter, rejecting an invalid configuration.
-    pub fn new(config: Config, _schema_source: Option<&str>) -> Result<Linter, ConfigError> {
+    pub fn new(config: Config, schema_source: Option<&str>) -> Result<Linter, ConfigError> {
         if !(1..=8).contains(&config.indent_size) {
             return Err(config_error(
                 "/rules/indentation",
@@ -62,7 +93,10 @@ impl Linter {
                 format!("rule `{rule}` can't be configured"),
             ));
         }
-        Ok(Linter { config })
+        let schema = schema_source
+            .map(|source| compile_schema(source, config.schema.as_ref()))
+            .transpose()?;
+        Ok(Linter { config, schema })
     }
 
     /// Lints `source`.
@@ -108,7 +142,13 @@ impl Linter {
                         let doc = Document::new(source, &fm, root, data, &self.config.ignore_keys);
                         return LintReport {
                             front_matter: Some(range),
-                            diagnostics: run(&Context::new(source, &fm, &doc, &self.config)),
+                            diagnostics: run(&Context::new(
+                                source,
+                                &fm,
+                                &doc,
+                                &self.config,
+                                self.schema.as_ref(),
+                            )),
                         };
                     }
                 };

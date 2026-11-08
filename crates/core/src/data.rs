@@ -308,7 +308,7 @@ fn special_float(f: f64) -> Option<&'static str> {
 }
 
 /// The text of a mapping key in JSON, which only has string keys.
-fn key_text(key: &Data) -> String {
+pub(crate) fn key_text(key: &Data) -> String {
     match key {
         Data::Str(text) => text.clone(),
         Data::Int(n) => n.to_string(),
@@ -320,7 +320,6 @@ fn key_text(key: &Data) -> String {
 }
 
 /// The JSON value of `data` (spec §5.7). Duplicate keys: the last one wins.
-#[allow(dead_code)] // first caller lands with the schema check
 pub(crate) fn to_json(data: &Data) -> serde_json::Value {
     use serde_json::Value;
     match data {

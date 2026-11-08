@@ -15,6 +15,7 @@ pub(crate) mod no_trailing_commas;
 pub(crate) mod no_trailing_spaces;
 pub(crate) mod require_front_matter;
 pub(crate) mod required_keys;
+pub(crate) mod schema;
 pub(crate) mod single_space_after_colon;
 pub(crate) mod yaml_syntax;
 
@@ -38,4 +39,5 @@ pub(crate) const RULES: &[(RuleId, RuleFn)] = &[
     (RuleId::NoFlowMapping, no_flow_mapping::check),
     (RuleId::Indentation, indentation::check),
     (RuleId::NoRepeatedSpaces, no_repeated_spaces::check),
+    (RuleId::Schema, schema::check),
 ];

@@ -363,7 +363,7 @@ mod tests {
         let source = crate::testing::wrap("a: 'x'\nb: 'b:'\nc: 'z'\n");
         let (fm, doc) = crate::testing::document(&source, &[]);
         let config = Config::default();
-        let ctx = Context::new(&source, &fm, &doc, &config);
+        let ctx = Context::new(&source, &fm, &doc, &config, None);
         assert_eq!(check_with_budget(&ctx, usize::MAX).len(), 2);
         // The batch, then the first half: `a` is found, `c` is never reached.
         assert_eq!(check_with_budget(&ctx, 2 * fm.end).len(), 1);

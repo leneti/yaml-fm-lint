@@ -79,7 +79,6 @@ pub(crate) struct Document {
     /// The top-level mapping.
     pub root: Node,
     /// The values of the whole tree.
-    #[allow(dead_code)] // read by the schema rule
     pub data: Data,
     /// Every front-matter line, delimiters included.
     pub lines: Vec<Line>,
