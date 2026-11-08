@@ -22,7 +22,8 @@
 //! # Fix
 //!
 //! A suggestion, never applied by `fix`: it collapses every run in the value to one
-//! space, which changes the value's text. Keys get no fix, since renaming a key changes
+//! space, which changes the value's text. It is attached to the first finding of each
+//! value only, so a value with thousands of runs stays cheap. Keys get no fix, since renaming a key changes
 //! the data's shape.
 
 use crate::document::Role;
@@ -62,9 +63,9 @@ pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
         if runs.is_empty() {
             return;
         }
-        // Every finding of a scalar carries the whole-scalar fix, so its edits always
-        // produce `new_plain`.
-        let fix = (r.role != Role::Key).then(|| Fix {
+        // Only the scalar's first finding carries the whole-scalar fix, whose edits produce
+        // `new_plain`. A copy per finding would be quadratic in the runs of one scalar.
+        let mut fix = (r.role != Role::Key).then(|| Fix {
             applicability: Applicability::Suggestion,
             data_effect: DataEffect::ChangesScalar {
                 path: path.to_vec(),
@@ -82,7 +83,7 @@ pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
             findings.push(Finding {
                 range,
                 message: MESSAGE.to_string(),
-                fix: fix.clone(),
+                fix: fix.take(),
             });
         }
     });
@@ -184,8 +185,7 @@ mod tests {
         let source = wrap(fm);
         let fixes = fixes(fm);
         assert_eq!(fixes.len(), 2);
-        for fix in fixes {
-            let fix = fix.expect("a fix");
+        for fix in fixes.into_iter().flatten() {
             assert_eq!(fix.applicability, Applicability::Suggestion);
             let DataEffect::ChangesScalar { new_plain, .. } = &fix.data_effect else {
                 panic!("expected ChangesScalar");
@@ -196,6 +196,27 @@ mod tests {
                 Some("---\na: x y z\n---\nBody.\n")
             );
         }
+    }
+
+    #[test]
+    fn only_the_first_finding_of_a_scalar_carries_the_fix() {
+        let fm = "a: x   y  z\n";
+        let fixes = fixes(fm);
+        assert_eq!(fixes.len(), 2);
+        assert!(fixes[0].is_some());
+        assert_eq!(fixes[1], None);
+    }
+
+    #[test]
+    fn thousands_of_runs_on_one_line_stay_linear() {
+        // 10k runs: a fix per finding would be 100M edits in all.
+        let fm = format!("l: {}\n", "a  ".repeat(10_000));
+        let started = std::time::Instant::now();
+        let fixes = fixes(&fm);
+        assert_eq!(fixes.len(), 10_000 - 1);
+        assert_eq!(fixes.iter().filter(|f| f.is_some()).count(), 1);
+        // Generous: slow runners; the quadratic version takes minutes or aborts.
+        assert!(started.elapsed() < std::time::Duration::from_secs(30));
     }
 
     #[test]
