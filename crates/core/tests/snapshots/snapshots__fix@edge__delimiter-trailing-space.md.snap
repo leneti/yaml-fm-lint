@@ -1,0 +1,14 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/delimiter-trailing-space.md
+---
+---
+title: Trailing space after the opening delimiter
+---
+
+Body.
+
+applied: 1
+refused:
+remaining:

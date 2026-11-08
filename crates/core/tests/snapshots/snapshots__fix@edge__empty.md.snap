@@ -1,0 +1,15 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/empty.md
+---
+---
+---
+
+# Heading
+
+Body text.
+
+applied: 0
+refused:
+remaining:

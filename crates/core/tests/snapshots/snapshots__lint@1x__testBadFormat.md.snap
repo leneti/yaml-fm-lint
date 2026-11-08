@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testBadFormat.md
+---
+5:1-5:1 error [yaml-syntax] simple key expect ':'
+fixable: 0

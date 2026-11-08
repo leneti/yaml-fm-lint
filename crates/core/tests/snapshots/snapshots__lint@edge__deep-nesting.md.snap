@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/edge/deep-nesting.md
+---
+130:257-130:257 error [input-limit] nesting is deeper than 128 levels
+fixable: 0

@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testSpaceBeforeColon.md
+---
+2:5-2:6 error [no-space-before-colon] whitespace before ":"
+fixable: 1

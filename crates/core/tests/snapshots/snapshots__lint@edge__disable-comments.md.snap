@@ -1,0 +1,9 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/edge/disable-comments.md
+---
+4:19-4:20 error [no-trailing-spaces] trailing whitespace
+6:1-6:38 warning [invalid-disable-comment] unknown rule `not-a-rule` in disable comment
+7:7-7:8 error [no-trailing-spaces] trailing whitespace
+fixable: 2

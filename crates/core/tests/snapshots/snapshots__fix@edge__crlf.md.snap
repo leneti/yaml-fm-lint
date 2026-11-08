@@ -1,0 +1,19 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/crlf.md
+---
+---␍
+title: Windows line endings␍
+tags:␍
+  - one␍
+  - two␍
+---␍
+␍
+# Heading␍
+␍
+Body text.␍
+
+applied: 0
+refused:
+remaining:

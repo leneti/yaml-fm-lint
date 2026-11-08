@@ -1,0 +1,20 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/anchors-aliases.md
+---
+---
+defaults: &defaults
+  author: Jane
+  draft: false
+post:
+  <<: *defaults
+  title: Post
+other: *defaults
+---
+
+Body.
+
+applied: 0
+refused:
+remaining:

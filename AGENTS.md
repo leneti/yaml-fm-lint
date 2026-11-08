@@ -76,6 +76,22 @@ what it reports for every fixture. It is run once and the JSON in
 Fixtures and parity records are `-text` in `.gitattributes`, so never
 normalise their line endings.
 
+## Snapshot tests
+
+`crates/core/tests/snapshots.rs` snapshots what `lint` and `fix` do to every
+fixture in `tests/fixtures/{1x,edge}` (default config); the `.snap` files live in
+`crates/core/tests/snapshots/` and are `-text` in `.gitattributes`.
+
+```sh
+cargo install cargo-insta@1.49.0 --locked   # once
+cargo insta test -p yaml-fm-lint-core       # run and collect changed snapshots
+cargo insta review                          # accept or reject them one by one
+```
+
+Never accept a snapshot you haven't read: a changed snapshot is either a
+deliberate behaviour change or a bug, and only reading it tells you which.
+Fix the code, not the snapshot, when it shows a bug.
+
 ## Code rules
 
 - No panics: `unwrap`, `expect`, `panic!`, `todo!` and indexing/slicing are

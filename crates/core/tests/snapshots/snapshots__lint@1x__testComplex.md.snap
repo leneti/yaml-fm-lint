@@ -1,0 +1,53 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testComplex.md
+---
+2:1-2:1 error [no-blank-lines] blank line
+3:6-3:7 error [no-space-before-colon] whitespace before ":"
+3:16-3:18 warning [no-repeated-spaces] repeated spaces in a value
+4:1-4:1 error [no-blank-lines] blank line
+5:1-5:7 error [no-quotes] unnecessary quotes
+5:14-5:17 warning [no-repeated-spaces] repeated spaces in a value
+5:24-5:28 error [no-trailing-spaces] trailing whitespace
+6:4-6:9 error [no-space-before-colon] whitespace before ":"
+6:11-6:18 error [no-quotes] unnecessary quotes
+9:10-9:34 warning [no-commas] comma in a plain value; use a sequence for lists
+9:14-9:16 warning [no-repeated-spaces] repeated spaces in a value
+10:5-10:8 warning [single-space-after-colon] more than one space after ":"
+12:8-12:10 warning [no-repeated-spaces] repeated spaces in a value
+12:8-12:11 error [no-trailing-commas] trailing comma
+13:8-13:9 error [no-trailing-commas] trailing comma
+15:10-15:34 error [no-flow-sequence] flow sequence; use a block sequence
+15:11-15:17 error [no-quotes] unnecessary quotes
+15:19-15:25 error [no-quotes] unnecessary quotes
+15:27-15:33 error [no-quotes] unnecessary quotes
+17:3-23:4 error [no-flow-sequence] flow sequence; use a block sequence
+29:1-29:14 error [indentation] expected indentation of 2 spaces, found 13
+29:16-29:60 error [no-flow-mapping] flow mapping; use a block mapping
+29:23-29:24 error [no-space-before-colon] whitespace before ":"
+29:26-29:48 error [no-quotes] unnecessary quotes
+29:55-29:58 error [no-quotes] unnecessary quotes
+30:16-30:71 error [no-flow-mapping] flow mapping; use a block mapping
+30:66-30:69 error [no-quotes] unnecessary quotes
+32:10-32:11 error [no-trailing-commas] trailing comma
+33:16-33:17 error [no-trailing-commas] trailing comma
+34:10-34:15 error [no-quotes] unnecessary quotes
+37:10-37:17 error [no-quotes] unnecessary quotes
+45:1-45:9 error [indentation] expected indentation of 6 spaces, found 8
+51:17-51:18 error [no-trailing-spaces] trailing whitespace
+54:19-54:20 error [no-space-before-colon] whitespace before ":"
+57:6-57:7 error [no-trailing-spaces] trailing whitespace
+63:10-63:11 error [no-trailing-spaces] trailing whitespace
+66:8-66:167 error [no-flow-mapping] flow mapping; use a block mapping
+66:36-66:165 error [no-flow-mapping] flow mapping; use a block mapping
+66:45-66:50 error [no-quotes] unnecessary quotes
+66:58-66:64 error [no-quotes] unnecessary quotes
+66:71-66:163 error [no-flow-mapping] flow mapping; use a block mapping
+66:120-66:162 error [no-flow-mapping] flow mapping; use a block mapping
+66:128-66:135 error [no-quotes] unnecessary quotes
+66:142-66:147 error [no-quotes] unnecessary quotes
+66:154-66:161 error [no-quotes] unnecessary quotes
+67:1-67:1 error [no-blank-lines] blank line
+68:1-68:1 error [no-blank-lines] blank line
+fixable: 42

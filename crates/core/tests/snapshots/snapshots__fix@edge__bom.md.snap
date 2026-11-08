@@ -1,0 +1,18 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/bom.md
+---
+<BOM>---
+title: Starts with a BOM
+tags:
+  - one
+---
+
+# Heading
+
+Body text.
+
+applied: 0
+refused:
+remaining:

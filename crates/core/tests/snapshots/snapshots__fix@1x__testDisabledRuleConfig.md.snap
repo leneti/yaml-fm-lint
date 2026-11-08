@@ -1,0 +1,20 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/1x/testDisabledRuleConfig.md
+---
+---
+test:
+  - title: Test, test's test
+    url: test \# test.test/#tags
+disabledTags:
+  - test
+  - rule
+  - third
+---
+
+Test
+applied: 2
+refused:
+remaining:
+3:12-3:29 warning [no-commas] comma in a plain value; use a sequence for lists

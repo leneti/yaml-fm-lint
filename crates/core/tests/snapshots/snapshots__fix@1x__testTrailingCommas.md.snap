@@ -1,0 +1,14 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/1x/testTrailingCommas.md
+---
+---
+test:
+  - test
+---
+
+Test
+applied: 1
+refused:
+remaining:

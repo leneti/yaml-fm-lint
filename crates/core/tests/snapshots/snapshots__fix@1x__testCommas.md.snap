@@ -1,0 +1,14 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/1x/testCommas.md
+---
+---
+test: test, test
+---
+
+Test
+applied: 0
+refused:
+remaining:
+2:7-2:17 warning [no-commas] comma in a plain value; use a sequence for lists

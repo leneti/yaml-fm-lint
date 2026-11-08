@@ -1,0 +1,8 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/edge/quotes-unneeded.md
+---
+2:9-2:16 error [no-quotes] unnecessary quotes
+3:9-3:16 error [no-quotes] unnecessary quotes
+fixable: 2

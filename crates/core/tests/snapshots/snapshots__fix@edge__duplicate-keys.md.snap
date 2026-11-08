@@ -1,0 +1,6 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/duplicate-keys.md
+---
+Unparseable

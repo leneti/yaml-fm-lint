@@ -1,0 +1,19 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/1x/testLowercaseTags.md
+---
+---
+tags:
+  - tag1
+  - tag2
+  - Tag3
+  - tag4
+  - TaG5
+---
+
+Test Passing
+
+applied: 0
+refused:
+remaining:
