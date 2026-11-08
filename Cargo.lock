@@ -1325,6 +1325,7 @@ dependencies = [
  "saphyr-parser",
  "serde_json",
  "thiserror",
+ "yaml-fm-lint-core",
 ]
 
 [[package]]

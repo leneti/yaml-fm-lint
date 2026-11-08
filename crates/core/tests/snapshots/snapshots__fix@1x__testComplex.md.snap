@@ -76,7 +76,7 @@ seven: { id: 1, pos: center, name: { first: tom, last: wall, pos: {center: false
 - item
 - item
 
-applied: 39
+applied: 38
 refused:
 remaining:
 2:15-2:17 warning [no-repeated-spaces] repeated spaces in a value

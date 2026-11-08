@@ -11,6 +11,8 @@ mod edit;
 mod error;
 mod extract;
 mod fix;
+#[cfg(feature = "invariants")]
+pub mod invariants;
 mod line_index;
 mod lint;
 mod linter;

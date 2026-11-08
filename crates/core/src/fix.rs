@@ -155,7 +155,7 @@ struct Pass {
     edits: Vec<TextEdit>,
     /// How many fixes were applied.
     applied: usize,
-    /// The fixes that were refused.
+    /// The fixes that were refused for good: they fail on their own, not beside other fixes.
     refused: Vec<Diagnostic>,
     /// The verification budget ran out before every fix was decided.
     exhausted: bool,
@@ -248,7 +248,12 @@ fn run_pass(text: &str, chosen: &[Candidate], budget: &mut usize) -> Pass {
             break;
         }
         if let Some((diagnostic, _)) = rest.get(lo).filter(|_| lo < hi) {
-            pass.refused.push(diagnostic.clone());
+            // Only a fix that fails on the text as it stands is refused for good. One that
+            // fails beside fixes already accepted may be fine once those are applied (an
+            // indentation fix moves the line a flow fix lays out), so the next pass retries it.
+            if pass.edits.is_empty() {
+                pass.refused.push(diagnostic.clone());
+            }
         }
         start += lo + 1;
     }
@@ -467,9 +472,31 @@ mod tests {
             outcome.output,
             "---\nreferences:\n  - title: Branching Strategies\n    url: /\n---\nBody\n"
         );
-        assert_eq!(outcome.applied, 5);
+        assert_eq!(outcome.applied, 4);
         assert!(outcome.refused.is_empty());
         assert!(outcome.remaining.is_empty());
+    }
+
+    #[test]
+    fn fix_retries_a_fix_that_failed_beside_another() {
+        // The flow-mapping fix lays out its lines for the current indentation, so it fails
+        // beside the indentation fix, which does not touch its range. It is not refused: the
+        // next pass applies it to the re-indented text.
+        let config = Config {
+            indent_size: 4,
+            ..Config::default()
+        };
+        let linter = Linter::new(config, None).unwrap();
+        let outcome = linter
+            .fix("---\na:\n  - {a: a, b: r}\n---\ntext\n")
+            .unwrap();
+        assert_eq!(
+            outcome.output,
+            "---\na:\n    - a: a\n      b: r\n---\ntext\n"
+        );
+        assert!(outcome.refused.is_empty());
+        assert!(outcome.remaining.is_empty());
+        assert_eq!(linter.fix(&outcome.output).unwrap().applied, 0);
     }
 
     #[test]
