@@ -26,7 +26,9 @@ pub struct Config {
     pub indent_size: u8,
     /// Keys whose subtrees style rules skip.
     pub ignore_keys: Vec<String>,
-    /// Path of the JSON Schema to validate against.
+    /// Path of the JSON Schema to validate against. The core reads no files: the caller loads
+    /// the file and passes its text to [`Linter::new`](crate::Linter::new), which uses this
+    /// only to name the schema in errors, and rejects a path given without that text.
     pub schema: Option<String>,
 }
 

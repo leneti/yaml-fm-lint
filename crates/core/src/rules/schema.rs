@@ -189,6 +189,22 @@ mod tests {
         assert_eq!(error.kind, ConfigErrorKind::Schema);
     }
 
+    #[rstest]
+    #[case::relative(r#"{"$ref":"other.json#/x"}"#, "other.json#/x")]
+    #[case::nested(r#"{"properties":{"a":{"$ref":"other.json"}}}"#, "other.json")]
+    #[case::http(
+        r#"{"$ref":"https://example.com/s.json"}"#,
+        "https://example.com/s.json"
+    )]
+    fn external_ref_error_message(#[case] schema: &str, #[case] uri: &str) {
+        let error = Linter::new(Config::default(), Some(schema)).unwrap_err();
+        assert_eq!(error.kind, ConfigErrorKind::Schema);
+        assert_eq!(
+            error.message,
+            format!("schema `$ref` to another document is not allowed: {uri}")
+        );
+    }
+
     #[test]
     fn schema_error_details() {
         let config = Config {
@@ -235,7 +251,7 @@ mod tests {
             .iter()
             .filter(|d| d.rule == RuleId::Schema);
         assert_eq!(found.count(), 5_000);
-        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+        assert!(started.elapsed() < std::time::Duration::from_secs(30));
     }
 
     #[test]

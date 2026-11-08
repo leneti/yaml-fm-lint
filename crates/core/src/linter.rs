@@ -1,5 +1,7 @@
 //! The linter: configuration plus the lint pipeline.
 
+use jsonschema::{ReferencingError, error::ValidationErrorKind};
+
 use crate::data::build;
 use crate::document::Document;
 use crate::extract::{Extraction, extract, start_offset};
@@ -77,11 +79,25 @@ fn compile_schema(
         .should_validate_formats(true)
         .with_pattern_options(jsonschema::PatternOptions::regex())
         .build(&value)
-        .map_err(|e| schema_error(file, format!("invalid schema: {e}")))
+        .map_err(|e| match e.kind() {
+            // The core crate does no I/O, so a `$ref` to another document can never resolve.
+            ValidationErrorKind::Referencing(ReferencingError::Unretrievable { uri, .. }) => {
+                schema_error(
+                    file,
+                    format!("schema `$ref` to another document is not allowed: {uri}"),
+                )
+            }
+            _ => schema_error(file, format!("invalid schema: {e}")),
+        })
 }
 
 impl Linter {
     /// Creates a linter, rejecting an invalid configuration.
+    ///
+    /// `schema_source` is the text of the JSON Schema to validate against, already read by the
+    /// caller (the core does no I/O); `config.schema` only names it in errors. Setting
+    /// `config.schema` without a `schema_source` is an error, so a schema is never silently
+    /// skipped.
     pub fn new(config: Config, schema_source: Option<&str>) -> Result<Linter, ConfigError> {
         if !(1..=8).contains(&config.indent_size) {
             return Err(config_error(
@@ -93,6 +109,12 @@ impl Linter {
             return Err(config_error(
                 &format!("/rules/{rule}"),
                 format!("rule `{rule}` can't be configured"),
+            ));
+        }
+        if let (Some(path), None) = (&config.schema, schema_source) {
+            return Err(config_error(
+                "/schema",
+                format!("schema `{path}` was configured but not loaded"),
             ));
         }
         let schema = schema_source
@@ -262,6 +284,22 @@ mod tests {
         assert_eq!(error.kind, ConfigErrorKind::Config);
         assert_eq!(error.pointer.as_deref(), Some(pointer));
         assert_eq!(error.message, message);
+    }
+
+    #[test]
+    fn linter_rejects_a_schema_path_without_the_schema_text() {
+        let config = Config {
+            schema: Some("s.json".to_string()),
+            ..Config::default()
+        };
+        let error = Linter::new(config.clone(), None).unwrap_err();
+        assert_eq!(error.kind, ConfigErrorKind::Config);
+        assert_eq!(error.pointer.as_deref(), Some("/schema"));
+        assert_eq!(
+            error.message,
+            "schema `s.json` was configured but not loaded"
+        );
+        assert!(Linter::new(config, Some("{}")).is_ok());
     }
 
     #[test]
