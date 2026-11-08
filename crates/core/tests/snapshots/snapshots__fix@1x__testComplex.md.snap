@@ -78,8 +78,6 @@ seven: { id: 1, pos: center, name: { first: tom, last: wall, pos: {center: false
 
 applied: 39
 refused:
-29:16-29:60 error [no-flow-mapping] flow mapping; use a block mapping
-30:16-30:71 error [no-flow-mapping] flow mapping; use a block mapping
 remaining:
 2:15-2:17 warning [no-repeated-spaces] repeated spaces in a value
 3:12-3:15 warning [no-repeated-spaces] repeated spaces in a value

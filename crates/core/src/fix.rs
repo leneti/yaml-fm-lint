@@ -307,7 +307,6 @@ impl Linter {
         }
         let mut text = source.to_string();
         let mut applied = 0;
-        let mut refused = Vec::new();
         let mut refused_ranges = BTreeSet::new();
         let mut budget = MAX_FIX_VERIFIES;
         let mut exhausted = false;
@@ -319,7 +318,6 @@ impl Linter {
             let pass = run_pass(&text, &chosen, &mut budget);
             applied += pass.applied;
             refused_ranges.extend(pass.refused.iter().map(|d| (d.rule, d.range)));
-            refused.extend(pass.refused);
             if !pass.edits.is_empty() {
                 refused_ranges = shift(&refused_ranges, &pass.edits);
                 text = pass.output;
@@ -336,7 +334,7 @@ impl Linter {
         } else {
             BTreeSet::new()
         };
-        let remaining = report
+        let remaining: Vec<Diagnostic> = report
             .diagnostics
             .into_iter()
             .map(|mut d| {
@@ -348,6 +346,11 @@ impl Linter {
                 }
                 d
             })
+            .collect();
+        // Only refusals that still stand in the final output; one a later pass resolved is gone.
+        let refused = (remaining.iter())
+            .filter(|d| d.message.ends_with(REFUSED_NOTE))
+            .cloned()
             .collect();
         Ok(FixOutcome {
             output: text,
@@ -452,6 +455,21 @@ mod tests {
             outcome.remaining[0].message,
             "trailing comma (fix refused: would change data)"
         );
+    }
+
+    #[test]
+    fn fix_does_not_report_a_refusal_a_later_pass_resolved() {
+        // The flow-mapping fix conflicts with the indentation fix in the first pass and is
+        // refused there, then applied in the second pass.
+        let source = "---\nreferences:\n             - { title : \"Branching Strategies\", url: \"/\" }\n---\nBody\n";
+        let outcome = linter().fix(source).unwrap();
+        assert_eq!(
+            outcome.output,
+            "---\nreferences:\n  - title: Branching Strategies\n    url: /\n---\nBody\n"
+        );
+        assert_eq!(outcome.applied, 5);
+        assert!(outcome.refused.is_empty());
+        assert!(outcome.remaining.is_empty());
     }
 
     #[test]

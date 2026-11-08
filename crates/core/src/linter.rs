@@ -31,7 +31,9 @@ pub struct FixOutcome {
     pub output: String,
     /// How many fixes were applied.
     pub applied: usize,
-    /// Fixes that were refused because they would change data.
+    /// The findings in `remaining` whose fix was refused because it would change data (their
+    /// messages carry the refusal note). A fix refused in one pass and applied in a later one
+    /// is not listed. Positions are in `output`.
     pub refused: Vec<Diagnostic>,
     /// The findings that remain in `output`.
     pub remaining: Vec<Diagnostic>,
