@@ -28,8 +28,9 @@
 //! # Fix
 //!
 //! Moves the collection and everything inside it (block text and continuation lines
-//! included) left or right by the difference. No fix when a line in it has fewer leading
-//! spaces than it would lose; the fixer also refuses a shift that would change the data.
+//! included) left or right by the difference. A comment line with fewer leading spaces than
+//! it would lose moves to column 0. No fix when any other line has fewer leading spaces
+//! than it would lose; the fixer also refuses a shift that would change the data.
 
 use crate::document::{LineKind, Role};
 use crate::lint::{Context, Finding};
@@ -109,8 +110,9 @@ pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
 
 /// A fix that moves the lines of `node` from `first_line` on from `found` to `expected` spaces.
 ///
-/// Blank lines stay as they are (a blank line inside a scalar is data either way); `None` if
-/// a line has fewer leading spaces than it would lose.
+/// Blank lines stay as they are (a blank line inside a scalar is data either way). An own-line
+/// comment with fewer leading spaces than it would lose moves to column 0 (a comment is not
+/// data); `None` if any other line has fewer.
 fn shift(
     ctx: &Context<'_>,
     node: &Node,
@@ -137,13 +139,18 @@ fn shift(
             }
         } else {
             let lost = found - expected;
-            if leading < lost {
+            let own_line_comment =
+                line.kind == LineKind::Structural && text.get(leading..)?.starts_with('#');
+            if leading < lost && !own_line_comment {
                 return None;
+            }
+            if leading == 0 {
+                continue;
             }
             TextEdit {
                 range: TextRange {
                     start: line.range.start,
-                    end: line.range.start + lost,
+                    end: line.range.start + lost.min(leading),
                 },
                 new_text: String::new(),
             }
@@ -262,14 +269,32 @@ mod tests {
         assert_eq!(fix_fm(fm, with_size(size)), fixed);
     }
 
-    // The diagnostic is there, but no fix: a line would lose more spaces than it has.
+    // Own-line comments are clamped to column 0 instead of blocking the fix.
     #[rstest]
     #[case::comment_at_column_0(
         "a:\n    b: 1\n# c\n    d: 2\n",
-        &["3:1-3:5 expected indentation of 2 spaces, found 4"]
+        &["3:1-3:5 expected indentation of 2 spaces, found 4"],
+        "a:\n  b: 1\n# c\n  d: 2\n"
     )]
     #[case::comment_at_column_1(
         "a:\n    b: 1\n # c\n    d: 2\n",
+        &["3:1-3:5 expected indentation of 2 spaces, found 4"],
+        "a:\n  b: 1\n# c\n  d: 2\n"
+    )]
+    #[case::comment_at_column_0_root(
+        "  a: 1\n# c\n  b: 2\n",
+        &["2:1-2:3 expected indentation of 0 spaces, found 2"],
+        "a: 1\n# c\nb: 2\n"
+    )]
+    fn comments_clamp(#[case] fm: &str, #[case] want: &[&str], #[case] fixed: &str) {
+        assert_eq!(lint_rule(RULE, fm, Config::default()), want);
+        assert_eq!(fix_fm(fm, Config::default()), fixed);
+    }
+
+    // The diagnostic is there, but no fix: a data line would lose more spaces than it has.
+    #[rstest]
+    #[case::short_line_in_block_text(
+        "a:\n    b: |\n        t\n \n        u\n",
         &["3:1-3:5 expected indentation of 2 spaces, found 4"]
     )]
     fn flagged_without_fix(#[case] fm: &str, #[case] want: &[&str]) {
