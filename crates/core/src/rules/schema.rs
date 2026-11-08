@@ -27,12 +27,17 @@
 //!
 //! No fix.
 
+use std::collections::HashMap;
+
 use jsonschema::error::ValidationErrorKind;
-use jsonschema::paths::LocationSegment;
 
 use crate::data::{Data, key_text, to_json};
 use crate::lint::{Context, Finding};
 use crate::tree::{Node, NodeKind};
+
+/// For each mapping a path went through: its keys' JSON text to the index of the last entry
+/// with that key. Built once per mapping, so placing N errors costs O(N + keys), not O(N * keys).
+type KeyIndex = HashMap<*const Node, HashMap<String, usize>>;
 
 /// One finding per schema error; none when no schema is configured.
 pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
@@ -40,14 +45,17 @@ pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
         return Vec::new();
     };
     let instance = to_json(&ctx.doc.data);
+    let mut index = KeyIndex::new();
     schema
         .iter_errors(&instance)
         .map(|error| {
-            let location = error.instance_path();
-            let segments: Vec<_> = location.into_iter().collect();
-            let (node, complete) = resolve(&ctx.doc.root, &ctx.doc.data, &segments);
+            // The pointer text, not `Location`'s iterator: that drops a trailing empty segment,
+            // so a key `""` would read as the root.
+            let pointer = error.instance_path().to_string();
+            let segments = segments(&pointer);
+            let (node, complete) = resolve(&mut index, &ctx.doc.root, &ctx.doc.data, &segments);
             let range = match (error.kind(), &node.kind) {
-                _ if segments.is_empty()
+                _ if pointer.is_empty()
                     && matches!(error.kind(), ValidationErrorKind::Required { .. }) =>
                 {
                     ctx.fm.open
@@ -59,10 +67,10 @@ pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
                 }
                 _ => node.range,
             };
-            let path = if segments.is_empty() {
-                "(root)".to_string()
+            let path = if pointer.is_empty() {
+                "(root)"
             } else {
-                location.to_string()
+                &pointer
             };
             Finding {
                 range,
@@ -73,28 +81,38 @@ pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
         .collect()
 }
 
+/// The unescaped segments of a JSON pointer (`""` has none, `"/"` has one empty one).
+fn segments(pointer: &str) -> Vec<String> {
+    pointer
+        .split('/')
+        .skip(1)
+        .map(|part| part.replace("~1", "/").replace("~0", "~"))
+        .collect()
+}
+
 /// The node at the longest prefix of `segments` that exists in the tree, and whether that is
 /// all of `segments`. Mapping segments match the key's JSON text (the last duplicate wins, as
 /// in the JSON value); an alias ends the walk, since its target is not below it in the tree.
 fn resolve<'a>(
+    index: &mut KeyIndex,
     root: &'a Node,
     data: &'a Data,
-    segments: &[LocationSegment<'_>],
+    segments: &[String],
 ) -> (&'a Node, bool) {
     let (mut node, mut data) = (root, data);
     for segment in segments {
-        let next = match (&node.kind, data, segment) {
-            (NodeKind::Mapping { entries, .. }, Data::Map(pairs), _) => {
-                let text = segment.to_string();
-                pairs
-                    .iter()
-                    .enumerate()
-                    .rev()
-                    .find(|(_, (key, _))| key_text(key) == text)
-                    .and_then(|(i, (_, value))| Some((&entries.get(i)?.value, value)))
-            }
-            (NodeKind::Sequence { items, .. }, Data::Seq(values), LocationSegment::Index(i)) => {
-                items.get(*i).zip(values.get(*i))
+        let next = match (&node.kind, data) {
+            (NodeKind::Mapping { entries, .. }, Data::Map(pairs)) => index
+                .entry(node)
+                .or_insert_with(|| {
+                    let keys = pairs.iter().enumerate();
+                    keys.map(|(i, (key, _))| (key_text(key), i)).collect()
+                })
+                .get(segment)
+                .and_then(|&i| Some((&entries.get(i)?.value, &pairs.get(i)?.1))),
+            (NodeKind::Sequence { items, .. }, Data::Seq(values)) => {
+                let i = segment.parse::<usize>().ok();
+                i.and_then(|i| items.get(i).zip(values.get(i)))
             }
             _ => None,
         };
@@ -183,6 +201,41 @@ mod tests {
         assert!(error.message.starts_with("schema is not valid JSON: "));
         let error = Linter::new(Config::default(), Some(r#"{"type":5}"#)).unwrap_err();
         assert!(error.message.starts_with("invalid schema: "), "{error}");
+    }
+
+    #[rstest]
+    #[case::empty_key(
+        r#"{"properties":{"":{"type":"string"}}}"#,
+        "\"\": 5\n",
+        &[r#"2:5-2:6 schema /: 5 is not of type "string""#]
+    )]
+    #[case::escaped_key(
+        r#"{"properties":{"a/b":{"type":"string"}}}"#,
+        "a/b: 5\n",
+        &[r#"2:6-2:7 schema /a~1b: 5 is not of type "string""#]
+    )]
+    fn odd_keys(#[case] schema: &str, #[case] fm: &str, #[case] want: &[&str]) {
+        assert_eq!(lint(schema, fm, Config::default()), want);
+    }
+
+    /// Placement must not be quadratic: one error per key, thousands of keys.
+    #[test]
+    fn many_keys_are_placed_in_linear_time() {
+        let source = wrap(
+            &(0..5_000)
+                .map(|i| format!("key{i}: {i}\n"))
+                .collect::<String>(),
+        );
+        let schema = r#"{"additionalProperties":{"type":"string"}}"#;
+        let linter = Linter::new(Config::default(), Some(schema)).expect("valid schema");
+        let started = std::time::Instant::now();
+        let report = linter.lint(&source);
+        let found = report
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == RuleId::Schema);
+        assert_eq!(found.count(), 5_000);
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
     }
 
     #[test]
