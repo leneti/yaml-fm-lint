@@ -91,6 +91,8 @@ cargo insta review                          # accept or reject them one by one
 Never accept a snapshot you haven't read: a changed snapshot is either a
 deliberate behaviour change or a bug, and only reading it tells you which.
 Fix the code, not the snapshot, when it shows a bug.
+Some snapshots end lines with significant trailing spaces (block-scalar fixtures), so
+never let an editor trim whitespace in `crates/core/tests/snapshots/*.snap`.
 
 ## Code rules
 

@@ -59,7 +59,7 @@ fn fixtures() {
                     "{}\napplied: {}\nrefused:\n{}remaining:\n{}",
                     visible(&outcome.output),
                     outcome.applied,
-                    show(&index, &outcome.refused),
+                    show(&out_index, &outcome.refused),
                     show(&out_index, &outcome.remaining)
                 )
             }
