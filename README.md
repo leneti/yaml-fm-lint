@@ -23,7 +23,7 @@
 
 ## 2.0 is in development
 
-yaml-fm-lint 2.0 is a Rust rewrite and is in development on this branch. It is not released yet, and the binary is currently a stub. 1.x continues on the [`v1` branch](https://github.com/leneti/yaml-fm-lint/tree/v1).
+yaml-fm-lint 2.0 is a Rust rewrite and is in development on this branch. The core engine (extraction, parsing, rules, disable comments, verified fixes and schema checks) is done; the command-line tool is next, so the binary is currently a stub. It is not released yet. 1.x continues on the [`v1` branch](https://github.com/leneti/yaml-fm-lint/tree/v1).
 
 ## Install
 

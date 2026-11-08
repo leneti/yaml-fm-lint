@@ -21,6 +21,11 @@ yaml-fm-lint/
 ├─ clippy.toml, .cargo/config.toml (the `cargo xtask` alias)
 ├─ crates/
 │  ├─ core/   -> `yaml-fm-lint-core` (lib; no I/O of any kind)
+│  │   ├─ src/  # extract, parse, tree, data, document, line_index, config, diagnostic,
+│  │   │        # disable (comments), lint (rule runner), fix + edit (verified fixes),
+│  │   │        # linter (public API), invariants (feature `invariants`, for fuzzing),
+│  │   │        # rule_id, rules/<rule_id>.rs (one module per rule)
+│  │   └─ tests/  # snapshots.rs, fix_props.rs, limits.rs
 │  ├─ cli/    -> `yaml-fm-lint` (bin)
 │  └─ wasm/   -> `yaml-fm-lint-wasm` (planned)
 ├─ xtask/                  # `cargo xtask <command>`; commands: parity-record, bench-corpus
@@ -75,6 +80,20 @@ what it reports for every fixture. It is run once and the JSON in
 `tests/parity/expected-1x/` is committed; re-run it only when fixtures change.
 Fixtures and parity records are `-text` in `.gitattributes`, so never
 normalise their line endings.
+
+## Adding a rule
+
+1. Add a variant to `RuleId` in `crates/core/src/rule_id.rs` (with its name, default
+   level and flags) and a row to its tests.
+2. Create `crates/core/src/rules/<rule_id>.rs` with the module-doc sections `# Why`,
+   `# Examples` (bad and good) and, if it has a fix, `# Fix`; declare the module in
+   `rules/mod.rs`.
+3. Write the case table and run it: it must fail first.
+4. Implement `check` and register it in `RULES` in `rules/mod.rs`.
+5. If it has a fix, declare its `DataEffect` honestly: the fix engine re-parses the
+   result and refuses any fix whose real effect on the data differs from the declared one.
+6. Review the snapshot changes (`cargo insta review`), reading each one.
+7. Run the standard check (the commands in "Commands" above).
 
 ## Fuzzing and coverage
 
