@@ -39,7 +39,7 @@ use crate::edit::apply_edits;
 use crate::extract::{Extraction, extract};
 use crate::lint::{Context, Finding};
 use crate::parse::parse;
-use crate::tree::{NodeKind, Style, walk};
+use crate::tree::{NodeKind, Style};
 use crate::{Applicability, DataEffect, Fix, PathStep, TextEdit, TextRange};
 
 /// The message for every finding.
@@ -136,12 +136,8 @@ fn never_plain(value: &str, in_flow: bool) -> bool {
 /// The quoted scalars worth re-parsing, in source order.
 fn candidates(ctx: &Context<'_>) -> Vec<Candidate> {
     let mut found = Vec::new();
-    // `nodes()` and `walk` both go in pre-order, keys before values.
-    let mut refs = ctx.doc.nodes().into_iter();
-    walk(&ctx.doc.root, &mut |node, path| {
-        let Some(r) = refs.next() else {
-            return;
-        };
+    ctx.doc.walk_nodes(&mut |r, path| {
+        let node = r.node;
         let NodeKind::Scalar {
             value,
             style: Style::SingleQuoted | Style::DoubleQuoted,

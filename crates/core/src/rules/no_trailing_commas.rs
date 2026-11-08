@@ -31,7 +31,7 @@
 
 use crate::document::Role;
 use crate::lint::{Context, Finding};
-use crate::tree::{NodeKind, Style, walk};
+use crate::tree::{NodeKind, Style};
 use crate::{Applicability, DataEffect, Fix, TextEdit, TextRange};
 
 /// The message for every finding.
@@ -40,13 +40,9 @@ const MESSAGE: &str = "trailing comma";
 /// Flags a trailing run of commas and whitespace on single-line plain values and items.
 pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
     let mut findings = Vec::new();
-    // `nodes()` and `walk` both go in pre-order, keys before values.
-    let mut refs = ctx.doc.nodes().into_iter();
-    walk(&ctx.doc.root, &mut |node, path| {
-        let Some(r) = refs.next() else {
-            return;
-        };
-        if !std::ptr::eq(r.node, node) || r.in_flow || !matches!(r.role, Role::Value | Role::Item) {
+    ctx.doc.walk_nodes(&mut |r, path| {
+        let node = r.node;
+        if r.in_flow || !matches!(r.role, Role::Value | Role::Item) {
             return;
         }
         let NodeKind::Scalar {

@@ -1,9 +1,9 @@
 //! The front matter as lines, comments and nodes: what the rules look at.
 
-use crate::TextRange;
 use crate::data::Data;
 use crate::extract::FrontMatter;
 use crate::tree::{Entry, Node, NodeKind, Style};
+use crate::{PathStep, TextRange};
 
 /// What a front-matter line is, for the whitespace rules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,33 +96,53 @@ fn scalar_at(scalars: &[Span], offset: usize) -> Option<&Span> {
         .filter(|s| offset < s.end)
 }
 
-fn collect<'a>(
+/// Visits `node` and everything below it in pre-order (keys before values), handing `f` each
+/// node with its path from the root. Like [`walk`], one shared path stack: O(depth) memory.
+fn visit<'a>(
     node: &'a Node,
     role: Role,
     in_flow: bool,
     link: (Option<&'a Entry>, Option<&'a Node>),
-    out: &mut Vec<NodeRef<'a>>,
+    path: &mut Vec<PathStep>,
+    f: &mut impl FnMut(NodeRef<'a>, &[PathStep]),
 ) {
     let (entry, parent) = link;
-    out.push(NodeRef {
-        node,
-        role,
-        in_flow,
-        entry,
-        parent,
-    });
+    f(
+        NodeRef {
+            node,
+            role,
+            in_flow,
+            entry,
+            parent,
+        },
+        path,
+    );
     // Recursion depth is the nesting depth, which `parse` caps at MAX_DEPTH.
     match &node.kind {
         NodeKind::Sequence { flow, items } => {
-            for item in items {
-                collect(item, Role::Item, in_flow || *flow, (None, Some(node)), out);
+            for (i, item) in items.iter().enumerate() {
+                path.push(PathStep::Item(i));
+                visit(
+                    item,
+                    Role::Item,
+                    in_flow || *flow,
+                    (None, Some(node)),
+                    path,
+                    f,
+                );
+                path.pop();
             }
         }
         NodeKind::Mapping { flow, entries } => {
-            for e in entries {
+            for (i, e) in entries.iter().enumerate() {
                 let in_flow = in_flow || *flow;
-                collect(&e.key, Role::Key, in_flow, (Some(e), Some(node)), out);
-                collect(&e.value, Role::Value, in_flow, (Some(e), Some(node)), out);
+                let link = (Some(e), Some(node));
+                path.push(PathStep::Key(i));
+                visit(&e.key, Role::Key, in_flow, link, path, f);
+                path.pop();
+                path.push(PathStep::Value(i));
+                visit(&e.value, Role::Value, in_flow, link, path, f);
+                path.pop();
             }
         }
         NodeKind::Scalar { .. } | NodeKind::Alias { .. } => {}
@@ -131,7 +151,14 @@ fn collect<'a>(
 
 fn node_refs(root: &Node) -> Vec<NodeRef<'_>> {
     let mut out = Vec::new();
-    collect(root, Role::Root, false, (None, None), &mut out);
+    visit(
+        root,
+        Role::Root,
+        false,
+        (None, None),
+        &mut Vec::new(),
+        &mut |r, _| out.push(r),
+    );
     out
 }
 
@@ -267,6 +294,19 @@ impl Document {
     /// Every node, in pre-order with keys before values.
     pub(crate) fn nodes(&self) -> Vec<NodeRef<'_>> {
         node_refs(&self.root)
+    }
+
+    /// Hands `f` every node as [`nodes`](Self::nodes) lists them, with its path from the root, in
+    /// one traversal (the path stack is shared: O(depth) memory).
+    pub(crate) fn walk_nodes<'a>(&'a self, f: &mut impl FnMut(NodeRef<'a>, &[PathStep])) {
+        visit(
+            &self.root,
+            Role::Root,
+            false,
+            (None, None),
+            &mut Vec::new(),
+            f,
+        );
     }
 
     /// Whether `offset` is strictly inside a scalar's range. For a block scalar that is the body
@@ -420,6 +460,23 @@ mod tests {
                 .get(3)
                 .is_some_and(|n| n.parent.is_some() && n.entry.is_some())
         );
+    }
+
+    #[test]
+    fn walk_nodes_matches_nodes_and_tree_walk() {
+        let (_, doc) = document(&wrap("a: {b: [c, d]}\ne:\n  - f: g\n"), &[]);
+        let mut seen = Vec::new();
+        doc.walk_nodes(&mut |r, path| seen.push((r, path.to_vec())));
+        let nodes = doc.nodes();
+        assert_eq!(seen.len(), nodes.len());
+        for ((r, _), n) in seen.iter().zip(&nodes) {
+            assert!(std::ptr::eq(r.node, n.node));
+            assert_eq!((r.role, r.in_flow), (n.role, n.in_flow));
+        }
+        let mut paths = Vec::new();
+        crate::tree::walk(&doc.root, &mut |_, path| paths.push(path.to_vec()));
+        let got: Vec<_> = seen.into_iter().map(|(_, p)| p).collect();
+        assert_eq!(got, paths);
     }
 
     #[test]

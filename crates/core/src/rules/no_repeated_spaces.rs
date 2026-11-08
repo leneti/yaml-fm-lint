@@ -28,7 +28,7 @@
 
 use crate::document::Role;
 use crate::lint::{Context, Finding};
-use crate::tree::{NodeKind, Style, walk};
+use crate::tree::{NodeKind, Style};
 use crate::{Applicability, DataEffect, Fix, TextEdit, TextRange};
 
 /// The message for every finding.
@@ -37,13 +37,9 @@ const MESSAGE: &str = "repeated spaces in a value";
 /// Flags each run of two or more spaces in single-line plain scalars.
 pub(crate) fn check(ctx: &Context<'_>) -> Vec<Finding> {
     let mut findings = Vec::new();
-    // `nodes()` and `walk` both go in pre-order, keys before values.
-    let mut refs = ctx.doc.nodes().into_iter();
-    walk(&ctx.doc.root, &mut |node, path| {
-        let Some(r) = refs.next() else {
-            return;
-        };
-        if !std::ptr::eq(r.node, node) || r.in_flow {
+    ctx.doc.walk_nodes(&mut |r, path| {
+        let node = r.node;
+        if r.in_flow {
             return;
         }
         let NodeKind::Scalar {
