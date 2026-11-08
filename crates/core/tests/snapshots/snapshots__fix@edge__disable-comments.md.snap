@@ -1,0 +1,21 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/disable-comments.md
+---
+---
+# fmlint-disable-next-line no-trailing-spaces
+title: Has trailing space 
+other: also spaced
+last: value # fmlint-disable-line
+# fmlint-disable-next-line not-a-rule
+bad: x
+quoted: "# fmlint-disable-line"
+---
+
+Body.
+
+applied: 2
+refused:
+remaining:
+6:1-6:38 warning [invalid-disable-comment] unknown rule `not-a-rule` in disable comment

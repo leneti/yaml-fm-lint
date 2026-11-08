@@ -1,0 +1,10 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/1x/testNoYaml.md
+---
+Test
+applied: 0
+refused:
+remaining:
+1:1-1:1 error [require-front-matter] no front matter (the first line must be ---)

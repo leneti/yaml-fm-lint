@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testCommas.md
+---
+2:7-2:17 warning [no-commas] comma in a plain value; use a sequence for lists
+fixable: 0

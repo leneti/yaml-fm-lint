@@ -1,0 +1,18 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/1x/testDisabledRule.md
+---
+---
+test:
+  - title: Test, test's test # fmlint-disable-line
+    url: test \# test.test/#tags
+  - title: Test2 test2s test2 # random comment
+# fmlint-disable-next-line
+    url: test2 \# test2.test2/#tags2
+---
+
+Test
+applied: 0
+refused:
+remaining:

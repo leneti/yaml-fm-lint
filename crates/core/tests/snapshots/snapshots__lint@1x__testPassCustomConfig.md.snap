@@ -1,0 +1,6 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testPassCustomConfig.md
+---
+fixable: 0

@@ -1,0 +1,28 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/nested-flow.md
+---
+---
+title: Nested flow
+data: {
+  a: {b: [1, {c: d}], e: [x, y]}
+}
+list: [
+  1,
+  [2, 3]
+]
+---
+
+Body.
+
+applied: 0
+refused:
+remaining:
+3:7-5:2 error [no-flow-mapping] flow mapping; use a block mapping
+4:6-4:33 error [no-flow-mapping] flow mapping; use a block mapping
+4:10-4:21 error [no-flow-sequence] flow sequence; use a block sequence
+4:14-4:20 error [no-flow-mapping] flow mapping; use a block mapping
+4:26-4:32 error [no-flow-sequence] flow sequence; use a block sequence
+6:7-9:2 error [no-flow-sequence] flow sequence; use a block sequence
+8:3-8:9 error [no-flow-sequence] flow sequence; use a block sequence

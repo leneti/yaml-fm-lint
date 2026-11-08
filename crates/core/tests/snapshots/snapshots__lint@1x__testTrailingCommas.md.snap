@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testTrailingCommas.md
+---
+3:9-3:10 error [no-trailing-commas] trailing comma
+fixable: 1

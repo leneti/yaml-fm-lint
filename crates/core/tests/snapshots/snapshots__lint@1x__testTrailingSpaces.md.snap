@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testTrailingSpaces.md
+---
+2:11-2:17 error [no-trailing-spaces] trailing whitespace
+fixable: 1

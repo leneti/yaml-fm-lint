@@ -1,0 +1,20 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/unicode.md
+---
+---
+title: Unicode 🎉
+emoji: 😀
+cjk: 日本語のタイトル
+lithuanian: ąčęėįšųūž
+hebrew: שלום עולם
+---
+
+# Unicode
+
+Body 🎉 text.
+
+applied: 2
+refused:
+remaining:

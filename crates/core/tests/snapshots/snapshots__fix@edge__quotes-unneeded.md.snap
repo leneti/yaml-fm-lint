@@ -1,0 +1,15 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/quotes-unneeded.md
+---
+---
+double: hello
+single: world
+---
+
+Body.
+
+applied: 2
+refused:
+remaining:

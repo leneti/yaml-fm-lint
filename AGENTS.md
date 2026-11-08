@@ -21,6 +21,12 @@ yaml-fm-lint/
 ├─ clippy.toml, .cargo/config.toml (the `cargo xtask` alias)
 ├─ crates/
 │  ├─ core/   -> `yaml-fm-lint-core` (lib; no I/O of any kind)
+│  │   ├─ src/  # extract, parse, tree, data, document, line_index, config, diagnostic,
+│  │   │        # error, disable (comments), lint (rule runner), fix + edit (verified fixes),
+│  │   │        # linter (public API), invariants (feature `invariants`, for fuzzing),
+│  │   │        # testing (test-only helpers), rule_id,
+│  │   │        # rules/mod.rs (the `RULES` table), rules/<rule_id>.rs (one module per rule)
+│  │   └─ tests/  # snapshots.rs, fix_props.rs, limits.rs
 │  ├─ cli/    -> `yaml-fm-lint` (bin)
 │  └─ wasm/   -> `yaml-fm-lint-wasm` (planned)
 ├─ xtask/                  # `cargo xtask <command>`; commands: parity-record, bench-corpus
@@ -28,12 +34,12 @@ yaml-fm-lint/
 ├─ tests/fixtures/edge/    # edge-case fixtures (CRLF, BOM, unicode, ...); see its README
 ├─ tests/parity/expected-1x/  # recorded 1.7.1 results, one JSON per fixture
 ├─ deny.toml, renovate.json   # cargo-deny policy; Renovate config
-├─ .github/workflows/ci.yml, .gitattributes, .gitignore
+├─ .github/workflows/ci.yml, fuzz-nightly.yml, .gitattributes, .gitignore
 ├─ CHANGELOG.md, SECURITY.md  # (planned)
 ├─ npm/                    # (planned) launcher and platform packages
 ├─ editors/vscode/         # (planned)
 ├─ schemas/, docs/         # (planned) generated
-├─ fuzz/                   # (planned) cargo-fuzz targets
+├─ fuzz/                   # cargo-fuzz targets (lint, fix); own workspace and Cargo.lock
 └─ bench/                  # baseline.sh (hyperfine), RESULTS.md, results/*.json
 ```
 
@@ -75,6 +81,59 @@ what it reports for every fixture. It is run once and the JSON in
 `tests/parity/expected-1x/` is committed; re-run it only when fixtures change.
 Fixtures and parity records are `-text` in `.gitattributes`, so never
 normalise their line endings.
+
+## Adding a rule
+
+1. Add a variant to `RuleId` in `crates/core/src/rule_id.rs` (with its name, default
+   level and flags) and a row to its tests.
+2. Create `crates/core/src/rules/<rule_id>.rs` with the module-doc sections `# Why`,
+   `# Examples` (bad and good) and, if it has a fix, `# Fix`; declare the module in
+   `rules/mod.rs`.
+3. Write the case table and run it: it must fail first.
+4. Implement `check` and register it in `RULES` in `rules/mod.rs`.
+5. If it has a fix, declare its `DataEffect` honestly: the fix engine re-parses the
+   result and refuses any fix whose real effect on the data differs from the declared one.
+6. Review the snapshot changes (`cargo insta review`), reading each one.
+7. Run the standard check (the commands in "Commands" above).
+
+## Fuzzing and coverage
+
+```sh
+cargo install cargo-llvm-cov@0.9.1 cargo-fuzz@0.13.2 --locked   # once
+rustup component add llvm-tools-preview                        # once
+cargo llvm-cov -p yaml-fm-lint-core --fail-under-lines 80      # coverage gate (CI job `coverage`)
+rustup toolchain install nightly-2026-11-03 --profile minimal  # once; fuzzing needs nightly
+cd fuzz && mkdir -p corpus/lint && cargo +nightly-2026-11-03 fuzz run lint corpus/lint ../tests/fixtures/1x ../tests/fixtures/edge -- -max_total_time=60
+```
+
+Targets: `lint` (every range is in bounds and on character boundaries) and
+`fix` (`invariants::check_fix` holds). A crash is written to `fuzz/artifacts/<target>/`:
+turn it into a regression test in the owning module, then fix the code.
+`libfuzzer-sys` compiles C++, so the machine needs a C++ compiler. The `fuzz`
+job in `ci.yml` runs each target for 60 seconds; `fuzz-nightly.yml` runs them for 15 minutes every night.
+
+The nightly date (`nightly-2026-11-03`) is pinned in `ci.yml`, `fuzz-nightly.yml`
+and here. Renovate cannot track it, so bump it by hand in all three places (and
+`cargo +<new date> fuzz build` to check) when a nightly job breaks, or about once
+a quarter. `fuzz/Cargo.lock` is committed; `fuzz/` is excluded from the root workspace.
+
+## Snapshot tests
+
+`crates/core/tests/snapshots.rs` snapshots what `lint` and `fix` do to every
+fixture in `tests/fixtures/{1x,edge}` (default config); the `.snap` files live in
+`crates/core/tests/snapshots/` and are `-text` in `.gitattributes`.
+
+```sh
+cargo install cargo-insta@1.49.0 --locked   # once
+cargo insta test -p yaml-fm-lint-core       # run and collect changed snapshots
+cargo insta review                          # accept or reject them one by one
+```
+
+Never accept a snapshot you haven't read: a changed snapshot is either a
+deliberate behaviour change or a bug, and only reading it tells you which.
+Fix the code, not the snapshot, when it shows a bug.
+Some snapshots end lines with significant trailing spaces (block-scalar fixtures), so
+never let an editor trim whitespace in `crates/core/tests/snapshots/*.snap`.
 
 ## Code rules
 

@@ -1,0 +1,16 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/empty-collections.md
+---
+---
+title: Empty collections
+tags: []
+meta: {}
+---
+
+Body.
+
+applied: 0
+refused:
+remaining:

@@ -1,0 +1,13 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/edge/nested-flow.md
+---
+3:7-5:2 error [no-flow-mapping] flow mapping; use a block mapping
+4:6-4:33 error [no-flow-mapping] flow mapping; use a block mapping
+4:10-4:21 error [no-flow-sequence] flow sequence; use a block sequence
+4:14-4:20 error [no-flow-mapping] flow mapping; use a block mapping
+4:26-4:32 error [no-flow-sequence] flow sequence; use a block sequence
+6:7-9:2 error [no-flow-sequence] flow sequence; use a block sequence
+8:3-8:9 error [no-flow-sequence] flow sequence; use a block sequence
+fixable: 0

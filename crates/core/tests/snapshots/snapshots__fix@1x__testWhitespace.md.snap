@@ -1,0 +1,14 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/1x/testWhitespace.md
+---
+---
+test: test  test
+---
+
+Test
+applied: 1
+refused:
+remaining:
+2:11-2:13 warning [no-repeated-spaces] repeated spaces in a value

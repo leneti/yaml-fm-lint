@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testNoYaml.md
+---
+1:1-1:1 error [require-front-matter] no front matter (the first line must be ---)
+fixable: 0

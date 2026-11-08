@@ -1,0 +1,13 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/1x/testPassCustomConfig.md
+---
+---
+customTest: test
+---
+
+Test
+applied: 0
+refused:
+remaining:

@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/edge/unclosed.md
+---
+1:1-1:1 error [require-front-matter] opening --- is never closed
+fixable: 0

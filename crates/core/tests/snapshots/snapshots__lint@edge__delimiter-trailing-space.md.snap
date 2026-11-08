@@ -1,0 +1,7 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/edge/delimiter-trailing-space.md
+---
+1:4-1:5 error [no-trailing-spaces] trailing whitespace
+fixable: 1

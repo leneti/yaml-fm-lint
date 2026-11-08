@@ -1,0 +1,8 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testWhitespace.md
+---
+2:6-2:8 warning [single-space-after-colon] more than one space after ":"
+2:12-2:14 warning [no-repeated-spaces] repeated spaces in a value
+fixable: 2

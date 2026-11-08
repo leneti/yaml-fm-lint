@@ -59,6 +59,52 @@ jobs:
       - run: rustup toolchain install 1.88 --profile minimal
       - run: cargo +1.88 check -p yaml-fm-lint-core -p yaml-fm-lint --locked
 
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+        with:
+          tool: cargo-llvm-cov@0.9.1
+      - run: rustup component add llvm-tools-preview
+      - run: cargo llvm-cov -p yaml-fm-lint-core --fail-under-lines 80
+
+  fuzz:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [lint, fix]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: fuzz
+      # The nightly date is also pinned in fuzz-nightly.yml and AGENTS.md; bump all three together.
+      - run: rustup toolchain install nightly-2026-11-03 --profile minimal
+      # taiki-e/install-action has no manifest for cargo-fuzz, so build it from source.
+      - run: cargo install --locked cargo-fuzz@0.13.2
+      - name: Fuzz for 60 seconds
+        working-directory: fuzz
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p "corpus/$TARGET"
+          cargo +nightly-2026-11-03 fuzz run "$TARGET" "corpus/$TARGET" ../tests/fixtures/1x ../tests/fixtures/edge -- -max_total_time=60
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/
+          if-no-files-found: ignore
+
   deny:
     runs-on: ubuntu-latest
     timeout-minutes: 30

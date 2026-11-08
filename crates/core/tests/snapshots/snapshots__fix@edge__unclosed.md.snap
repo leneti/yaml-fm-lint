@@ -1,0 +1,18 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/unclosed.md
+---
+---
+title: Never closed
+tags:
+  - one
+
+# Heading
+
+Body text.
+
+applied: 0
+refused:
+remaining:
+1:1-1:1 error [require-front-matter] opening --- is never closed

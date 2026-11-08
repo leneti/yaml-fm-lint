@@ -1,0 +1,9 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/1x/testDisabledRuleConfig.md
+---
+3:12-3:29 warning [no-commas] comma in a plain value; use a sequence for lists
+6:9-6:10 error [no-trailing-commas] trailing comma
+7:9-7:10 error [no-trailing-commas] trailing comma
+fixable: 2

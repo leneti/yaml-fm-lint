@@ -1,0 +1,90 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/1x/testComplex.md
+---
+---
+title: This is  a title!
+name: Derek   Worthen
+age: young
+contact:
+email: email@domain.com
+address: some  location, at yours
+boo: true
+pets:
+  - cat
+  - dog
+  - bat
+oldTags:
+  - tag1
+  - tag2
+  - tag3
+newTags:
+  - reallylongtag
+  - anotherreallyreallylongtag
+  - andanotherreallyreallylongtag
+  - andanotherreallyreallylongtag
+  - anotherreallyreallyreallyreallyreallylongtag
+tags:
+  - TAG1
+  - taG2
+  - Tag3
+references:
+  - title: Branching Strategies
+    url: /
+  - title: Code Reviews, with Pull Requests
+    url: /
+one:
+  - id: 1
+    name: franc
+    age: old
+  - id: 11
+    name: Tom
+    age: young
+two:
+  - three:
+      - id: 1
+        name: franc
+      - id: 11
+        name: Tom
+  - four:
+      - id: 1
+        name: franc
+      - id: 11
+        name: Tom
+      - id: 111
+        name: John
+        likes:
+          - cats: true
+          - dogs: true
+          - fish: false
+ten:
+  - eleven:
+    -
+five:
+  id: 1
+  name: franc
+six:
+  - id: 1
+    name:
+    - first: franc
+      last: worthen
+seven: { id: 1, pos: center, name: { first: tom, last: wall, pos: {center: false, right: false, left: true, other: {hello: world, how: are, you: doing}} } }
+---
+
+- item
+- item
+- item
+
+applied: 38
+refused:
+remaining:
+2:15-2:17 warning [no-repeated-spaces] repeated spaces in a value
+3:12-3:15 warning [no-repeated-spaces] repeated spaces in a value
+7:10-7:34 warning [no-commas] comma in a plain value; use a sequence for lists
+7:14-7:16 warning [no-repeated-spaces] repeated spaces in a value
+30:12-30:44 warning [no-commas] comma in a plain value; use a sequence for lists
+67:8-67:157 error [no-flow-mapping] flow mapping; use a block mapping
+67:36-67:155 error [no-flow-mapping] flow mapping; use a block mapping
+67:67-67:153 error [no-flow-mapping] flow mapping; use a block mapping
+67:116-67:152 error [no-flow-mapping] flow mapping; use a block mapping

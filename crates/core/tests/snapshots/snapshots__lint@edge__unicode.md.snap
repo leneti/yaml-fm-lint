@@ -1,0 +1,8 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: "format!(\"{}fixable: {fixable}\\n\", show(&index, &report.diagnostics))"
+input_file: tests/fixtures/edge/unicode.md
+---
+2:8-2:19 error [no-quotes] unnecessary quotes
+3:9-3:10 error [no-trailing-spaces] trailing whitespace
+fixable: 2

@@ -1,0 +1,22 @@
+---
+source: crates/core/tests/snapshots.rs
+expression: fixed
+input_file: tests/fixtures/edge/quotes-needed.md
+---
+---
+handle: '@handle'
+colon: "a: b"
+hash: "x #y"
+boolish: "yes"
+nullish: "null"
+numeric: "123"
+star: '*star'
+apostrophe: it's
+plain: It's fine
+---
+
+Body.
+
+applied: 1
+refused:
+remaining:
