@@ -9,6 +9,7 @@ pub(crate) mod no_commas;
 pub(crate) mod no_flow_mapping;
 pub(crate) mod no_flow_sequence;
 pub(crate) mod no_quotes;
+pub(crate) mod no_repeated_spaces;
 pub(crate) mod no_space_before_colon;
 pub(crate) mod no_trailing_commas;
 pub(crate) mod no_trailing_spaces;
@@ -36,4 +37,5 @@ pub(crate) const RULES: &[(RuleId, RuleFn)] = &[
     (RuleId::NoFlowSequence, no_flow_sequence::check),
     (RuleId::NoFlowMapping, no_flow_mapping::check),
     (RuleId::Indentation, indentation::check),
+    (RuleId::NoRepeatedSpaces, no_repeated_spaces::check),
 ];
