@@ -1,4 +1,5 @@
-//! Every range `lint` reports lies inside the text, on character boundaries.
+//! Every range `lint` reports, and every fix edit range, lies inside the text, on character
+//! boundaries.
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
@@ -20,7 +21,12 @@ fuzz_target!(|data: &[u8]| {
     let ranges = report
         .front_matter
         .into_iter()
-        .chain(report.diagnostics.iter().map(|d| d.range));
+        .chain(report.diagnostics.iter().map(|d| d.range))
+        .chain(
+            (report.diagnostics.iter())
+                .filter_map(|d| d.fix.as_ref())
+                .flat_map(|fix| fix.edits.iter().map(|e| e.range)),
+        );
     for range in ranges {
         assert!(
             range.start <= range.end && range.end <= text.len(),

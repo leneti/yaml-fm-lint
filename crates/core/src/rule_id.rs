@@ -19,21 +19,21 @@ pub enum RuleId {
     NoBlankLines,
     /// A key has whitespace before its colon.
     NoSpaceBeforeColon,
-    /// A scalar is quoted.
+    /// A quoted scalar that reads the same unquoted.
     NoQuotes,
     /// A sequence is written in flow style.
     NoFlowSequence,
     /// A mapping is written in flow style.
     NoFlowMapping,
-    /// A line ends with whitespace.
+    /// A line, delimiter lines included, ends with whitespace.
     NoTrailingSpaces,
-    /// A line ends with a comma.
+    /// A single-line plain scalar ends with a run of commas.
     NoTrailingCommas,
-    /// Indentation is not a multiple of the configured size.
+    /// A nested block collection is not indented exactly the configured size more than its parent.
     Indentation,
     /// A value contains repeated spaces.
     NoRepeatedSpaces,
-    /// A colon is not followed by exactly one space.
+    /// A colon is followed by more than one space.
     SingleSpaceAfterColon,
     /// A value contains a comma.
     NoCommas,
@@ -93,7 +93,8 @@ impl RuleId {
         RuleId::ALL.into_iter().find(|rule| rule.as_str() == name)
     }
 
-    /// Whether configuration may change the rule's level.
+    /// Whether configuration may change the rule's level. `yaml-syntax`, `input-limit` and
+    /// `invalid-disable-comment` cannot be turned off or have their level changed.
     pub fn is_configurable(self) -> bool {
         !matches!(
             self,
@@ -154,6 +155,22 @@ mod tests {
                 "single-space-after-colon",
                 "no-commas",
                 "invalid-disable-comment"
+            ]
+        );
+        assert_eq!(
+            names(&|r| r.is_style()),
+            [
+                "no-blank-lines",
+                "no-space-before-colon",
+                "no-quotes",
+                "no-flow-sequence",
+                "no-flow-mapping",
+                "no-trailing-spaces",
+                "no-trailing-commas",
+                "indentation",
+                "no-repeated-spaces",
+                "single-space-after-colon",
+                "no-commas"
             ]
         );
         assert_eq!(

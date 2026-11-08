@@ -22,9 +22,10 @@ yaml-fm-lint/
 ├─ crates/
 │  ├─ core/   -> `yaml-fm-lint-core` (lib; no I/O of any kind)
 │  │   ├─ src/  # extract, parse, tree, data, document, line_index, config, diagnostic,
-│  │   │        # disable (comments), lint (rule runner), fix + edit (verified fixes),
+│  │   │        # error, disable (comments), lint (rule runner), fix + edit (verified fixes),
 │  │   │        # linter (public API), invariants (feature `invariants`, for fuzzing),
-│  │   │        # rule_id, rules/<rule_id>.rs (one module per rule)
+│  │   │        # testing (test-only helpers), rule_id,
+│  │   │        # rules/mod.rs (the `RULES` table), rules/<rule_id>.rs (one module per rule)
 │  │   └─ tests/  # snapshots.rs, fix_props.rs, limits.rs
 │  ├─ cli/    -> `yaml-fm-lint` (bin)
 │  └─ wasm/   -> `yaml-fm-lint-wasm` (planned)

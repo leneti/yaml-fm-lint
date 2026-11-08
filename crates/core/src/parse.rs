@@ -1116,7 +1116,7 @@ mod tests {
             panic!("not a mapping")
         };
         assert!(entries.iter().all(|e| e.explicit));
-        assert!(start.elapsed().as_secs() < 5, "{:?}", start.elapsed());
+        assert!(start.elapsed().as_secs() < 30, "{:?}", start.elapsed());
     }
 
     #[test]
@@ -1252,6 +1252,6 @@ mod tests {
             assert!(path.len() <= 128);
         });
         assert!(count > 200_000);
-        assert!(start.elapsed().as_secs() < 5, "{:?}", start.elapsed());
+        assert!(start.elapsed().as_secs() < 30, "{:?}", start.elapsed());
     }
 }

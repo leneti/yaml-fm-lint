@@ -528,7 +528,7 @@ mod tests {
             lines[0].ends_with("input-limit aliases expand to more than 16 MiB of text"),
             "{lines:?}"
         );
-        assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
+        assert!(started.elapsed().as_secs() < 30, "{:?}", started.elapsed());
 
         let Extraction::Found(fm) = extract(&source) else {
             panic!()

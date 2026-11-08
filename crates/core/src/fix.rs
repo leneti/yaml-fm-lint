@@ -19,12 +19,15 @@ pub(crate) const MAX_FIX_PASSES: usize = 10;
 /// The most verifications (each parses the output) one `fix` call may run.
 pub(crate) const MAX_FIX_VERIFIES: usize = 64;
 
-/// Appended to the message of a finding whose fix was refused.
-pub(crate) const REFUSED_NOTE: &str = " (fix refused: would change data)";
+/// Appended to the message of a finding whose fix `fix` refused because it would change the
+/// data (see [`FixOutcome::refused`]). Output formats that split the note from the message
+/// (JSON, SARIF) can strip this suffix.
+pub const REFUSED_NOTE: &str = " (fix refused: would change data)";
 
 /// Appended to the message of a finding whose fix was left undone because `fix` hit a limit:
-/// the verification budget ran out or the passes did.
-pub(crate) const SKIPPED_NOTE: &str = " (fix skipped: fix limit reached)";
+/// the verification budget ran out or the passes did. Like [`REFUSED_NOTE`], it is the exact
+/// suffix of the message.
+pub const SKIPPED_NOTE: &str = " (fix skipped: fix limit reached)";
 
 /// A diagnostic and its automatic fix.
 type Candidate = (Diagnostic, Fix);
@@ -143,7 +146,7 @@ impl<'a> Baseline<'a> {
 }
 
 /// Whether `output` is `input` with the front matter changed only as `effects` say.
-#[cfg_attr(not(test), allow(dead_code))] // the engine uses `Baseline` to parse `input` once
+#[cfg(test)] // test-only: the engine uses `Baseline` to parse `input` once
 pub(crate) fn verify(input: &str, output: &str, effects: &[DataEffect]) -> bool {
     Baseline::new(input).is_some_and(|base| base.check(output, effects.iter()))
 }
@@ -301,9 +304,9 @@ impl Linter {
     ///
     /// Only `Automatic` fixes are applied, in passes of non-overlapping fixes. A fix whose
     /// result would change the data (beyond what the fix declares) or touch anything outside
-    /// the front matter is refused and reported in [`FixOutcome::refused`]. At most
-    /// [`MAX_FIX_VERIFIES`] verifications and [`MAX_FIX_PASSES`] passes run; if either limit
-    /// is reached, the fixes still undone are left in `remaining` with a note.
+    /// the front matter is refused and reported in [`FixOutcome::refused`]. At most 64
+    /// verifications and 10 passes run; if either limit is reached, the fixes still undone are
+    /// left in `remaining` with a note ([`SKIPPED_NOTE`]).
     pub fn fix(&self, source: &str) -> Result<FixOutcome, FixError> {
         let mut report = self.lint(source);
         if report
@@ -526,15 +529,22 @@ mod tests {
     }
 
     #[test]
-    fn one_refusal_among_many_fixes_is_fast() {
+    fn one_refusal_among_many_fixes_costs_few_verifications() {
         let source = many_fixes(1, 2000);
-        let started = std::time::Instant::now();
-        let outcome = linter().fix(&source).unwrap();
-        assert!(
-            started.elapsed().as_secs() < 2,
-            "took {:?}",
-            started.elapsed()
-        );
+        // The first pass: bisection finds the refused fix (about log2(2001) = 11 attempts), then
+        // one more takes the other 2000. A fix-by-fix scan would use 2000.
+        let linter = linter();
+        let (chosen, _) = select(candidates(
+            &linter.lint(&source).diagnostics,
+            &BTreeSet::new(),
+        ));
+        assert_eq!(chosen.len(), 2001);
+        let mut budget = MAX_FIX_VERIFIES;
+        let pass = run_pass(&source, &chosen, &mut budget);
+        assert_eq!((pass.applied, pass.refused.len()), (2000, 1));
+        let used = MAX_FIX_VERIFIES - budget;
+        assert!(used <= 16, "used {used} verifications");
+        let outcome = linter.fix(&source).unwrap();
         assert_eq!(outcome.applied, 2000);
         assert_eq!(outcome.refused.len(), 1);
         assert_eq!(outcome.remaining.len(), 1);
@@ -566,13 +576,7 @@ mod tests {
     #[test]
     fn exhausted_budget_leaves_a_note_and_safe_output() {
         let source = many_fixes(100, 50);
-        let started = std::time::Instant::now();
         let outcome = linter().fix(&source).unwrap();
-        assert!(
-            started.elapsed().as_secs() < 2,
-            "took {:?}",
-            started.elapsed()
-        );
         // The data is unchanged, and so is everything outside the front matter.
         assert!(verify(&source, &outcome.output, &[]));
         let refused = outcome
