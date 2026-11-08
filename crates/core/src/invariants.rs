@@ -2,14 +2,9 @@
 
 use crate::data::{Data, build, data_eq, resolve_plain};
 use crate::extract::{Extraction, FrontMatter, extract};
+use crate::fix::{REFUSED_NOTE, SKIPPED_NOTE};
 use crate::parse::parse;
 use crate::{Applicability, FixError, Linter, RuleId};
-
-/// The refusal notes `fix` appends to the message of a finding it left alone.
-const NOTES: [&str; 2] = [
-    " (fix refused: would change data)",
-    " (fix skipped: too many refused fixes)",
-];
 
 /// The front matter of `text` and its data, if it has a complete block that parses.
 fn parsed(text: &str) -> Option<(FrontMatter, Data)> {
@@ -123,7 +118,7 @@ pub fn check_fix(linter: &Linter, input: &str) -> Result<(), String> {
             .fix
             .as_ref()
             .is_some_and(|f| f.applicability == Applicability::Automatic);
-        automatic && !NOTES.iter().any(|note| d.message.ends_with(note))
+        automatic && !(d.message.ends_with(REFUSED_NOTE) || d.message.ends_with(SKIPPED_NOTE))
     }) {
         return Err(format!(
             "an automatic fix remains: {} {}\noutput: {output:?}",

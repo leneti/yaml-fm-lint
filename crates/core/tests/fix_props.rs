@@ -288,14 +288,9 @@ fn linter(indent_size: u8) -> Linter {
     Linter::new(config, None).expect("valid config")
 }
 
-/// 256 cases, or `PROPTEST_CASES`.
+/// 256 cases, or `PROPTEST_CASES`; failures are saved in the crate's `proptest-regressions`.
 fn config() -> ProptestConfig {
-    let cases = std::env::var("PROPTEST_CASES")
-        .ok()
-        .and_then(|n| n.parse().ok())
-        .unwrap_or(256);
     ProptestConfig {
-        cases,
         // Relative to the crate directory, where `cargo test` runs the tests.
         failure_persistence: Some(Box::new(FileFailurePersistence::Direct(
             "proptest-regressions/fix_props.txt",

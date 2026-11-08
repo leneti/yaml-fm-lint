@@ -20,10 +20,11 @@ pub(crate) const MAX_FIX_PASSES: usize = 10;
 pub(crate) const MAX_FIX_VERIFIES: usize = 64;
 
 /// Appended to the message of a finding whose fix was refused.
-const REFUSED_NOTE: &str = " (fix refused: would change data)";
+pub(crate) const REFUSED_NOTE: &str = " (fix refused: would change data)";
 
-/// Appended to the message of a finding whose fix was never verified: the budget ran out.
-const SKIPPED_NOTE: &str = " (fix skipped: too many refused fixes)";
+/// Appended to the message of a finding whose fix was left undone because `fix` hit a limit:
+/// the verification budget ran out or the passes did.
+pub(crate) const SKIPPED_NOTE: &str = " (fix skipped: fix limit reached)";
 
 /// A diagnostic and its automatic fix.
 type Candidate = (Diagnostic, Fix);
@@ -193,8 +194,10 @@ fn attempt(
 }
 
 /// Applies `chosen` to `text` if the result verifies. Otherwise it accepts the longest
-/// prefix that verifies (found by bisection), refuses the fix after it, and goes on with
-/// the rest, so the pass always makes progress without verifying every fix on its own.
+/// prefix that verifies (found by bisection) and goes on with the rest, so the pass always
+/// makes progress without verifying every fix on its own. The fix after the prefix is refused
+/// if nothing was accepted before it in the pass (it fails on the text as it stands);
+/// otherwise it is deferred, to be retried against the new text in the next pass.
 fn run_pass(text: &str, chosen: &[Candidate], budget: &mut usize) -> Pass {
     let mut pass = Pass {
         output: text.to_string(),
@@ -299,8 +302,8 @@ impl Linter {
     /// Only `Automatic` fixes are applied, in passes of non-overlapping fixes. A fix whose
     /// result would change the data (beyond what the fix declares) or touch anything outside
     /// the front matter is refused and reported in [`FixOutcome::refused`]. At most
-    /// [`MAX_FIX_VERIFIES`] verifications run; if many fixes are refused the budget runs
-    /// out, and the fixes not yet verified are left in `remaining` with a note.
+    /// [`MAX_FIX_VERIFIES`] verifications and [`MAX_FIX_PASSES`] passes run; if either limit
+    /// is reached, the fixes still undone are left in `remaining` with a note.
     pub fn fix(&self, source: &str) -> Result<FixOutcome, FixError> {
         let mut report = self.lint(source);
         if report
@@ -314,7 +317,6 @@ impl Linter {
         let mut applied = 0;
         let mut refused_ranges = BTreeSet::new();
         let mut budget = MAX_FIX_VERIFIES;
-        let mut exhausted = false;
         for _ in 0..MAX_FIX_PASSES {
             let (chosen, _) = select(candidates(&report.diagnostics, &refused_ranges));
             if chosen.is_empty() {
@@ -329,16 +331,13 @@ impl Linter {
                 report = self.lint(&text);
             }
             if pass.exhausted {
-                exhausted = true;
                 break;
             }
         }
-        let unverified: BTreeSet<_> = if exhausted {
-            let fixable = candidates(&report.diagnostics, &refused_ranges);
-            fixable.iter().map(|(d, _)| (d.rule, d.range)).collect()
-        } else {
-            BTreeSet::new()
-        };
+        // Whatever is still fixable and not refused was left by a limit: the loop ends early
+        // only when nothing is fixable.
+        let fixable = candidates(&report.diagnostics, &refused_ranges);
+        let skipped: BTreeSet<_> = fixable.iter().map(|(d, _)| (d.rule, d.range)).collect();
         let remaining: Vec<Diagnostic> = report
             .diagnostics
             .into_iter()
@@ -346,7 +345,7 @@ impl Linter {
                 let key = (d.rule, d.range);
                 if refused_ranges.contains(&key) {
                     d.message.push_str(REFUSED_NOTE);
-                } else if unverified.contains(&key) {
+                } else if skipped.contains(&key) {
                     d.message.push_str(SKIPPED_NOTE);
                 }
                 d
@@ -464,8 +463,9 @@ mod tests {
 
     #[test]
     fn fix_does_not_report_a_refusal_a_later_pass_resolved() {
-        // The flow-mapping fix conflicts with the indentation fix in the first pass and is
-        // refused there, then applied in the second pass.
+        // The flow-mapping fix fails beside the indentation fix in the first pass, so it is
+        // deferred (not refused) and applied in the second. A real refusal that a later pass
+        // clears by `shift` is covered structurally, by `shift_moves_or_drops_refused_ranges`.
         let source = "---\nreferences:\n             - { title : \"Branching Strategies\", url: \"/\" }\n---\nBody\n";
         let outcome = linter().fix(source).unwrap();
         assert_eq!(
@@ -545,6 +545,22 @@ mod tests {
                 .output
                 .starts_with("---\na0: &a0 x,\nb0: *a0\nk0: 1\n")
         );
+    }
+
+    #[test]
+    fn pass_limit_leaves_a_note_and_safe_output() {
+        // Each pass can only fix the shallowest wrong indentation, so 13 levels need 13 passes.
+        let nested: String = (0..13)
+            .map(|i| format!("{}k{i}:\n", " ".repeat(4 * i)))
+            .collect();
+        let source = format!("---\n{nested}{}leaf: 1\n---\nBody\n", " ".repeat(52));
+        let outcome = linter().fix(&source).unwrap();
+        assert_eq!(outcome.applied, MAX_FIX_PASSES);
+        assert!(verify(&source, &outcome.output, &[]));
+        assert!(outcome.refused.is_empty());
+        assert_eq!(outcome.remaining.len(), 1);
+        assert!(outcome.remaining[0].message.ends_with(SKIPPED_NOTE));
+        assert!(outcome.remaining[0].fix.is_some());
     }
 
     #[test]
