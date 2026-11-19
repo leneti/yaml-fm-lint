@@ -94,7 +94,8 @@ fn max_warnings() {
 fn cascading() {
     let no_quotes = |level: &str| format!(r#"{{"rules": {{"no-quotes": "{level}"}}}}"#);
     let dir = project_without_git(&[
-        ("t/.yaml-fm-lint.json", no_quotes("off").as_bytes()),
+        // Invalid, so reaching it past the `.git` folder would exit 2.
+        ("t/.yaml-fm-lint.json", br#"{"excludeDirs": []}"#),
         ("t/repo/.git/HEAD", b"ref: refs/heads/main\n"),
         ("t/repo/.yaml-fm-lint.json", no_quotes("warn").as_bytes()),
         ("t/repo/a.md", BAD),
@@ -202,4 +203,21 @@ fn invalid_utf8_is_a_read_error() {
         .assert()
         .code(2)
         .stderr("u.md: not valid UTF-8\n");
+}
+
+#[test]
+fn read_errors_are_listed_before_a_config_error() {
+    let dir = project(&[
+        (".yaml-fm-lint.json", br#"{"excludeDirs": []}"#),
+        ("bad.md", BAD),
+    ]);
+    yfl(dir.path())
+        .args(["--format", "compact", "bad.md", "nope.md"])
+        .assert()
+        .code(2)
+        .stdout("")
+        .stderr(
+            predicates::str::is_match("^nope.md: no such file or directory\nconfig error: ")
+                .unwrap(),
+        );
 }

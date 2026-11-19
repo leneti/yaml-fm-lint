@@ -103,7 +103,9 @@ fn chain(
         return found.clone();
     }
     let mut layers = match dir.parent() {
-        Some(parent) if !dir.join(".git").exists() => chain(cache, parent)?.as_ref().clone(),
+        Some(parent) if dir.join(".git").symlink_metadata().is_err() => {
+            chain(cache, parent)?.as_ref().clone()
+        }
         _ => Vec::new(),
     };
     let result = read_layer(dir).map(|layer| {

@@ -107,23 +107,26 @@ pub fn lint(cli: &Cli) -> anyhow::Result<u8> {
     // shortcut: every path is read as a file; Task 6 adds folders, globs and the default ".".
     let items = process(&cli.paths, &cwd, &configs, cli.quiet);
 
-    if let Some(line) = items.iter().find_map(|item| match &item.outcome {
-        Err(f) if f.is_config => Some(&f.line),
-        _ => None,
-    }) {
-        write_stderr(line);
-        return Ok(2);
-    }
     let mut results = Vec::new();
+    let mut config_error = None;
     let mut fatal = false;
     for item in items {
         match item.outcome {
             Ok(result) => results.push(result),
             Err(failure) => {
                 fatal = true;
-                write_stderr(&failure.line);
+                if failure.is_config {
+                    // The first one, by sorted path.
+                    config_error.get_or_insert(failure.line);
+                } else {
+                    write_stderr(&failure.line);
+                }
             }
         }
+    }
+    if let Some(line) = config_error {
+        write_stderr(&line);
+        return Ok(2);
     }
     let summary = Summary::new(&results, started);
     let text = output::render(cli.format, &results, &summary, true);
