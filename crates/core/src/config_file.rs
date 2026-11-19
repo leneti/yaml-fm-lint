@@ -23,7 +23,6 @@ pub struct ConfigLayer {
 /// The settings of one config file, validated but not yet merged.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Layer {
-    #[allow(dead_code)] // read by the cascade, once `resolve_config` handles several layers
     root: Option<bool>,
     extensions: Option<Vec<String>>,
     include: Option<Vec<FilePattern>>,
@@ -61,15 +60,37 @@ const BAD_LEVEL: &str = r#"must be "error", "warn" or "off", or ["error" | "warn
 
 /// Builds the configuration from config files, lowest priority first, and an optional extra file
 /// that has the highest priority.
-// shortcut: applies every layer in order and ignores `root`, until the cascade handles it
+///
+/// Files are parsed from the last to the first and parsing stops after the first one with
+/// `root: true`, so an invalid file above it is no error. A `root: true` in `extra` drops every
+/// other file.
 pub fn resolve_config(
     layers: &[ConfigLayer],
     extra: Option<&ConfigLayer>,
 ) -> Result<Config, ConfigError> {
+    let extra = extra
+        .map(|file| parse_layer(file).map(|layer| (file, layer)))
+        .transpose()?;
+    let mut parsed = Vec::new();
+    if extra
+        .as_ref()
+        .is_none_or(|(_, layer)| layer.root != Some(true))
+    {
+        for file in layers.iter().rev() {
+            let layer = parse_layer(file)?;
+            let is_root = layer.root == Some(true);
+            parsed.push((file, layer));
+            if is_root {
+                break;
+            }
+        }
+        parsed.reverse();
+    }
+    parsed.extend(extra);
     let mut config = Config::default();
-    for layer in layers.iter().chain(extra) {
-        apply(&mut config, &parse_layer(layer)?);
-        config.layers.push(layer.path.clone());
+    for (file, layer) in &parsed {
+        apply(&mut config, layer);
+        config.layers.push(file.path.clone());
     }
     Ok(config)
 }
@@ -574,5 +595,153 @@ mod tests {
                 pattern: "a/**".into()
             }]
         );
+    }
+
+    fn l(dir: &str, src: &str) -> ConfigLayer {
+        ConfigLayer {
+            dir: dir.into(),
+            path: format!("{dir}/.yaml-fm-lint.json"),
+            source: src.into(),
+        }
+    }
+
+    #[test]
+    fn later_layers_override_per_key() {
+        let config = resolve_config(
+            &[
+                l(
+                    "/r",
+                    r#"{"rules": {"no-commas": "off", "no-quotes": "warn"},
+                        "files": {"extensions": [".md", ".mdx"], "exclude": ["a/**"]}}"#,
+                ),
+                l(
+                    "/r/sub",
+                    r#"{"rules": {"no-quotes": "error"}, "files": {"exclude": ["b/**"]}}"#,
+                ),
+            ],
+            None,
+        )
+        .unwrap();
+        assert_eq!(config.level(RuleId::NoCommas), Level::Off);
+        assert_eq!(config.level(RuleId::NoQuotes), Level::Error);
+        assert_eq!(config.files.extensions, [".md", ".mdx"]);
+        assert_eq!(
+            config.files.exclude,
+            [FilePattern {
+                dir: "/r/sub".into(),
+                pattern: "b/**".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn rule_value_replaced_whole() {
+        let config = resolve_config(
+            &[
+                l(
+                    "/r",
+                    r#"{"rules": {"required-keys": ["error", {"keys": ["a"]}]}}"#,
+                ),
+                l("/r/s", r#"{"rules": {"required-keys": "warn"}}"#),
+            ],
+            None,
+        )
+        .unwrap();
+        assert_eq!(config.level(RuleId::RequiredKeys), Level::Warn);
+        assert!(config.required_keys.is_empty());
+    }
+
+    #[test]
+    fn arrays_replaced() {
+        let config = resolve_config(
+            &[
+                l("/r", r#"{"ignoreKeys": ["a"]}"#),
+                l("/r/s", r#"{"ignoreKeys": ["b"]}"#),
+            ],
+            None,
+        )
+        .unwrap();
+        assert_eq!(config.ignore_keys, ["b"]);
+    }
+
+    #[test]
+    fn root_drops_layers_above_unparsed() {
+        let config = resolve_config(
+            &[
+                l("/r", "{"),
+                l("/r/s", r#"{"root": true, "rules": {"no-commas": "off"}}"#),
+                l("/r/s/d", "{}"),
+            ],
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            config.layers,
+            ["/r/s/.yaml-fm-lint.json", "/r/s/d/.yaml-fm-lint.json"]
+        );
+        assert_eq!(config.level(RuleId::NoCommas), Level::Off);
+    }
+
+    #[test]
+    fn invalid_layer_below_root_is_an_error() {
+        let e =
+            resolve_config(&[l("/r/s", r#"{"root": true}"#), l("/r/s/d", "{")], None).unwrap_err();
+        assert_eq!(e.file.as_deref(), Some("/r/s/d/.yaml-fm-lint.json"));
+    }
+
+    fn extra(src: &str) -> ConfigLayer {
+        ConfigLayer {
+            dir: "/home/x".into(),
+            path: "/home/x/ci.json".into(),
+            source: src.into(),
+        }
+    }
+
+    #[test]
+    fn extra_is_last_and_highest() {
+        let config = resolve_config(
+            &[l("/r", r#"{"rules": {"no-quotes": "warn"}}"#)],
+            Some(&extra(r#"{"rules": {"no-quotes": "off"}}"#)),
+        )
+        .unwrap();
+        assert_eq!(config.level(RuleId::NoQuotes), Level::Off);
+        assert_eq!(config.layers, ["/r/.yaml-fm-lint.json", "/home/x/ci.json"]);
+    }
+
+    #[test]
+    fn extra_root_drops_all_discovered() {
+        let config = resolve_config(&[l("/r", "{")], Some(&extra(r#"{"root": true}"#))).unwrap();
+        assert_eq!(config.layers, ["/home/x/ci.json"]);
+    }
+
+    #[test]
+    fn invalid_extra_is_an_error() {
+        let e = resolve_config(&[], Some(&extra("{"))).unwrap_err();
+        assert_eq!(e.file.as_deref(), Some("/home/x/ci.json"));
+    }
+
+    #[test]
+    fn to_json_shape() {
+        use serde_json::json;
+        let json = Config::default().to_json();
+        assert_eq!(json["rules"].as_object().map(|r| r.len()), Some(14));
+        assert_eq!(json["rules"]["no-commas"], "warn");
+        assert_eq!(
+            json["rules"]["required-keys"],
+            json!(["error", {"keys": []}])
+        );
+        assert_eq!(json["rules"]["indentation"], json!(["error", {"size": 2}]));
+        assert!(json["rules"].get("yaml-syntax").is_none());
+        assert!(json["schema"].is_null());
+        assert_eq!(json["files"]["extensions"], json!([".md"]));
+        assert!(json.get("layers").is_none());
+
+        let json = resolve(r#"{"files": {"exclude": ["a/**"]}, "rules": {"indentation": "off"}}"#)
+            .to_json();
+        assert_eq!(
+            json["files"]["exclude"],
+            json!([{"dir": "/r", "pattern": "a/**"}])
+        );
+        assert_eq!(json["rules"]["indentation"], "off");
     }
 }

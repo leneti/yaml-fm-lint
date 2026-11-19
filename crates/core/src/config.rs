@@ -2,6 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use serde_json::{Value, json};
+
 use crate::RuleId;
 
 /// How a rule's findings are reported.
@@ -62,7 +64,7 @@ pub struct Config {
     pub schema: Option<String>,
     /// Which files are linted.
     pub files: Files,
-    /// The config files this configuration came from, lowest priority first.
+    /// The config files that were applied, lowest priority first; a `--config` file is last.
     pub layers: Vec<String>,
 }
 
@@ -91,6 +93,37 @@ impl Config {
         } else {
             rule.default_level()
         }
+    }
+
+    /// The effective configuration as JSON, for `print-config`; `layers` is not included.
+    pub fn to_json(&self) -> Value {
+        let pattern = |p: &FilePattern| json!({"dir": p.dir, "pattern": p.pattern});
+        let mut rules = serde_json::Map::new();
+        for rule in RuleId::ALL.into_iter().filter(|r| r.is_configurable()) {
+            let level = self.level(rule);
+            let name = match level {
+                Level::Off => "off",
+                Level::Warn => "warn",
+                Level::Error => "error",
+            };
+            let value = match (rule, level) {
+                (_, Level::Off) => json!("off"),
+                (RuleId::RequiredKeys, _) => json!([name, {"keys": self.required_keys}]),
+                (RuleId::Indentation, _) => json!([name, {"size": self.indent_size}]),
+                _ => json!(name),
+            };
+            rules.insert(rule.as_str().to_string(), value);
+        }
+        json!({
+            "files": {
+                "extensions": self.files.extensions,
+                "include": self.files.include.iter().map(pattern).collect::<Vec<_>>(),
+                "exclude": self.files.exclude.iter().map(pattern).collect::<Vec<_>>(),
+            },
+            "ignoreKeys": self.ignore_keys,
+            "rules": rules,
+            "schema": self.schema,
+        })
     }
 }
 
