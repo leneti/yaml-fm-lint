@@ -7,8 +7,6 @@ use clap::{Parser, Subcommand, ValueEnum};
 /// Lints and fixes the YAML front matter of markdown files.
 #[derive(Debug, Parser)]
 #[command(version, args_conflicts_with_subcommands = true)]
-// `allow`, not `expect`: Rust 1.88 and current stable disagree on which fields count as read.
-#[allow(dead_code, reason = "fields are read by later tasks")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -50,6 +48,8 @@ pub struct Cli {
 
     /// Accepted for compatibility with 1.x and ignored
     #[arg(short, long, hide = true)]
+    // `allow`, not `expect`: Rust 1.88 and current stable disagree on which fields count as read.
+    #[allow(dead_code, reason = "accepted and ignored")]
     pub recursive: bool,
 }
 

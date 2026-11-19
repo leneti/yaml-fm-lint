@@ -89,22 +89,51 @@ fn fix_preserves_permissions_and_leaves_no_temp_files() {
     assert_eq!(names(dir.path()), before);
 }
 
+/// A file symlink named on the command line is linted but never written (a rename would replace
+/// the link, not the file): its problems are reported and count, and none is called fixable.
 #[cfg(unix)]
 #[test]
-fn fix_skips_symlinks() {
+fn fix_lints_a_named_symlink_but_never_writes_it() {
     let dir = project(&[("bad.md", BAD)]);
     std::os::unix::fs::symlink("bad.md", dir.path().join("link.md")).unwrap();
     yfl(dir.path())
         .args(["--fix", "--format", "compact", "link.md"])
         .assert()
-        .code(0)
-        .stderr(contains("link.md: skipped: symlink"));
+        .code(1)
+        .stdout("link.md:2:8: error [no-quotes] unnecessary quotes\n")
+        .stderr("link.md: not fixed (symlink)\n");
     assert_eq!(std::fs::read(dir.path().join("bad.md")).unwrap(), BAD);
     assert!(
         std::fs::symlink_metadata(dir.path().join("link.md"))
             .unwrap()
             .is_symlink()
     );
+    let human = yfl(dir.path())
+        .args(["--fix", "--color", "never", "link.md"])
+        .output()
+        .unwrap();
+    let human = String::from_utf8(human.stdout).unwrap();
+    assert!(human.contains("fixed 0 problems in 0 files"), "{human}");
+    assert!(!human.contains("fixable"), "{human}");
+}
+
+/// What `--fix` refused or skipped is not "fixable with --fix": running it again won't help.
+#[test]
+fn fix_does_not_call_skipped_problems_fixable() {
+    // Each pass fixes only the shallowest wrong indentation, so 13 levels outlast the passes.
+    let nested: String = (0..13)
+        .map(|i| format!("{}k{i}:\n", " ".repeat(4 * i)))
+        .collect();
+    let text = format!("---\n{nested}{}leaf: 1\n---\nBody\n", " ".repeat(52));
+    let dir = project(&[("deep.md", text.as_bytes())]);
+    let out = yfl(dir.path())
+        .args(["--fix", "--color", "never", "deep.md"])
+        .output()
+        .unwrap();
+    let out = String::from_utf8(out.stdout).unwrap();
+    assert!(out.contains("fix skipped"), "{out}");
+    assert!(out.contains("✘ "), "{out}");
+    assert!(!out.contains("fixable"), "{out}");
 }
 
 #[cfg(unix)]
