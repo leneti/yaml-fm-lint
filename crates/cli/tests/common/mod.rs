@@ -41,7 +41,14 @@ pub fn project_without_git(files: &[(&str, &[u8])]) -> TempDir {
 /// `dir` as an absolute path the binary and the test agree on: symlinks resolved (macOS `/var`),
 /// and without the `\\?\` prefix that Windows' `canonicalize` adds (its `?` would be a glob
 /// character in a path argument).
+///
+/// On Windows it is `dir` itself: the child's working directory is `dir` as given (possibly an
+/// 8.3 short name like `RUNNER~1`), and the binary only prints relative paths when its paths are
+/// in that same form, which `canonicalize` would change.
 pub fn plain_path(dir: &Path) -> String {
+    if cfg!(windows) {
+        return dir.display().to_string();
+    }
     let canonical = std::fs::canonicalize(dir).unwrap();
     let text = canonical.display().to_string();
     text.strip_prefix(r"\\?\").unwrap_or(&text).to_string()
