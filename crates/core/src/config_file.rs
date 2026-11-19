@@ -758,3 +758,215 @@ mod tests {
         assert_eq!(json["rules"]["indentation"], "off");
     }
 }
+
+/// The JSON Schema of the config file, generated from test-only types and checked in at
+/// `schemas/config.schema.json`.
+#[cfg(test)]
+mod schema_tests {
+    use super::*;
+    use schemars::{JsonSchema, Schema, SchemaGenerator, transform::RecursiveTransform};
+    use serde_json::json;
+
+    const SCHEMA_PATH: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../schemas/config.schema.json"
+    );
+
+    /// Configuration of yaml-fm-lint, from a `.yaml-fm-lint.json` file.
+    #[derive(JsonSchema)]
+    #[schemars(
+        title = "yaml-fm-lint configuration",
+        extend("$id" = "https://unpkg.com/yaml-fm-lint@2/config.schema.json"),
+        deny_unknown_fields,
+        transform = RecursiveTransform(all_optional)
+    )]
+    #[expect(dead_code, reason = "the fields only describe the file format")]
+    struct ConfigFileSchema {
+        /// The URL of this schema. Optional and ignored.
+        #[schemars(rename = "$schema")]
+        schema_url: Option<String>,
+        /// Stop looking for config files in parent folders; discovery also stops at a `.git` folder.
+        root: Option<bool>,
+        /// Which files are linted.
+        files: Option<FilesSchema>,
+        /// Top-level keys whose subtrees the style rules skip.
+        #[schemars(rename = "ignoreKeys")]
+        ignore_keys: Option<Vec<String>>,
+        /// The level of each rule: "error", "warn" or "off"; `required-keys` and `indentation` also take `[level, {options}]`.
+        #[schemars(schema_with = "rules_schema")]
+        rules: Option<Vec<String>>,
+        /// A JSON Schema file the front matter must match, relative to this config file.
+        schema: Option<String>,
+    }
+
+    /// The `files` key.
+    #[derive(JsonSchema)]
+    #[schemars(deny_unknown_fields, transform = RecursiveTransform(all_optional))]
+    #[expect(dead_code, reason = "the fields only describe the file format")]
+    struct FilesSchema {
+        /// Extensions of the files to lint, each with its leading dot. Default: `[".md"]`.
+        extensions: Option<Vec<String>>,
+        /// Glob patterns, relative to this config file. If there are any, a file must match one to be linted.
+        include: Option<Vec<String>>,
+        /// Glob patterns, relative to this config file, of files to skip. A leading `!` re-includes; the last match wins.
+        exclude: Option<Vec<String>>,
+    }
+
+    /// Every key is optional, and none accepts `null`: the config parser rejects it.
+    fn all_optional(schema: &mut Schema) {
+        schema.remove("required");
+        if let Some(serde_json::Value::Array(types)) = schema.get_mut("type") {
+            types.retain(|t| t != "null");
+            if let [only] = types.as_slice() {
+                let only = only.clone();
+                schema.insert("type".into(), only);
+            }
+        }
+        if let Some(serde_json::Value::Array(branches)) = schema.get_mut("anyOf") {
+            branches.retain(|b| *b != json!({"type": "null"}));
+            if let [only] = branches.as_slice() {
+                let only = only.clone();
+                schema.remove("anyOf");
+                if let serde_json::Value::Object(entries) = only {
+                    schema.as_object_mut().unwrap().extend(entries);
+                }
+            }
+        }
+    }
+
+    fn rules_schema(_: &mut SchemaGenerator) -> Schema {
+        let level = json!({"enum": ["error", "warn", "off"]});
+        let tuple = |options: serde_json::Value| {
+            json!({"oneOf": [level, {
+                "type": "array",
+                "prefixItems": [{"enum": ["error", "warn"]}, options],
+                "minItems": 2,
+                "maxItems": 2,
+                "items": false,
+            }]})
+        };
+        let mut properties = serde_json::Map::new();
+        for rule in RuleId::ALL.into_iter().filter(|r| r.is_configurable()) {
+            let schema = match rule {
+                RuleId::RequiredKeys => tuple(json!({
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {"keys": {"type": "array", "items": {"type": "string"}}},
+                })),
+                RuleId::Indentation => tuple(json!({
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {"size": {"type": "integer", "minimum": 1, "maximum": 8}},
+                })),
+                _ => level.clone(),
+            };
+            properties.insert(rule.as_str().into(), schema);
+        }
+        Schema::try_from(json!({
+            "type": "object",
+            "additionalProperties": false,
+            "properties": properties,
+        }))
+        .unwrap()
+    }
+
+    fn generated() -> String {
+        let mut text =
+            serde_json::to_string_pretty(&schemars::schema_for!(ConfigFileSchema)).unwrap();
+        text.push('\n');
+        text
+    }
+
+    #[test]
+    fn config_schema_is_current() {
+        let text = generated();
+        if std::env::var("UPDATE_SCHEMAS").is_ok_and(|v| v == "1") {
+            std::fs::create_dir_all(std::path::Path::new(SCHEMA_PATH).parent().unwrap()).unwrap();
+            std::fs::write(SCHEMA_PATH, &text).unwrap();
+        }
+        let on_disk = std::fs::read_to_string(SCHEMA_PATH).unwrap_or_default();
+        assert!(
+            on_disk == text,
+            "schemas/config.schema.json is out of date; run with UPDATE_SCHEMAS=1"
+        );
+        let schema: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            schema["$id"],
+            "https://unpkg.com/yaml-fm-lint@2/config.schema.json"
+        );
+        assert_eq!(schema["title"], "yaml-fm-lint configuration");
+        assert_eq!(schema["additionalProperties"], false);
+        assert_eq!(
+            schema["properties"]["rules"]["properties"]
+                .as_object()
+                .map(|rules| rules.len()),
+            Some(14)
+        );
+    }
+
+    #[test]
+    fn schema_agrees_with_resolve_config() {
+        let schema = serde_json::from_str(&generated()).unwrap();
+        let validator = jsonschema::draft202012::new(&schema).unwrap();
+        for (source, accepted) in [
+            ("{}", true),
+            (
+                r#"{"$schema": "https://unpkg.com/yaml-fm-lint@2/config.schema.json",
+                    "root": false,
+                    "files": {"extensions": [".md"], "include": ["docs/**"], "exclude": ["!a.md"]},
+                    "ignoreKeys": ["x"],
+                    "schema": "./s.json",
+                    "rules": {"no-quotes": "warn", "indentation": ["error", {"size": 4}]}}"#,
+                true,
+            ),
+            (r#"{"rulez": 1}"#, false),
+            (r#"{"rules": {"no-quotes": ["error", {}]}}"#, false),
+            (
+                r#"{"rules": {"indentation": ["warn", {"size": 9}]}}"#,
+                false,
+            ),
+            (r#"{"rules": {"yaml-syntax": "off"}}"#, false),
+            (
+                r#"{"rules": {"required-keys": ["off", {"keys": []}]}}"#,
+                false,
+            ),
+            (r#"{"rules": {"required-keys": ["error"]}}"#, false),
+            (r#"{"files": {"extensions": [1]}}"#, false),
+            (r#"{"root": null}"#, false),
+            (r#"{"root": true, "ignoreKeys": ["a"]}"#, true),
+        ] {
+            let value: serde_json::Value = serde_json::from_str(source).unwrap();
+            let layer = ConfigLayer {
+                dir: "/r".into(),
+                path: "/r/.yaml-fm-lint.json".into(),
+                source: source.into(),
+            };
+            assert_eq!(validator.is_valid(&value), accepted, "schema: {source}");
+            assert_eq!(resolve_config(&[layer], None).is_ok(), accepted, "{source}");
+        }
+    }
+
+    /// Known gap: the schema checks shapes, not what a string means or how a number is spelled.
+    #[test]
+    fn schema_accepts_what_resolve_config_rejects() {
+        let schema = serde_json::from_str(&generated()).unwrap();
+        let validator = jsonschema::draft202012::new(&schema).unwrap();
+        for source in [
+            // glob syntax
+            r#"{"files": {"exclude": ["a/[b"]}}"#,
+            // an empty pattern
+            r#"{"files": {"include": [""]}}"#,
+            // `2.0` is an integer to JSON Schema, but not to `resolve_config`
+            r#"{"rules": {"indentation": ["error", {"size": 2.0}]}}"#,
+        ] {
+            let value: serde_json::Value = serde_json::from_str(source).unwrap();
+            let layer = ConfigLayer {
+                dir: "/r".into(),
+                path: "/r/.yaml-fm-lint.json".into(),
+                source: source.into(),
+            };
+            assert!(validator.is_valid(&value), "schema: {source}");
+            assert!(resolve_config(&[layer], None).is_err(), "{source}");
+        }
+    }
+}

@@ -26,4 +26,5 @@ globset = { version = "0.4.21", default-features = false }
 rstest = "0.28.0"
 insta = { version = "1.49.0", features = ["glob"] }
 proptest = "1.12.0"
+schemars = "1.2.3"
 yaml-fm-lint-core = { path = ".", features = ["invariants"] }

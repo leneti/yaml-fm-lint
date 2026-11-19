@@ -38,8 +38,9 @@ yaml-fm-lint/
 ├─ CHANGELOG.md, SECURITY.md  # (planned)
 ├─ npm/                    # (planned) launcher and platform packages
 ├─ editors/vscode/         # (planned)
-├─ schemas/, docs/         # (planned) generated
-├─ fuzz/                   # cargo-fuzz targets (lint, fix); own workspace and Cargo.lock
+├─ schemas/                # generated JSON Schemas (config.schema.json); `UPDATE_SCHEMAS=1 cargo test` rewrites them
+├─ docs/                   # (planned) generated
+├─ fuzz/                   # cargo-fuzz targets (lint, fix, config); own workspace and Cargo.lock; seeds/config/
 └─ bench/                  # baseline.sh (hyperfine), RESULTS.md, results/*.json
 ```
 
@@ -104,10 +105,12 @@ rustup component add llvm-tools-preview                        # once
 cargo llvm-cov -p yaml-fm-lint-core --fail-under-lines 80      # coverage gate (CI job `coverage`)
 rustup toolchain install nightly-2026-11-03 --profile minimal  # once; fuzzing needs nightly
 cd fuzz && mkdir -p corpus/lint && cargo +nightly-2026-11-03 fuzz run lint corpus/lint ../tests/fixtures/1x ../tests/fixtures/edge -- -max_total_time=60
+cd fuzz && mkdir -p corpus/config && cargo +nightly-2026-11-03 fuzz run config corpus/config seeds/config -- -max_total_time=60
 ```
 
-Targets: `lint` (every range is in bounds and on character boundaries) and
-`fix` (`invariants::check_fix` holds). A crash is written to `fuzz/artifacts/<target>/`:
+Targets: `lint` (every range is in bounds and on character boundaries),
+`fix` (`invariants::check_fix` holds) and `config` (`resolve_config`, `Linter::new` and
+`to_json` never panic; seeded from `fuzz/seeds/config`, not the YAML fixtures). A crash is written to `fuzz/artifacts/<target>/`:
 turn it into a regression test in the owning module, then fix the code.
 `libfuzzer-sys` compiles C++, so the machine needs a C++ compiler. The `fuzz`
 job in `ci.yml` runs each target for 60 seconds; `fuzz-nightly.yml` runs them for 15 minutes every night.
