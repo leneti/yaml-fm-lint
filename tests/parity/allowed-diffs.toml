@@ -1,0 +1,141 @@
+# Every difference between 1.7.1 and 2.0 on the fixtures. `crates/cli/tests/parity.rs` fails on any
+# difference not listed here, and on any listed match that no longer happens.
+
+[[diff]]
+id = "needed-quotes"
+decision = "D8"
+reason = "Apostrophes and needed quotes inside values are no longer flagged. 1.x flagged every quote character, including the apostrophe in `It's fine` and quotes that cannot be dropped (`'@handle'`, `\"a: b\"`, `\"x #y\"`, `\"yes\"`, `\"null\"`, `\"123\"`, `'*star'`, and `\"# fmlint-disable-line\"`, whose plain form would be a comment)."
+matches = [
+  { fixture = "1x/testDisabledRuleConfig.md", rule = "no-quotes", line = 3, change = "removed" },
+  { fixture = "edge/quotes-needed.md", rule = "no-quotes", line = 2, change = "removed" },
+  { fixture = "edge/quotes-needed.md", rule = "no-quotes", line = 3, change = "removed" },
+  { fixture = "edge/quotes-needed.md", rule = "no-quotes", line = 4, change = "removed" },
+  { fixture = "edge/quotes-needed.md", rule = "no-quotes", line = 5, change = "removed" },
+  { fixture = "edge/quotes-needed.md", rule = "no-quotes", line = 6, change = "removed" },
+  { fixture = "edge/quotes-needed.md", rule = "no-quotes", line = 7, change = "removed" },
+  { fixture = "edge/quotes-needed.md", rule = "no-quotes", line = 8, change = "removed" },
+  { fixture = "edge/quotes-needed.md", rule = "no-quotes", line = 10, change = "removed" },
+  { fixture = "edge/disable-comments.md", rule = "no-quotes", line = 8, change = "removed" },
+]
+
+[[diff]]
+id = "empty-flow-collections"
+decision = "D8"
+reason = "Empty `[]` and `{}` are allowed: there is no equivalent block form to ask for."
+matches = [
+  { fixture = "edge/empty-collections.md", rule = "no-flow-sequence", line = 3, change = "removed" },
+  { fixture = "edge/empty-collections.md", rule = "no-flow-mapping", line = 4, change = "removed" },
+]
+
+[[diff]]
+id = "flow-one-report-per-collection"
+decision = "§5.4"
+reason = "A flow collection is reported once, at its opening bracket. 1.x reported every bracket or brace character, so the line of a closing `]` or `}` on a later line was a separate hit."
+matches = [
+  { fixture = "1x/testComplex.md", rule = "no-flow-sequence", line = 23, change = "removed" },
+  { fixture = "edge/nested-flow.md", rule = "no-flow-mapping", line = 5, change = "removed" },
+  { fixture = "edge/nested-flow.md", rule = "no-flow-sequence", line = 9, change = "removed" },
+]
+
+[[diff]]
+id = "indentation-compact-item-nesting"
+decision = "T19"
+reason = "`indentation` measures the nesting of a compact item (`- three:` then `  - id: 1`) from the key column, not from the dash. 1.x testComplex row 40 was a 1.x false positive: the child is exactly 2 columns inside its key. (2.0 also flags any step smaller than `size` and a uniformly indented root; no fixture has one.)"
+matches = [
+  { fixture = "1x/testComplex.md", rule = "indentation", line = 40, change = "removed" },
+]
+
+[[diff]]
+id = "block-text-exempt"
+decision = "§15.5"
+reason = "Blank lines and trailing spaces inside the body of a `|` or `>` block scalar are content, so they are not flagged."
+matches = [
+  { fixture = "edge/block-scalars.md", rule = "no-blank-lines", line = 4, change = "removed" },
+  { fixture = "edge/block-scalars.md", rule = "no-blank-lines", line = 9, change = "removed" },
+  { fixture = "edge/block-scalars.md", rule = "no-blank-lines", line = 17, change = "removed" },
+  { fixture = "edge/block-scalars.md", rule = "no-blank-lines", line = 19, change = "removed" },
+  { fixture = "edge/block-scalars.md", rule = "no-trailing-spaces", line = 5, change = "removed" },
+  { fixture = "edge/block-scalars.md", rule = "no-trailing-spaces", line = 10, change = "removed" },
+]
+
+[[diff]]
+id = "bom-accepted"
+decision = "§5.2"
+reason = "A UTF-8 byte order mark before the opening `---` is accepted. 1.x reported that there is no front matter."
+matches = [
+  { fixture = "edge/bom.md", rule = "require-front-matter", line = 1, change = "removed" },
+]
+
+[[diff]]
+id = "disable-comments"
+decision = "§5.5"
+reason = "Disable comments are recognised only as real comments and are checked. An unknown rule ID gets an `invalid-disable-comment` warning and suppresses nothing, so the line it covers is still linted. 1.x skipped the next line for any `fmlint-disable-next-line` text."
+matches = [
+  { fixture = "edge/disable-comments.md", rule = "invalid-disable-comment", line = 6, change = "added" },
+  { fixture = "edge/disable-comments.md", rule = "no-trailing-spaces", line = 7, change = "added" },
+]
+
+[[diff]]
+id = "non-mapping-front-matter"
+decision = "§5.2"
+reason = "Front matter that is not a mapping (here a list) is a `yaml-syntax` error. 1.x accepted it."
+matches = [
+  { fixture = "edge/non-mapping.md", rule = "yaml-syntax", line = 2, change = "added" },
+]
+
+[[diff]]
+id = "nesting-limit"
+decision = "§5.8"
+reason = "Nesting deeper than 128 levels is an `input-limit` error, reported at the point the limit is passed. 1.x gave a `customError` at depth 100."
+matches = [
+  { fixture = "edge/deep-nesting.md", rule = "yaml-syntax", line = 101, change = "removed" },
+  { fixture = "edge/deep-nesting.md", rule = "input-limit", line = 130, change = "added" },
+]
+
+[[diff]]
+id = "parser-error-position"
+decision = "§5.3"
+reason = "Both parsers reject the file, but they report the error at different places: js-yaml at the line with the bad indentation, saphyr at the line where it expected a `:`."
+matches = [
+  { fixture = "1x/testBadFormat.md", rule = "yaml-syntax", line = 4, change = "removed" },
+  { fixture = "1x/testBadFormat.md", rule = "yaml-syntax", line = 5, change = "added" },
+]
+
+[[diff]]
+id = "no-commas-plain-scalars-only"
+decision = "P17"
+reason = "`no-commas` looks only at plain scalars that contain a comma. 1.x flagged every comma on a line: the separators in a flow collection and a comma inside a quoted string (`\"Code Reviews, with Pull Requests\"`)."
+matches = [
+  { fixture = "1x/testComplex.md", rule = "no-commas", line = 15, change = "removed" },
+  { fixture = "1x/testComplex.md", rule = "no-commas", line = 29, change = "removed" },
+  { fixture = "1x/testComplex.md", rule = "no-commas", line = 30, change = "removed" },
+  { fixture = "1x/testComplex.md", rule = "no-commas", line = 66, change = "removed" },
+  { fixture = "edge/nested-flow.md", rule = "no-commas", line = 4, change = "removed" },
+  { fixture = "edge/nested-flow.md", rule = "no-commas", line = 8, change = "removed" },
+]
+
+[[diff]]
+id = "flow-commas-are-separators"
+decision = "§5.4"
+reason = "A comma at the end of a line inside a multi-line flow collection separates items; it is not a plain scalar ending in `,`, so `no-trailing-commas` does not apply."
+matches = [
+  { fixture = "1x/testComplex.md", rule = "no-trailing-commas", line = 18, change = "removed" },
+  { fixture = "1x/testComplex.md", rule = "no-trailing-commas", line = 19, change = "removed" },
+  { fixture = "1x/testComplex.md", rule = "no-trailing-commas", line = 20, change = "removed" },
+  { fixture = "1x/testComplex.md", rule = "no-trailing-commas", line = 21, change = "removed" },
+  { fixture = "1x/testComplex.md", rule = "no-trailing-commas", line = 22, change = "removed" },
+  { fixture = "edge/nested-flow.md", rule = "no-trailing-commas", line = 7, change = "removed" },
+]
+
+[[diff]]
+id = "repeated-spaces-before-punctuation"
+decision = "§5.4"
+reason = "`no-repeated-spaces` flags a run of 2+ spaces between any two non-space characters in a plain scalar. 1.x needed a word character on both sides, so `cat  ,` was missed."
+matches = [
+  { fixture = "1x/testComplex.md", rule = "whitespace", line = 12, change = "added" },
+]
+
+[[diff]]
+id = "flow-fix-unquotes"
+decision = "T17a"
+reason = "testComplex.md line 30: converting a flow mapping to block form also removes quotes that are no longer needed, so the fixed file then gets a `no-commas` warning for `Code Reviews, with Pull Requests`"
