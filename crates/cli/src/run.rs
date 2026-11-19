@@ -1,0 +1,208 @@
+//! Linting the files named on the command line.
+
+use std::io::{ErrorKind, Write};
+use std::path::Path;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Instant;
+
+use anyhow::Context;
+use yaml_fm_lint_core::{Applicability, Diagnostic, Severity};
+
+use crate::cli::Cli;
+use crate::configs::Configs;
+use crate::{output, paths};
+
+/// What happened to one file.
+#[derive(Debug)]
+pub struct FileResult {
+    /// How the file is named in output.
+    pub display: String,
+    /// The file's text, kept only when there are diagnostics.
+    pub text: Option<String>,
+    pub diagnostics: Vec<Diagnostic>,
+    /// Fixes applied to the file.
+    pub fixed: usize,
+    /// Whether the file was rewritten.
+    pub written: bool,
+}
+
+/// The counts of a run.
+#[derive(Debug)]
+#[expect(dead_code, reason = "fields are read by later tasks")]
+pub struct Summary {
+    pub errors: usize,
+    pub warnings: usize,
+    /// Problems with an automatic fix.
+    pub fixable: usize,
+    pub files: usize,
+    pub files_with_problems: usize,
+    pub fixed_problems: usize,
+    pub fixed_files: usize,
+    pub elapsed_ms: u128,
+}
+
+impl Summary {
+    fn new(results: &[FileResult], started: Instant) -> Summary {
+        let count = |severity| {
+            results
+                .iter()
+                .flat_map(|r| &r.diagnostics)
+                .filter(|d| d.severity == severity)
+                .count()
+        };
+        Summary {
+            errors: count(Severity::Error),
+            warnings: count(Severity::Warning),
+            fixable: results
+                .iter()
+                .flat_map(|r| &r.diagnostics)
+                .filter(|d| {
+                    d.fix
+                        .as_ref()
+                        .is_some_and(|f| f.applicability == Applicability::Automatic)
+                })
+                .count(),
+            files: results.len(),
+            files_with_problems: results.iter().filter(|r| !r.diagnostics.is_empty()).count(),
+            fixed_problems: results.iter().map(|r| r.fixed).sum(),
+            fixed_files: results.iter().filter(|r| r.written).count(),
+            elapsed_ms: started.elapsed().as_millis(),
+        }
+    }
+}
+
+/// 2 when `fatal` (a config error, or a file that couldn't be read or written), else 1 when
+/// there are errors or more warnings than `max_warnings`, else 0.
+pub fn exit_code(summary: &Summary, fatal: bool, max_warnings: Option<usize>) -> u8 {
+    if fatal {
+        2
+    } else if summary.errors > 0 || max_warnings.is_some_and(|max| summary.warnings > max) {
+        1
+    } else {
+        0
+    }
+}
+
+/// A file that could not be processed: the line to print on stderr.
+struct Failure {
+    line: String,
+    is_config: bool,
+}
+
+struct Item {
+    display: String,
+    outcome: Result<FileResult, Failure>,
+}
+
+/// Lints the files named in `cli.paths` and prints the report; returns the exit code.
+pub fn lint(cli: &Cli) -> anyhow::Result<u8> {
+    // shortcut: these are refused until Tasks 6 to 10 add them.
+    if cli.command.is_some() || cli.fix || cli.stdin {
+        anyhow::bail!("this option is not available yet");
+    }
+    let started = Instant::now();
+    let cwd = std::env::current_dir().context("can't find the current folder")?;
+    let configs = Configs::new(cli.config.as_deref(), &cwd)?;
+    // shortcut: every path is read as a file; Task 6 adds folders, globs and the default ".".
+    let items = process(&cli.paths, &cwd, &configs, cli.quiet);
+
+    if let Some(line) = items.iter().find_map(|item| match &item.outcome {
+        Err(f) if f.is_config => Some(&f.line),
+        _ => None,
+    }) {
+        write_stderr(line);
+        return Ok(2);
+    }
+    let mut results = Vec::new();
+    let mut fatal = false;
+    for item in items {
+        match item.outcome {
+            Ok(result) => results.push(result),
+            Err(failure) => {
+                fatal = true;
+                write_stderr(&failure.line);
+            }
+        }
+    }
+    let summary = Summary::new(&results, started);
+    let text = output::render(cli.format, &results, &summary, true);
+    let mut stdout = anstream::AutoStream::new(std::io::stdout().lock(), cli.color.choice());
+    match stdout
+        .write_all(text.as_bytes())
+        .and_then(|()| stdout.flush())
+    {
+        Ok(()) => {}
+        // The reader went away (`| head`): nothing more to say.
+        Err(e) if e.kind() == ErrorKind::BrokenPipe => {}
+        Err(e) => anyhow::bail!("can't write output: {e}"),
+    }
+    Ok(exit_code(&summary, fatal, cli.max_warnings))
+}
+
+fn write_stderr(line: &str) {
+    // Nobody to tell if stderr is closed.
+    let _ = writeln!(std::io::stderr().lock(), "{line}");
+}
+
+/// Lints every argument on worker threads; the items come back sorted by `display`.
+fn process(args: &[String], cwd: &Path, configs: &Configs, quiet: bool) -> Vec<Item> {
+    let next = AtomicUsize::new(0);
+    let items = Mutex::new(Vec::with_capacity(args.len()));
+    let workers = std::thread::available_parallelism().map_or(1, usize::from);
+    std::thread::scope(|scope| {
+        for _ in 0..workers.min(args.len()) {
+            scope.spawn(|| {
+                while let Some(arg) = args.get(next.fetch_add(1, Ordering::Relaxed)) {
+                    let item = lint_file(arg, cwd, configs, quiet);
+                    items
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .push(item);
+                }
+            });
+        }
+    });
+    let mut items = items
+        .into_inner()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    items.sort_by(|a, b| a.display.cmp(&b.display));
+    items
+}
+
+fn lint_file(arg: &str, cwd: &Path, configs: &Configs, quiet: bool) -> Item {
+    let path = paths::absolute(Path::new(arg), cwd);
+    let display = paths::display(&path, cwd);
+    let read_error = |line: String| Failure {
+        line,
+        is_config: false,
+    };
+    let outcome = (|| {
+        let bytes = std::fs::read(&path).map_err(|e| {
+            read_error(match e.kind() {
+                ErrorKind::NotFound => format!("{display}: no such file or directory"),
+                _ => format!("{display}: can't read: {e}"),
+            })
+        })?;
+        let text = String::from_utf8(bytes)
+            .map_err(|_| read_error(format!("{display}: not valid UTF-8")))?;
+        let linter = configs
+            .linter_for(path.parent().unwrap_or(&path))
+            .map_err(|line| Failure {
+                line,
+                is_config: true,
+            })?;
+        let mut diagnostics = linter.lint(&text).diagnostics;
+        if quiet {
+            diagnostics.retain(|d| d.severity == Severity::Error);
+        }
+        Ok(FileResult {
+            display: display.clone(),
+            text: (!diagnostics.is_empty()).then_some(text),
+            diagnostics,
+            fixed: 0,
+            written: false,
+        })
+    })();
+    Item { display, outcome }
+}

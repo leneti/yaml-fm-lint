@@ -1,11 +1,27 @@
+//! The `yaml-fm-lint` command; see AGENTS.md.
+
+mod cli;
+mod configs;
+mod output;
+mod paths;
+mod run;
+
+use std::io::Write;
 use std::process::ExitCode;
 
+use clap::Parser;
+
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.len() == 1 && args.first().map(String::as_str) == Some("--version") {
-        println!("yaml-fm-lint {}", env!("CARGO_PKG_VERSION"));
-        return ExitCode::SUCCESS;
+    match run() {
+        Ok(code) => ExitCode::from(code),
+        Err(e) => {
+            // Nobody to tell if stderr is closed.
+            let _ = writeln!(std::io::stderr().lock(), "error: {e:#}");
+            ExitCode::from(2)
+        }
     }
-    eprintln!("yaml-fm-lint 2.0 is under development; use yaml-fm-lint 1.x from npm");
-    ExitCode::from(2)
+}
+
+fn run() -> anyhow::Result<u8> {
+    run::lint(&cli::Cli::parse())
 }
