@@ -14,6 +14,7 @@ use crate::configs::Configs;
 use crate::output;
 use crate::paths::{absolute, display};
 use crate::read::{ReadError, read_for_lint, read_whole};
+use crate::reason::reason;
 use crate::walk::{Target, collect};
 use crate::write::write_atomic;
 
@@ -311,8 +312,12 @@ fn lint_file(target: &Target, configs: &Configs, quiet: bool, fix: bool) -> Item
             .map_err(|line| failed(Failure::Config, line))?;
         let (mut result, output) = check(&linter, display.clone(), &text, quiet, fix);
         if let Some(output) = output {
-            write_atomic(path, &output)
-                .map_err(|e| failed(Failure::Io, format!("{display}: can't write: {e}")))?;
+            write_atomic(path, &output).map_err(|e| {
+                failed(
+                    Failure::Io,
+                    format!("{display}: can't write: {}", reason(&e)),
+                )
+            })?;
             result.written = true;
         }
         Ok(result)

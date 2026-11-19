@@ -126,7 +126,7 @@ fn fix_unwritable_dir_keeps_original() {
     std::fs::set_permissions(&ro, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("ro/bad.md: can't write:"), "{stderr}");
+    assert_eq!(stderr, "ro/bad.md: can't write: permission denied\n");
     assert_eq!(std::fs::read(ro.join("bad.md")).unwrap(), BAD);
     assert_eq!(names(&ro), ["bad.md"]);
     assert_eq!(
@@ -315,4 +315,36 @@ fn fix_writes_a_file_named_like_a_glob() {
         FIXED
     );
     assert_eq!(std::fs::read(dir.path().join("blog/s.md")).unwrap(), BAD);
+}
+
+/// A read-only file is not rewritten: renaming a new file over it would work on Unix and fail
+/// on Windows.
+#[cfg(unix)]
+#[test]
+fn fix_does_not_rewrite_a_read_only_file() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = project(&[("ro.md", BAD), ("rw.md", BAD)]);
+    let ro = dir.path().join("ro.md");
+    std::fs::set_permissions(&ro, std::fs::Permissions::from_mode(0o444)).unwrap();
+    // Running as root: the file can be written anyway.
+    if std::fs::OpenOptions::new().write(true).open(&ro).is_ok() {
+        return;
+    }
+    let before = names(dir.path());
+    let output = yfl(dir.path())
+        .args(["--fix", "--format", "compact", "ro.md", "rw.md"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap(),
+        "ro.md: can't write: permission denied\n"
+    );
+    assert_eq!(std::fs::read(&ro).unwrap(), BAD);
+    assert_eq!(names(dir.path()), before);
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("rw.md")).unwrap(),
+        FIXED
+    );
 }

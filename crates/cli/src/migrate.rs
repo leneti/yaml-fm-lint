@@ -7,6 +7,7 @@ use anyhow::Context;
 use serde_json::{Map, Value, json};
 
 use crate::paths::{absolute, display};
+use crate::reason::reason;
 use crate::run::{emit, write_stderr};
 use crate::write::write_atomic;
 
@@ -190,7 +191,8 @@ pub fn run(path: Option<&Path>, write: bool) -> anyhow::Result<u8> {
     }
     let text = format!("{}\n", serde_json::to_string_pretty(&migrated.config)?);
     if write {
-        write_atomic(&path, &text).map_err(|e| anyhow::anyhow!("{shown}: can't write: {e}"))?;
+        write_atomic(&path, &text)
+            .map_err(|e| anyhow::anyhow!("{shown}: can't write: {}", reason(&e)))?;
         write_stderr(&format!("wrote {shown}"));
     } else {
         emit(std::io::stdout().lock(), &text)?;

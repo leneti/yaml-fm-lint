@@ -7,6 +7,7 @@ mod output;
 mod paths;
 mod print_config;
 mod read;
+mod reason;
 mod run;
 mod walk;
 mod write;
