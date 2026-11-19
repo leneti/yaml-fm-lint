@@ -5,8 +5,9 @@ use std::path::Path;
 
 use anyhow::Context;
 use serde_json::{Map, Value, json};
+use yaml_fm_lint_core::{ConfigLayer, Linter, resolve_config};
 
-use crate::paths::{absolute, display};
+use crate::paths::{absolute, display, slash};
 use crate::reason::reason;
 use crate::run::{emit, write_stderr};
 use crate::write::write_atomic;
@@ -75,6 +76,18 @@ fn strings(object: &Map<String, Value>, key: &str) -> Result<Option<Vec<String>>
         .ok_or_else(|| format!("/{key}: must be an array of strings"))
 }
 
+/// `name` with the characters that mean something in a glob escaped.
+fn escape_glob(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    for c in name.chars() {
+        if matches!(c, '\\' | '[' | ']' | '*' | '?' | '{' | '}') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// Converts the parsed 1.x config `v1` (spec §7.5).
 pub fn convert(v1: &Value) -> Result<Migrated, String> {
     let object = v1.as_object().ok_or("must be a JSON object")?;
@@ -90,25 +103,29 @@ pub fn convert(v1: &Value) -> Result<Migrated, String> {
         Some(value) => value.as_bool().ok_or("/mandatory: must be true or false")?,
     };
     let extensions = strings(object, "extensions")?;
-    // `drafts/` and `drafts` name the same folder.
-    let folders = |key| {
-        strings(object, key).map(|dirs| {
-            dirs.unwrap_or_default()
-                .into_iter()
-                .map(|dir| dir.trim_end_matches('/').to_string())
-                .collect::<Vec<_>>()
-        })
-    };
-    let exclude_dirs = folders("excludeDirs")?;
-    let extra_exclude_dirs = folders("extraExcludeDirs")?;
-    let exclude_files = strings(object, "excludeFiles")?.unwrap_or_default();
-    let include_dirs = folders("includeDirs")?;
-
     let mut notes: Vec<String> = object
         .keys()
         .filter(|key| !HANDLED_KEYS.contains(&key.as_str()))
         .map(|key| format!("dropped unknown key `{key}`"))
         .collect();
+    // `drafts/` and `drafts` name the same folder. 1.x names are literal, so glob characters
+    // in them are escaped; an empty one would exclude everything (or nothing) and is dropped.
+    let mut names = |key: &str| -> Result<Vec<String>, String> {
+        let mut kept = Vec::new();
+        for name in strings(object, key)?.unwrap_or_default() {
+            let name = name.trim_matches('/');
+            if name.is_empty() {
+                notes.push(format!("skipped an empty entry in `{key}`"));
+            } else {
+                kept.push(escape_glob(name));
+            }
+        }
+        Ok(kept)
+    };
+    let exclude_dirs = names("excludeDirs")?;
+    let extra_exclude_dirs = names("extraExcludeDirs")?;
+    let exclude_files = names("excludeFiles")?;
+    let include_dirs = names("includeDirs")?;
 
     let (defaults, dirs): (Vec<String>, Vec<String>) = exclude_dirs
         .into_iter()
@@ -161,6 +178,19 @@ pub fn convert(v1: &Value) -> Result<Migrated, String> {
     })
 }
 
+/// Fails unless 2.0 accepts `config` as the config file at `path`, files patterns included.
+fn check(config: &Value, path: &Path) -> Result<(), String> {
+    let layer = ConfigLayer {
+        dir: slash(path.parent().unwrap_or(path)),
+        path: slash(path),
+        source: config.to_string(),
+    };
+    let resolved = resolve_config(&[layer], None).map_err(|e| e.to_string())?;
+    Linter::new(resolved, None)
+        .map(drop)
+        .map_err(|e| e.to_string())
+}
+
 /// Converts the 1.x config at `path` (default `./.yaml-fm-lint.json`) and prints it, or with
 /// `write` replaces the file; returns the exit code.
 pub fn run(path: Option<&Path>, write: bool) -> anyhow::Result<u8> {
@@ -186,6 +216,9 @@ pub fn run(path: Option<&Path>, write: bool) -> anyhow::Result<u8> {
     let v1: Value =
         serde_json::from_str(&source).map_err(|e| anyhow::anyhow!("{shown}: invalid JSON: {e}"))?;
     let migrated = convert(&v1).map_err(|e| anyhow::anyhow!("{shown}: {e}"))?;
+    // Nothing is printed or written for a config that 2.0 would refuse.
+    check(&migrated.config, &path)
+        .map_err(|e| anyhow::anyhow!("{shown}: the converted config is not valid: {e}"))?;
     for note in &migrated.notes {
         write_stderr(note);
     }
@@ -254,5 +287,24 @@ mod tests {
             let err = convert(&json!({ key: null })).err().unwrap();
             assert!(err.contains(&format!("(it has `{key}`)")), "{err}");
         }
+    }
+
+    /// Whatever 1.x names say, the converted config is one 2.0 accepts.
+    #[test]
+    fn converted_names_always_make_a_valid_config() {
+        let names = [
+            "a[b", "]", "{", "}", "*", "?", "\\", "!x", "a,b", "{a,b}", "[!a]", "**",
+        ];
+        let v1 = json!({"excludeDirs": names, "excludeFiles": names, "includeDirs": names});
+        let migrated = convert(&v1).unwrap();
+        check(&migrated.config, Path::new("/x/.yaml-fm-lint.json")).unwrap();
+    }
+
+    #[test]
+    fn an_invalid_converted_config_is_refused() {
+        let invalid = json!({"files": {"exclude": ["a[b"]}});
+        let err = check(&invalid, Path::new("/x/.yaml-fm-lint.json")).unwrap_err();
+        assert!(err.contains("/files/exclude/0"), "{err}");
+        assert!(check(&json!({"$schema": SCHEMA_URL}), Path::new("/x/c.json")).is_ok());
     }
 }

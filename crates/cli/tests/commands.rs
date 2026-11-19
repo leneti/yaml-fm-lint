@@ -247,3 +247,60 @@ fn migrated_trailing_slash_dir_is_excluded() {
         .unwrap();
     assert_eq!(output.status.code(), Some(0), "{:?}", output.stdout);
 }
+
+/// 1.x entries that are empty (or only slashes) would become `**/` or `**//**`, which exclude
+/// every file or never match: they are left out, with a note.
+#[test]
+fn migrate_skips_empty_entries() {
+    let dir = project(&[(
+        ".yaml-fm-lint.json",
+        br#"{"excludeFiles": [""], "excludeDirs": ["/", "drafts"], "includeDirs": ["//"]}"#,
+    )]);
+    let output = yfl(dir.path()).arg("migrate").output().unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        stdout_json(&output)["files"]["exclude"],
+        json!(["**/drafts/**"])
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    for key in ["excludeFiles", "excludeDirs", "includeDirs"] {
+        assert!(
+            stderr.contains(&format!("skipped an empty entry in `{key}`")),
+            "{stderr}"
+        );
+    }
+}
+
+/// `[draft].md` is a file name in 1.x, not a pattern: in 2.0 it must exclude that file only.
+#[test]
+fn migrate_keeps_names_literal() {
+    let dir = project(&[
+        (
+            ".yaml-fm-lint.json",
+            br#"{"excludeFiles": ["[draft].md", "a{b"], "excludeDirs": ["x*y"]}"#,
+        ),
+        ("[draft].md", common::BAD),
+        ("d.md", common::BAD),
+        ("xay/z.md", common::BAD),
+    ]);
+    let output = yfl(dir.path())
+        .args(["migrate", "--write"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0), "{:?}", output.stderr);
+    let written: Value =
+        serde_json::from_slice(&std::fs::read(dir.path().join(".yaml-fm-lint.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        written["files"]["exclude"],
+        json!(["**/x\\*y/**", "**/\\[draft\\].md", "**/a\\{b"])
+    );
+    let linted = yfl(dir.path())
+        .args(["--format", "compact"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        String::from_utf8(linted.stdout).unwrap(),
+        "d.md:2:8: error [no-quotes] unnecessary quotes\nxay/z.md:2:8: error [no-quotes] unnecessary quotes\n"
+    );
+}
