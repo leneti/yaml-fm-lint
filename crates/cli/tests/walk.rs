@@ -175,10 +175,9 @@ fn unreadable_folder_is_reported() {
         String::from_utf8(out.stdout).unwrap(),
         "a.md:2:8: error [no-quotes] unnecessary quotes\n"
     );
-    assert!(
-        String::from_utf8(out.stderr)
-            .unwrap()
-            .starts_with("locked: can't read: ")
+    assert_eq!(
+        String::from_utf8(out.stderr).unwrap(),
+        "locked: can't read: permission denied\n"
     );
 }
 

@@ -45,11 +45,14 @@ pub struct Summary {
     pub fixed_files: usize,
     /// Whether the run was asked to fix files.
     pub fix: bool,
+    /// Whether a file couldn't be processed: the run says nothing about it, so it can't claim
+    /// that there are no problems.
+    pub incomplete: bool,
     pub elapsed_ms: u128,
 }
 
 impl Summary {
-    fn new(results: &[FileResult], started: Instant, fix: bool) -> Summary {
+    fn new(results: &[FileResult], started: Instant, fix: bool, incomplete: bool) -> Summary {
         let count = |severity| {
             results
                 .iter()
@@ -74,6 +77,7 @@ impl Summary {
             fixed_problems: results.iter().map(|r| r.fixed).sum(),
             fixed_files: results.iter().filter(|r| r.written).count(),
             fix,
+            incomplete,
             elapsed_ms: started.elapsed().as_millis(),
         }
     }
@@ -159,7 +163,7 @@ pub fn lint(cli: &Cli) -> anyhow::Result<u8> {
         write_stderr(&line);
         return Ok(2);
     }
-    let summary = Summary::new(&results, started, cli.fix);
+    let summary = Summary::new(&results, started, cli.fix, fatal);
     let text = output::render(cli.format, &results, &summary);
     // `anstream` removes the colour codes when colour is off.
     let stdout = anstream::AutoStream::new(std::io::stdout().lock(), cli.color.choice());
@@ -188,7 +192,7 @@ fn lint_stdin(cli: &Cli, cwd: &Path, configs: &Configs, started: Instant) -> any
         Ok(text) => text,
         Err(e) => {
             write_stderr(&match e {
-                ReadError::Io(e) => format!("{shown}: can't read: {e}"),
+                ReadError::Io(e) => format!("{shown}: can't read: {}", reason(&e)),
                 ReadError::NotUtf8 => format!("{shown}: not valid UTF-8"),
             });
             return Ok(2);
@@ -204,7 +208,7 @@ fn lint_stdin(cli: &Cli, cwd: &Path, configs: &Configs, started: Instant) -> any
     };
     let (result, output) = check(&linter, shown, &text, cli.quiet, cli.fix);
     let results = [result];
-    let summary = Summary::new(&results, started, cli.fix);
+    let summary = Summary::new(&results, started, cli.fix, false);
     if cli.fix {
         // Exactly the text, so an editor can pipe a buffer through; no problems are printed.
         emit(std::io::stdout().lock(), output.as_deref().unwrap_or(&text))?;
@@ -302,7 +306,7 @@ fn lint_file(target: &Target, configs: &Configs, quiet: bool, fix: bool) -> Item
                         ReadError::Io(e) if e.kind() == ErrorKind::NotFound => {
                             format!("{display}: no such file or directory")
                         }
-                        ReadError::Io(e) => format!("{display}: can't read: {e}"),
+                        ReadError::Io(e) => format!("{display}: can't read: {}", reason(&e)),
                         ReadError::NotUtf8 => format!("{display}: not valid UTF-8"),
                     },
                 )

@@ -98,6 +98,7 @@ fn summary_lines(summary: &Summary, out: &mut String) {
         fixed_problems,
         fixed_files,
         fix,
+        incomplete,
         elapsed_ms,
     } = summary;
     let total = format!("{} in {elapsed_ms} ms", count(*files, "file"));
@@ -110,7 +111,9 @@ fn summary_lines(summary: &Summary, out: &mut String) {
         );
     }
     if errors + warnings == 0 {
-        let _ = writeln!(out, "✔ no problems · {total}");
+        if !incomplete {
+            let _ = writeln!(out, "✔ no problems · {total}");
+        }
         return;
     }
     let _ = write!(

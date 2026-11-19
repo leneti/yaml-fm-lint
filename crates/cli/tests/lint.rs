@@ -315,3 +315,45 @@ fn config_and_schema_that_are_not_regular_files_are_refused() {
         "ci.json: not a regular file",
     );
 }
+
+/// A run that couldn't read a file is not a run with no problems.
+#[test]
+fn a_failed_run_does_not_claim_no_problems() {
+    let dir = project(&[("ok.md", OK)]);
+    for args in [&["nope.md"][..], &["ok.md", "nope.md"]] {
+        let output = yfl(dir.path())
+            .args(["--color", "never"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(!stdout.contains("no problems"), "{args:?}: {stdout}");
+    }
+    yfl(dir.path())
+        .args(["--color", "never", "ok.md"])
+        .assert()
+        .code(0)
+        .stdout(contains("no problems"));
+}
+
+/// Read errors say why in plain words: no OS error number, no paths but the file's own.
+#[cfg(unix)]
+#[test]
+fn unreadable_file_is_explained_in_plain_words() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = project(&[("locked.md", OK)]);
+    let path = dir.path().join("locked.md");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+    // Running as root: the file can be read anyway.
+    if std::fs::File::open(&path).is_ok() {
+        return;
+    }
+    yfl(dir.path())
+        .args(["--format", "compact", "locked.md"])
+        .assert()
+        .code(2)
+        .stdout("")
+        .stderr("locked.md: can't read: permission denied\n");
+}

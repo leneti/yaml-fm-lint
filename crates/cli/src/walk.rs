@@ -8,6 +8,7 @@ use ignore::{WalkBuilder, WalkState};
 
 use crate::configs::Configs;
 use crate::paths::{absolute, display, slash};
+use crate::reason::reason;
 
 /// A file to lint.
 #[derive(Debug)]
@@ -181,8 +182,10 @@ fn walk(
                     // Other errors (a bad line in a `.gitignore`) are not about a file.
                     if let Some(io) = e.io_error() {
                         let line = match error_path(&e) {
-                            Some(path) => format!("{}: can't read: {io}", display(path, cwd)),
-                            None => format!("can't read: {io}"),
+                            Some(path) => {
+                                format!("{}: can't read: {}", display(path, cwd), reason(io))
+                            }
+                            None => format!("can't read: {}", reason(io)),
                         };
                         Found::push(found, |f| f.errors.push(line));
                     }

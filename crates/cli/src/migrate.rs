@@ -211,7 +211,7 @@ pub fn run(path: Option<&Path>, write: bool) -> anyhow::Result<u8> {
         Err(e) if e.kind() == ErrorKind::NotFound => {
             anyhow::bail!("{shown}: no such file or directory")
         }
-        Err(e) => anyhow::bail!("{shown}: can't read: {e}"),
+        Err(e) => anyhow::bail!("{shown}: can't read: {}", reason(&e)),
     };
     let v1: Value =
         serde_json::from_str(&source).map_err(|e| anyhow::anyhow!("{shown}: invalid JSON: {e}"))?;

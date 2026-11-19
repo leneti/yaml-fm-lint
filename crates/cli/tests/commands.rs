@@ -304,3 +304,16 @@ fn migrate_keeps_names_literal() {
         "d.md:2:8: error [no-quotes] unnecessary quotes\nxay/z.md:2:8: error [no-quotes] unnecessary quotes\n"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn migrate_read_error_is_explained_in_plain_words() {
+    let dir = project(&[]);
+    std::fs::create_dir(dir.path().join(".yaml-fm-lint.json")).unwrap();
+    let output = yfl(dir.path()).arg("migrate").output().unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap(),
+        "error: .yaml-fm-lint.json: can't read: is a directory\n"
+    );
+}
