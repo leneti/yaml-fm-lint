@@ -100,7 +100,7 @@ pub fn collect(args: &[String], cwd: &Path, configs: &Configs) -> Collected {
 
 /// Walks from the folder a glob starts in and keeps the files it matches.
 fn walk_glob(arg: &str, cwd: &Path, configs: &Configs, found: &Mutex<Found>) {
-    let (prefix, rest) = split_glob(arg);
+    let (prefix, rest) = split_glob(&glob_separators(arg, cfg!(windows)));
     let root = absolute(Path::new(&prefix), cwd);
     // A folder that isn't there has no files in it (and is not an error).
     if !std::fs::metadata(&root).is_ok_and(|meta| meta.is_dir()) {
@@ -111,6 +111,17 @@ fn walk_glob(arg: &str, cwd: &Path, configs: &Configs, found: &Mutex<Found>) {
         Err(e) => Found::push(found, |f| {
             f.errors.push(format!("{arg}: invalid glob: {}", e.kind()));
         }),
+    }
+}
+
+/// On Windows `\` separates folders (`C:\repo\docs\*.md`) and can't escape a glob character, so
+/// it becomes `/`. Everywhere else it is left alone. (`windows` is a parameter so that a test on
+/// any OS covers the Windows rule.)
+fn glob_separators(arg: &str, windows: bool) -> String {
+    if windows {
+        arg.replace('\\', "/")
+    } else {
+        arg.to_string()
     }
 }
 
@@ -125,11 +136,16 @@ fn split_glob(arg: &str) -> (String, String) {
     let join = |parts: Option<&[&str]>| parts.unwrap_or_default().join("/");
     let prefix = match join(parts.get(..at)) {
         _ if at == 0 => ".".to_string(),
-        // `/*.md`: the root.
-        prefix if prefix.is_empty() => "/".to_string(),
+        // `/*.md`: the root; `C:/*.md`: the root of a drive, not its current folder.
+        prefix if prefix.is_empty() || is_drive(&prefix) => format!("{prefix}/"),
         prefix => prefix,
     };
     (prefix, join(parts.get(at..)))
+}
+
+/// `C:`.
+fn is_drive(prefix: &str) -> bool {
+    matches!(prefix.as_bytes(), [letter, b':'] if letter.is_ascii_alphabetic())
 }
 
 /// Walks `root` and records the files to lint: with `glob`, the ones it matches (relative to
@@ -236,5 +252,23 @@ mod tests {
         assert_eq!(split("/x/y/*.md"), ("/x/y".into(), "*.md".into()));
         assert_eq!(split("x/{a/b,c}"), ("x".into(), "{a/b,c}".into()));
         assert_eq!(split("{a/b,c}/*.md"), (".".into(), "{a/b,c}/*.md".into()));
+    }
+
+    #[test]
+    fn windows_globs_split_like_slash_globs() {
+        let split = |arg: &str| split_glob(&glob_separators(arg, true));
+        assert_eq!(
+            split(r"C:\repo\docs\*.md"),
+            ("C:/repo/docs".into(), "*.md".into())
+        );
+        assert_eq!(
+            split(r"..\other\**\*.md"),
+            ("../other".into(), "**/*.md".into())
+        );
+        assert_eq!(split(r"docs\*.md"), ("docs".into(), "*.md".into()));
+        // A drive root is a folder, not the drive's current folder.
+        assert_eq!(split(r"C:\*.md"), ("C:/".into(), "*.md".into()));
+        // Elsewhere `\` is a file name character (and a glob escape), so it stays.
+        assert_eq!(glob_separators(r"a\[b].md", false), r"a\[b].md");
     }
 }
