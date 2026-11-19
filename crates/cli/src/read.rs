@@ -60,7 +60,6 @@ pub fn read_for_lint(reader: impl Read) -> Result<String, ReadError> {
 }
 
 /// The whole file.
-#[cfg_attr(not(test), expect(dead_code, reason = "used by --fix in Task 9"))]
 pub fn read_whole(mut reader: impl Read) -> Result<String, ReadError> {
     let mut buf = Vec::new();
     reader.read_to_end(&mut buf)?;

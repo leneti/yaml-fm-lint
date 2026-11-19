@@ -97,10 +97,11 @@ fn summary_lines(summary: &Summary, out: &mut String) {
         files_with_problems,
         fixed_problems,
         fixed_files,
+        fix,
         elapsed_ms,
     } = summary;
     let total = format!("{} in {elapsed_ms} ms", count(*files, "file"));
-    if *fixed_problems > 0 {
+    if *fix {
         let _ = writeln!(
             out,
             "fixed {} in {}",

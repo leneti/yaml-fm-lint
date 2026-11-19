@@ -7,6 +7,7 @@ mod paths;
 mod read;
 mod run;
 mod walk;
+mod write;
 
 use std::io::Write;
 use std::process::ExitCode;
