@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use jsonc_parser::{ParseOptions, parse_to_serde_value};
 use serde_json::{Map, Value};
 
+use crate::files::check_pattern;
 use crate::{Config, ConfigError, ConfigErrorKind, FilePattern, Level, RuleId};
 
 /// One config file, already read by the caller.
@@ -233,15 +234,27 @@ impl Parser<'_> {
         }
     }
 
-    fn patterns(&self, value: &Value, pointer: &str) -> Result<Vec<FilePattern>, ConfigError> {
-        Ok(self
-            .strings(value, pointer)?
+    /// `list` is `include` or `exclude`.
+    fn patterns(
+        &self,
+        value: &Value,
+        pointer: &str,
+        list: &str,
+    ) -> Result<Vec<FilePattern>, ConfigError> {
+        self.strings(value, pointer)?
             .into_iter()
-            .map(|pattern| FilePattern {
-                dir: self.dir.to_string(),
-                pattern,
+            .enumerate()
+            .map(|(index, pattern)| {
+                check_pattern(&pattern, list, index).map_err(|e| ConfigError {
+                    file: Some(self.file.to_string()),
+                    ..e
+                })?;
+                Ok(FilePattern {
+                    dir: self.dir.to_string(),
+                    pattern,
+                })
             })
-            .collect())
+            .collect()
     }
 
     fn layer(&self, object: &Map<String, Value>) -> Result<Layer, ConfigError> {
@@ -283,8 +296,8 @@ impl Parser<'_> {
             let pointer = format!("{pointer}/{}", segment(key));
             match key.as_str() {
                 "extensions" => layer.extensions = Some(self.strings(value, &pointer)?),
-                "include" => layer.include = Some(self.patterns(value, &pointer)?),
-                "exclude" => layer.exclude = Some(self.patterns(value, &pointer)?),
+                "include" => layer.include = Some(self.patterns(value, &pointer, "include")?),
+                "exclude" => layer.exclude = Some(self.patterns(value, &pointer, "exclude")?),
                 _ => return self.unknown_key(&pointer, key, false),
             }
         }

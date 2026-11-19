@@ -1326,6 +1326,7 @@ dependencies = [
 name = "yaml-fm-lint-core"
 version = "2.0.0-dev"
 dependencies = [
+ "globset",
  "insta",
  "jsonc-parser",
  "jsonschema",

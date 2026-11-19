@@ -29,6 +29,7 @@ mod document;
 mod edit;
 mod error;
 mod extract;
+mod files;
 mod fix;
 #[cfg(feature = "invariants")]
 pub mod invariants;
@@ -48,6 +49,7 @@ pub use diagnostic::{
     Applicability, DataEffect, Diagnostic, Fix, PathStep, Severity, TextEdit, TextRange,
 };
 pub use error::{ConfigError, ConfigErrorKind, FixError};
+pub use extract::MAX_FRONT_MATTER_BYTES;
 pub use fix::{REFUSED_NOTE, SKIPPED_NOTE};
 pub use line_index::{LineIndex, Position};
 pub use linter::{FixOutcome, LintReport, Linter};
