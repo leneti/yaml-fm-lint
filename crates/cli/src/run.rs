@@ -1,7 +1,6 @@
 //! Linting the files named on the command line.
 
 use std::io::{ErrorKind, Write};
-use std::path::Path;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
@@ -11,7 +10,9 @@ use yaml_fm_lint_core::{Applicability, Diagnostic, Severity};
 
 use crate::cli::Cli;
 use crate::configs::Configs;
-use crate::{output, paths};
+use crate::output;
+use crate::read::{ReadError, read_for_lint};
+use crate::walk::{Target, collect};
 
 /// What happened to one file.
 #[derive(Debug)]
@@ -104,12 +105,23 @@ pub fn lint(cli: &Cli) -> anyhow::Result<u8> {
     let started = Instant::now();
     let cwd = std::env::current_dir().context("can't find the current folder")?;
     let configs = Configs::new(cli.config.as_deref(), &cwd)?;
-    // shortcut: every path is read as a file; Task 6 adds folders, globs and the default ".".
-    let items = process(&cli.paths, &cwd, &configs, cli.quiet);
+    let collected = collect(&cli.paths, &cwd, &configs);
+    for line in &collected.errors {
+        write_stderr(line);
+    }
+    if let Some(line) = &collected.fatal {
+        write_stderr(line);
+        return Ok(2);
+    }
+    if collected.targets.is_empty() && collected.errors.is_empty() {
+        write_stderr("no files matched");
+        return Ok(2);
+    }
+    let items = process(&collected.targets, &configs, cli.quiet);
 
     let mut results = Vec::new();
     let mut config_error = None;
-    let mut fatal = false;
+    let mut fatal = !collected.errors.is_empty();
     for item in items {
         match item.outcome {
             Ok(result) => results.push(result),
@@ -148,16 +160,16 @@ fn write_stderr(line: &str) {
     let _ = writeln!(std::io::stderr().lock(), "{line}");
 }
 
-/// Lints every argument on worker threads; the items come back sorted by `display`.
-fn process(args: &[String], cwd: &Path, configs: &Configs, quiet: bool) -> Vec<Item> {
+/// Lints every target on worker threads; the items come back sorted by `display`.
+fn process(targets: &[Target], configs: &Configs, quiet: bool) -> Vec<Item> {
     let next = AtomicUsize::new(0);
-    let items = Mutex::new(Vec::with_capacity(args.len()));
+    let items = Mutex::new(Vec::with_capacity(targets.len()));
     let workers = std::thread::available_parallelism().map_or(1, usize::from);
     std::thread::scope(|scope| {
-        for _ in 0..workers.min(args.len()) {
+        for _ in 0..workers.min(targets.len()) {
             scope.spawn(|| {
-                while let Some(arg) = args.get(next.fetch_add(1, Ordering::Relaxed)) {
-                    let item = lint_file(arg, cwd, configs, quiet);
+                while let Some(target) = targets.get(next.fetch_add(1, Ordering::Relaxed)) {
+                    let item = lint_file(target, configs, quiet);
                     items
                         .lock()
                         .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -173,24 +185,28 @@ fn process(args: &[String], cwd: &Path, configs: &Configs, quiet: bool) -> Vec<I
     items
 }
 
-fn lint_file(arg: &str, cwd: &Path, configs: &Configs, quiet: bool) -> Item {
-    let path = paths::absolute(Path::new(arg), cwd);
-    let display = paths::display(&path, cwd);
+fn lint_file(target: &Target, configs: &Configs, quiet: bool) -> Item {
+    let Target { path, display, .. } = target;
+    let display = display.clone();
     let read_error = |line: String| Failure {
         line,
         is_config: false,
     };
     let outcome = (|| {
-        let bytes = std::fs::read(&path).map_err(|e| {
-            read_error(match e.kind() {
-                ErrorKind::NotFound => format!("{display}: no such file or directory"),
-                _ => format!("{display}: can't read: {e}"),
-            })
-        })?;
-        let text = String::from_utf8(bytes)
-            .map_err(|_| read_error(format!("{display}: not valid UTF-8")))?;
+        let text = std::fs::File::open(path)
+            .map_err(ReadError::Io)
+            .and_then(read_for_lint)
+            .map_err(|e| {
+                read_error(match e {
+                    ReadError::Io(e) if e.kind() == ErrorKind::NotFound => {
+                        format!("{display}: no such file or directory")
+                    }
+                    ReadError::Io(e) => format!("{display}: can't read: {e}"),
+                    ReadError::NotUtf8 => format!("{display}: not valid UTF-8"),
+                })
+            })?;
         let linter = configs
-            .linter_for(path.parent().unwrap_or(&path))
+            .linter_for(path.parent().unwrap_or(path))
             .map_err(|line| Failure {
                 line,
                 is_config: true,

@@ -4,7 +4,9 @@ mod cli;
 mod configs;
 mod output;
 mod paths;
+mod read;
 mod run;
+mod walk;
 
 use std::io::Write;
 use std::process::ExitCode;
