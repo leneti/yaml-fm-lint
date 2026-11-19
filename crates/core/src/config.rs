@@ -15,6 +15,36 @@ pub enum Level {
     Error,
 }
 
+/// One `files.include` or `files.exclude` pattern, with the folder it is relative to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilePattern {
+    /// The absolute, `/`-separated folder of the config file that set the pattern.
+    pub dir: String,
+    /// The pattern as written, including any leading `!`.
+    pub pattern: String,
+}
+
+/// Which files are linted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Files {
+    /// Extensions of the files to lint, each with its leading dot.
+    pub extensions: Vec<String>,
+    /// Patterns a path must match, if there are any.
+    pub include: Vec<FilePattern>,
+    /// Patterns that exclude paths; `!` re-includes and the last match wins.
+    pub exclude: Vec<FilePattern>,
+}
+
+impl Default for Files {
+    fn default() -> Self {
+        Files {
+            extensions: vec![".md".to_string()],
+            include: Vec::new(),
+            exclude: Vec::new(),
+        }
+    }
+}
+
 /// Linter configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -30,6 +60,10 @@ pub struct Config {
     /// the file and passes its text to [`Linter::new`](crate::Linter::new), which uses this
     /// only to name the schema in errors, and rejects a path given without that text.
     pub schema: Option<String>,
+    /// Which files are linted.
+    pub files: Files,
+    /// The config files this configuration came from, lowest priority first.
+    pub layers: Vec<String>,
 }
 
 impl Default for Config {
@@ -40,6 +74,8 @@ impl Default for Config {
             indent_size: 2,
             ignore_keys: Vec::new(),
             schema: None,
+            files: Files::default(),
+            layers: Vec::new(),
         }
     }
 }

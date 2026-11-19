@@ -452,6 +452,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonc-parser"
+version = "0.34.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ecded084f9b9a718d39668a42657c32253663d1f6afb3fbb9134f0305f73f48"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "jsonschema"
 version = "0.60.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1318,6 +1327,7 @@ name = "yaml-fm-lint-core"
 version = "2.0.0-dev"
 dependencies = [
  "insta",
+ "jsonc-parser",
  "jsonschema",
  "proptest",
  "regex",

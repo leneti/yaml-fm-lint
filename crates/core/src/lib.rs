@@ -21,6 +21,7 @@
 #![deny(missing_docs)]
 
 mod config;
+mod config_file;
 mod data;
 mod diagnostic;
 mod disable;
@@ -41,7 +42,8 @@ mod rules;
 mod testing;
 mod tree;
 
-pub use config::{Config, Level};
+pub use config::{Config, FilePattern, Files, Level};
+pub use config_file::{ConfigLayer, resolve_config};
 pub use diagnostic::{
     Applicability, DataEffect, Diagnostic, Fix, PathStep, Severity, TextEdit, TextRange,
 };

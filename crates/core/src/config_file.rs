@@ -1,0 +1,578 @@
+//! Parsing and validating `.yaml-fm-lint.json` files.
+//!
+//! The core does no I/O: the caller reads each file and passes its text in a [`ConfigLayer`].
+
+use std::collections::BTreeMap;
+
+use jsonc_parser::{ParseOptions, parse_to_serde_value};
+use serde_json::{Map, Value};
+
+use crate::{Config, ConfigError, ConfigErrorKind, FilePattern, Level, RuleId};
+
+/// One config file, already read by the caller.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfigLayer {
+    /// The absolute, `/`-separated folder of the file; relative paths in it resolve against this.
+    pub dir: String,
+    /// The path of the file, used to name it in errors and in [`Config::layers`].
+    pub path: String,
+    /// The text of the file.
+    pub source: String,
+}
+
+/// The settings of one config file, validated but not yet merged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Layer {
+    #[allow(dead_code)] // read by the cascade, once `resolve_config` handles several layers
+    root: Option<bool>,
+    extensions: Option<Vec<String>>,
+    include: Option<Vec<FilePattern>>,
+    exclude: Option<Vec<FilePattern>>,
+    ignore_keys: Option<Vec<String>>,
+    rules: BTreeMap<RuleId, RuleSetting>,
+    /// Already absolute.
+    schema: Option<String>,
+}
+
+/// A rule's value in a config file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RuleSetting {
+    /// `"error"`, `"warn"` or `"off"`.
+    Level(Level),
+    /// `["error" | "warn", {"keys": [...]}]` for `required-keys`.
+    RequiredKeys(Level, Vec<String>),
+    /// `["error" | "warn", {"size": n}]` for `indentation`.
+    Indentation(Level, u8),
+}
+
+/// Keys of 1.x configs, which 2.0 no longer reads.
+pub(crate) const LEGACY_KEYS: [&str; 8] = [
+    "requiredAttributes",
+    "disabledAttributes",
+    "mandatory",
+    "extensions",
+    "excludeDirs",
+    "extraExcludeDirs",
+    "excludeFiles",
+    "includeDirs",
+];
+
+const BAD_LEVEL: &str = r#"must be "error", "warn" or "off", or ["error" | "warn", {options}]"#;
+
+/// Builds the configuration from config files, lowest priority first, and an optional extra file
+/// that has the highest priority.
+// shortcut: applies every layer in order and ignores `root`, until the cascade handles it
+pub fn resolve_config(
+    layers: &[ConfigLayer],
+    extra: Option<&ConfigLayer>,
+) -> Result<Config, ConfigError> {
+    let mut config = Config::default();
+    for layer in layers.iter().chain(extra) {
+        apply(&mut config, &parse_layer(layer)?);
+        config.layers.push(layer.path.clone());
+    }
+    Ok(config)
+}
+
+/// Merges `layer` into `config`: each setting that is present replaces the existing one, and a
+/// rule's value replaces everything that rule had, options included.
+pub(crate) fn apply(config: &mut Config, layer: &Layer) {
+    if let Some(extensions) = &layer.extensions {
+        config.files.extensions.clone_from(extensions);
+    }
+    if let Some(include) = &layer.include {
+        config.files.include.clone_from(include);
+    }
+    if let Some(exclude) = &layer.exclude {
+        config.files.exclude.clone_from(exclude);
+    }
+    if let Some(ignore_keys) = &layer.ignore_keys {
+        config.ignore_keys.clone_from(ignore_keys);
+    }
+    if let Some(schema) = &layer.schema {
+        config.schema = Some(schema.clone());
+    }
+    for (rule, setting) in &layer.rules {
+        let (RuleSetting::Level(level)
+        | RuleSetting::RequiredKeys(level, _)
+        | RuleSetting::Indentation(level, _)) = setting;
+        config.rules.insert(*rule, *level);
+        match (rule, setting) {
+            (RuleId::RequiredKeys, RuleSetting::RequiredKeys(_, keys)) => {
+                config.required_keys.clone_from(keys);
+            }
+            (RuleId::RequiredKeys, _) => config.required_keys.clear(),
+            (RuleId::Indentation, RuleSetting::Indentation(_, size)) => config.indent_size = *size,
+            (RuleId::Indentation, _) => config.indent_size = Config::default().indent_size,
+            _ => {}
+        }
+    }
+}
+
+/// Parses and validates the text of one config file.
+pub(crate) fn parse_layer(layer: &ConfigLayer) -> Result<Layer, ConfigError> {
+    let options = ParseOptions {
+        allow_comments: true,
+        allow_loose_object_property_names: false,
+        allow_trailing_commas: true,
+        allow_missing_commas: false,
+        allow_single_quoted_strings: false,
+        allow_hexadecimal_numbers: false,
+        allow_unary_plus_numbers: false,
+        allow_bare_decimal_point_numbers: false,
+        allow_non_finite_numbers: false,
+        allow_extended_string_escapes: false,
+    };
+    let parser = Parser {
+        file: &layer.path,
+        dir: &layer.dir,
+    };
+    let value =
+        parse_to_serde_value::<Value>(&layer.source, &options).map_err(|e| ConfigError {
+            line: Some(e.line_display()),
+            column: Some(e.column_display()),
+            ..parser.failure(None, format!("invalid JSON: {}", e.kind()))
+        })?;
+    let Value::Object(object) = value else {
+        return Err(parser.failure(None, "config must be a JSON object".into()));
+    };
+    parser.layer(&object)
+}
+
+/// Validates one config file; `file` names it in errors and `dir` is what its paths are
+/// relative to.
+struct Parser<'a> {
+    file: &'a str,
+    dir: &'a str,
+}
+
+/// A JSON pointer segment for `key`.
+fn segment(key: &str) -> String {
+    key.replace('~', "~0").replace('/', "~1")
+}
+
+impl Parser<'_> {
+    fn failure(&self, pointer: Option<&str>, message: String) -> ConfigError {
+        ConfigError {
+            kind: ConfigErrorKind::Config,
+            file: Some(self.file.to_string()),
+            pointer: pointer.map(str::to_string),
+            line: None,
+            column: None,
+            message,
+        }
+    }
+
+    fn error<T>(&self, pointer: &str, message: &str) -> Result<T, ConfigError> {
+        Err(self.failure(Some(pointer), message.to_string()))
+    }
+
+    fn unknown_key<T>(&self, pointer: &str, key: &str, legacy: bool) -> Result<T, ConfigError> {
+        let hint = if legacy && LEGACY_KEYS.contains(&key) {
+            "; this looks like a 1.x config; run `yaml-fm-lint migrate`"
+        } else {
+            ""
+        };
+        self.error(pointer, &format!("unknown key `{key}`{hint}"))
+    }
+
+    fn boolean(&self, value: &Value, pointer: &str) -> Result<bool, ConfigError> {
+        match value {
+            Value::Bool(b) => Ok(*b),
+            _ => self.error(pointer, "must be true or false"),
+        }
+    }
+
+    fn string(&self, value: &Value, pointer: &str) -> Result<String, ConfigError> {
+        match value {
+            Value::String(s) => Ok(s.clone()),
+            _ => self.error(pointer, "must be a string"),
+        }
+    }
+
+    fn strings(&self, value: &Value, pointer: &str) -> Result<Vec<String>, ConfigError> {
+        let Value::Array(items) = value else {
+            return self.error(pointer, "must be an array of strings");
+        };
+        items
+            .iter()
+            .enumerate()
+            .map(|(i, item)| self.string(item, &format!("{pointer}/{i}")))
+            .collect()
+    }
+
+    fn object<'v>(
+        &self,
+        value: &'v Value,
+        pointer: &str,
+    ) -> Result<&'v Map<String, Value>, ConfigError> {
+        match value {
+            Value::Object(object) => Ok(object),
+            _ => self.error(pointer, "must be an object"),
+        }
+    }
+
+    fn patterns(&self, value: &Value, pointer: &str) -> Result<Vec<FilePattern>, ConfigError> {
+        Ok(self
+            .strings(value, pointer)?
+            .into_iter()
+            .map(|pattern| FilePattern {
+                dir: self.dir.to_string(),
+                pattern,
+            })
+            .collect())
+    }
+
+    fn layer(&self, object: &Map<String, Value>) -> Result<Layer, ConfigError> {
+        let mut layer = Layer {
+            root: None,
+            extensions: None,
+            include: None,
+            exclude: None,
+            ignore_keys: None,
+            rules: BTreeMap::new(),
+            schema: None,
+        };
+        for (key, value) in object {
+            let pointer = format!("/{}", segment(key));
+            match key.as_str() {
+                "$schema" => {
+                    self.string(value, &pointer)?;
+                }
+                "root" => layer.root = Some(self.boolean(value, &pointer)?),
+                "ignoreKeys" => layer.ignore_keys = Some(self.strings(value, &pointer)?),
+                "schema" => {
+                    layer.schema = Some(join_path(self.dir, &self.string(value, &pointer)?));
+                }
+                "files" => self.files(&mut layer, value, &pointer)?,
+                "rules" => {
+                    for (name, setting) in self.object(value, &pointer)? {
+                        let (rule, setting) = self.rule(name, setting)?;
+                        layer.rules.insert(rule, setting);
+                    }
+                }
+                _ => return self.unknown_key(&pointer, key, true),
+            }
+        }
+        Ok(layer)
+    }
+
+    fn files(&self, layer: &mut Layer, value: &Value, pointer: &str) -> Result<(), ConfigError> {
+        for (key, value) in self.object(value, pointer)? {
+            let pointer = format!("{pointer}/{}", segment(key));
+            match key.as_str() {
+                "extensions" => layer.extensions = Some(self.strings(value, &pointer)?),
+                "include" => layer.include = Some(self.patterns(value, &pointer)?),
+                "exclude" => layer.exclude = Some(self.patterns(value, &pointer)?),
+                _ => return self.unknown_key(&pointer, key, false),
+            }
+        }
+        Ok(())
+    }
+
+    fn rule(&self, name: &str, value: &Value) -> Result<(RuleId, RuleSetting), ConfigError> {
+        let pointer = format!("/rules/{}", segment(name));
+        let Some(rule) = RuleId::from_name(name) else {
+            return self.error(&pointer, &format!("unknown rule `{name}`"));
+        };
+        if !rule.is_configurable() {
+            return self.error(&pointer, &format!("rule `{rule}` can't be configured"));
+        }
+        let (level, options) = match value {
+            Value::String(s) => (self.level(s, true, &pointer)?, None),
+            Value::Array(items) => match items.as_slice() {
+                [Value::String(s), options] => (self.level(s, false, &pointer)?, Some(options)),
+                _ => return self.error(&pointer, BAD_LEVEL),
+            },
+            _ => return self.error(&pointer, BAD_LEVEL),
+        };
+        let Some(options) = options else {
+            return Ok((rule, RuleSetting::Level(level)));
+        };
+        let options_pointer = format!("{pointer}/1");
+        match rule {
+            RuleId::RequiredKeys => {
+                let mut keys = Vec::new();
+                for (key, value) in self.object(options, &options_pointer)? {
+                    let pointer = format!("{options_pointer}/{}", segment(key));
+                    match key.as_str() {
+                        "keys" => keys = self.strings(value, &pointer)?,
+                        _ => return self.error(&pointer, &format!("unknown option `{key}`")),
+                    }
+                }
+                Ok((rule, RuleSetting::RequiredKeys(level, keys)))
+            }
+            RuleId::Indentation => {
+                let mut size = Config::default().indent_size;
+                for (key, value) in self.object(options, &options_pointer)? {
+                    let pointer = format!("{options_pointer}/{}", segment(key));
+                    match key.as_str() {
+                        "size" => {
+                            size = match value.as_u64().and_then(|n| u8::try_from(n).ok()) {
+                                Some(n @ 1..=8) => n,
+                                _ => return self.error(&pointer, "must be an integer from 1 to 8"),
+                            };
+                        }
+                        _ => return self.error(&pointer, &format!("unknown option `{key}`")),
+                    }
+                }
+                Ok((rule, RuleSetting::Indentation(level, size)))
+            }
+            _ => self.error(&pointer, &format!("rule `{rule}` takes no options")),
+        }
+    }
+
+    /// `"off"` is only allowed when the level stands alone, not in `[level, options]`.
+    fn level(&self, text: &str, allow_off: bool, pointer: &str) -> Result<Level, ConfigError> {
+        match text {
+            "error" => Ok(Level::Error),
+            "warn" => Ok(Level::Warn),
+            "off" if allow_off => Ok(Level::Off),
+            _ => self.error(pointer, BAD_LEVEL),
+        }
+    }
+}
+
+/// Resolves `rel` against the absolute folder `dir`, folding `.` and `..` without touching the
+/// file system. `\` counts as `/`, and an absolute `rel` (`/…`, `//…` or `X:/…`) is returned as
+/// it is.
+pub(crate) fn join_path(dir: &str, rel: &str) -> String {
+    let rel = rel.replace('\\', "/");
+    if root_len(&rel) > 0 {
+        return rel;
+    }
+    let joined = format!("{}/{rel}", dir.trim_end_matches('/'));
+    let (root, rest) = joined
+        .split_at_checked(root_len(&joined))
+        .unwrap_or(("", &joined));
+    let mut parts: Vec<&str> = Vec::new();
+    for part in rest.split('/') {
+        match part {
+            "" | "." => {}
+            // shortcut: `..` at the root is dropped, and so is one that climbs out of a UNC
+            // share's name; fine while `dir` is a real folder, upgrade if shares matter
+            ".." => {
+                parts.pop();
+            }
+            _ => parts.push(part),
+        }
+    }
+    format!("{root}{}", parts.join("/"))
+}
+
+/// The length of the root in `path` (`/`, `//` or `X:/`), or 0 for a relative path.
+fn root_len(path: &str) -> usize {
+    let mut chars = path.chars();
+    match (chars.next(), chars.next(), chars.next()) {
+        (Some('/'), Some('/'), _) => 2,
+        (Some('/'), _, _) => 1,
+        (Some(drive), Some(':'), Some('/')) if drive.is_ascii_alphabetic() => 3,
+        _ => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Config, FilePattern, Level, RuleId};
+    use rstest::rstest;
+
+    const PATH: &str = "/r/.yaml-fm-lint.json";
+
+    fn layer(src: &str) -> ConfigLayer {
+        ConfigLayer {
+            dir: "/r".into(),
+            path: PATH.into(),
+            source: src.into(),
+        }
+    }
+
+    fn resolve(src: &str) -> Config {
+        resolve_config(&[layer(src)], None).unwrap()
+    }
+
+    fn err(src: &str) -> crate::ConfigError {
+        resolve_config(&[layer(src)], None).unwrap_err()
+    }
+
+    const BAD_LEVEL: &str = r#"must be "error", "warn" or "off", or ["error" | "warn", {options}]"#;
+
+    #[test]
+    fn empty_object_gives_defaults() {
+        assert_eq!(
+            resolve("{}"),
+            Config {
+                layers: vec![PATH.into()],
+                ..Config::default()
+            }
+        );
+    }
+
+    #[test]
+    fn jsonc_comments_and_trailing_commas() {
+        let config = resolve("{\n // c\n \"ignoreKeys\": [\"a\",],\n}");
+        assert_eq!(config.ignore_keys, ["a"]);
+    }
+
+    #[rstest]
+    #[case::single_quotes("{'root': true}")]
+    #[case::bare_key("{root: true}")]
+    #[case::missing_comma(r#"{"root": true "ignoreKeys": []}"#)]
+    #[case::hex(r#"{"root": 0x1}"#)]
+    fn json5_extras_rejected(#[case] src: &str) {
+        let e = err(src);
+        assert!(e.message.starts_with("invalid JSON: "), "{}", e.message);
+        assert!(e.line.is_some() && e.column.is_some());
+        if src.starts_with("{'") {
+            assert_eq!((e.line, e.column), (Some(1), Some(2)));
+        }
+    }
+
+    #[rstest]
+    #[case("")]
+    #[case("null")]
+    #[case("[]")]
+    fn not_an_object(#[case] src: &str) {
+        let e = err(src);
+        assert_eq!(e.message, "config must be a JSON object");
+        assert_eq!(e.pointer, None);
+    }
+
+    #[rstest]
+    #[case(r#"{"rulez": {}}"#, "/rulez", "unknown key `rulez`")]
+    #[case(
+        r#"{"excludeDirs": ["x"]}"#,
+        "/excludeDirs",
+        "unknown key `excludeDirs`; this looks like a 1.x config; run `yaml-fm-lint migrate`"
+    )]
+    #[case(r#"{"root": "yes"}"#, "/root", "must be true or false")]
+    #[case(r#"{"ignoreKeys": "a"}"#, "/ignoreKeys", "must be an array of strings")]
+    #[case(r#"{"ignoreKeys": [1]}"#, "/ignoreKeys/0", "must be a string")]
+    #[case(r#"{"files": []}"#, "/files", "must be an object")]
+    #[case(r#"{"files": {"globs": []}}"#, "/files/globs", "unknown key `globs`")]
+    #[case(
+        r#"{"files": {"extensions": [".md", 2]}}"#,
+        "/files/extensions/1",
+        "must be a string"
+    )]
+    #[case(r#"{"schema": 1}"#, "/schema", "must be a string")]
+    #[case(r#"{"$schema": 1}"#, "/$schema", "must be a string")]
+    #[case(r#"{"rules": []}"#, "/rules", "must be an object")]
+    fn key_errors(#[case] src: &str, #[case] pointer: &str, #[case] message: &str) {
+        let e = err(src);
+        assert_eq!(e.pointer.as_deref(), Some(pointer));
+        assert_eq!(e.message, message);
+        assert_eq!(e.kind, crate::ConfigErrorKind::Config);
+        assert_eq!(e.file.as_deref(), Some(PATH));
+    }
+
+    #[rstest]
+    #[case(r#""nope": "off""#, "/rules/nope", "unknown rule `nope`")]
+    #[case(
+        r#""yaml-syntax": "off""#,
+        "/rules/yaml-syntax",
+        "rule `yaml-syntax` can't be configured"
+    )]
+    #[case(r#""no-quotes": "warning""#, "/rules/no-quotes", BAD_LEVEL)]
+    #[case(
+        r#""no-quotes": ["error", {}]"#,
+        "/rules/no-quotes",
+        "rule `no-quotes` takes no options"
+    )]
+    #[case(
+        r#""required-keys": ["off", {"keys": []}]"#,
+        "/rules/required-keys",
+        BAD_LEVEL
+    )]
+    #[case(r#""required-keys": ["error"]"#, "/rules/required-keys", BAD_LEVEL)]
+    #[case(
+        r#""required-keys": ["error", 1]"#,
+        "/rules/required-keys/1",
+        "must be an object"
+    )]
+    #[case(
+        r#""required-keys": ["error", {"key": []}]"#,
+        "/rules/required-keys/1/key",
+        "unknown option `key`"
+    )]
+    #[case(
+        r#""required-keys": ["error", {"keys": "a"}]"#,
+        "/rules/required-keys/1/keys",
+        "must be an array of strings"
+    )]
+    #[case(
+        r#""indentation": ["warn", {"size": 9}]"#,
+        "/rules/indentation/1/size",
+        "must be an integer from 1 to 8"
+    )]
+    #[case(
+        r#""indentation": ["warn", {"size": 2.5}]"#,
+        "/rules/indentation/1/size",
+        "must be an integer from 1 to 8"
+    )]
+    fn rule_errors(#[case] rule: &str, #[case] pointer: &str, #[case] message: &str) {
+        let e = err(&format!(r#"{{"rules": {{{rule}}}}}"#));
+        assert_eq!(e.pointer.as_deref(), Some(pointer));
+        assert_eq!(e.message, message);
+        assert_eq!(e.kind, crate::ConfigErrorKind::Config);
+        assert_eq!(e.file.as_deref(), Some(PATH));
+    }
+
+    #[test]
+    fn every_error_names_the_file() {
+        for src in [
+            "{",
+            "[]",
+            r#"{"rulez": 1}"#,
+            r#"{"rules": {"nope": "off"}}"#,
+        ] {
+            assert_eq!(err(src).file.as_deref(), Some(PATH), "{src}");
+        }
+    }
+
+    #[test]
+    fn pointers_escape_keys() {
+        let e = err(r#"{"rules": {"a/b~c": "off"}}"#);
+        assert_eq!(e.pointer.as_deref(), Some("/rules/a~1b~0c"));
+    }
+
+    #[test]
+    fn rule_values_parse() {
+        let config = resolve(
+            r#"{"rules": {"no-commas": "off", "required-keys": ["warn", {"keys": ["title"]}],
+                "indentation": ["error", {"size": 4}]}}"#,
+        );
+        assert_eq!(config.level(RuleId::NoCommas), Level::Off);
+        assert_eq!(config.level(RuleId::RequiredKeys), Level::Warn);
+        assert_eq!(config.required_keys, ["title"]);
+        assert_eq!(config.indent_size, 4);
+
+        let config = resolve(r#"{"rules": {"required-keys": ["error", {}]}}"#);
+        assert!(config.required_keys.is_empty());
+        assert_eq!(config.indent_size, 2);
+    }
+
+    #[rstest]
+    #[case("/r", "./s/fm.json", "/r/s/fm.json")]
+    #[case("/r/sub", "../x.json", "/r/x.json")]
+    #[case("/r", "/abs.json", "/abs.json")]
+    #[case("C:/p", "s\\fm.json", "C:/p/s/fm.json")]
+    #[case("C:/p", "D:/x.json", "D:/x.json")]
+    #[case("/", "../a", "/a")]
+    fn paths_are_absolute(#[case] dir: &str, #[case] rel: &str, #[case] expected: &str) {
+        assert_eq!(join_path(dir, rel), expected);
+    }
+
+    #[test]
+    fn schema_and_patterns_resolve_against_the_layer_dir() {
+        let config = resolve(r#"{"schema": "./fm.json", "files": {"exclude": ["a/**"]}}"#);
+        assert_eq!(config.schema.as_deref(), Some("/r/fm.json"));
+        assert_eq!(
+            config.files.exclude,
+            [FilePattern {
+                dir: "/r".into(),
+                pattern: "a/**".into()
+            }]
+        );
+    }
+}
