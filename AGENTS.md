@@ -177,7 +177,11 @@ never let an editor trim whitespace in `crates/core/tests/snapshots/*.snap`.
   a depth limit.
 - Use only the linear-time `regex` engine for schema `pattern`.
 - `--fix` must re-parse and verify after each pass, never touch the body,
-  write atomically and never write through symlinks.
+  write atomically and never write through a symlinked file (a file symlink
+  named on the command line is linted, reported, and not fixed). Known limit:
+  a symlinked folder named explicitly, or as the prefix of a glob, is walked
+  and its files are written. The walk itself never follows links. `migrate
+  --write` replaces a symlinked `.yaml-fm-lint.json` with a regular file.
 - Supply chain: pin GitHub Actions to full commit SHAs, top-level
   `permissions: contents: read`, no `pull_request_target`,
   `persist-credentials: false` on checkout, no install scripts (npm installs

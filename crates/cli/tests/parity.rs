@@ -167,6 +167,13 @@ fn actual_2x() -> BTreeMap<String, BTreeSet<Problem>> {
             .collect();
         by_fixture.insert(path, set);
     }
+    // A fixture that 2.0 no longer walks would show up as "no problems" and could hide a
+    // difference.
+    assert_eq!(
+        by_fixture.keys().cloned().collect::<Vec<_>>(),
+        fixtures(),
+        "2.0 reported on a different set of files than the fixtures"
+    );
     by_fixture
 }
 
@@ -218,6 +225,7 @@ fn allowed_diffs_are_well_formed() {
     let allowed = allowed();
     let kebab = regex::Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").unwrap();
     let mut ids = BTreeSet::new();
+    let mut tuples = BTreeSet::new();
     for diff in &allowed.diff {
         assert!(
             kebab.is_match(&diff.id),
@@ -243,6 +251,12 @@ fn allowed_diffs_are_well_formed() {
                 "{}: bad change {}",
                 diff.id,
                 m.change
+            );
+            let tuple = (&m.fixture, &m.rule, m.line, &m.change);
+            assert!(
+                tuples.insert(tuple),
+                "{}: {tuple:?} is listed by more than one entry",
+                diff.id
             );
         }
     }

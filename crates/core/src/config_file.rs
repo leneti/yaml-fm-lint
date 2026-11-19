@@ -586,6 +586,36 @@ mod tests {
         assert_eq!(config.indent_size, 2);
     }
 
+    /// Options belong to the rule's value: an empty `{}` or a plain level in a later file means
+    /// the defaults, not what an earlier file set.
+    #[test]
+    fn a_later_value_replaces_options_with_the_defaults() {
+        let config = resolve(r#"{"rules": {"indentation": ["error", {}]}}"#);
+        assert_eq!(config.indent_size, 2);
+        let layers = |later: &str| {
+            let first = layer(r#"{"rules": {"indentation": ["error", {"size": 4}]}}"#);
+            let second = ConfigLayer {
+                dir: "/r/sub".into(),
+                path: "/r/sub/.yaml-fm-lint.json".into(),
+                source: later.into(),
+            };
+            resolve_config(&[first, second], None).unwrap()
+        };
+        assert_eq!(layers("{}").indent_size, 4);
+        assert_eq!(
+            layers(r#"{"rules": {"indentation": "warn"}}"#).indent_size,
+            2
+        );
+        assert_eq!(
+            layers(r#"{"rules": {"indentation": ["error", {}]}}"#).indent_size,
+            2
+        );
+        assert_eq!(
+            layers(r#"{"rules": {"indentation": "off"}}"#).indent_size,
+            2
+        );
+    }
+
     #[rstest]
     #[case("/r", "./s/fm.json", "/r/s/fm.json")]
     #[case("/r/sub", "../x.json", "/r/x.json")]
