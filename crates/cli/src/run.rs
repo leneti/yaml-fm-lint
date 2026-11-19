@@ -114,10 +114,6 @@ struct Item {
 
 /// Lints the files named in `cli.paths` and prints the report; returns the exit code.
 pub fn lint(cli: &Cli) -> anyhow::Result<u8> {
-    // shortcut: subcommands are refused until Task 10 adds them.
-    if cli.command.is_some() {
-        anyhow::bail!("this option is not available yet");
-    }
     if cli.stdin && !cli.paths.is_empty() {
         anyhow::bail!("--stdin can't be combined with paths");
     }
@@ -171,7 +167,7 @@ pub fn lint(cli: &Cli) -> anyhow::Result<u8> {
 }
 
 /// Writes `text` to `out`. A reader that went away (`| head`) is not an error.
-fn emit(mut out: impl Write, text: &str) -> anyhow::Result<()> {
+pub fn emit(mut out: impl Write, text: &str) -> anyhow::Result<()> {
     match out.write_all(text.as_bytes()).and_then(|()| out.flush()) {
         Err(e) if e.kind() != ErrorKind::BrokenPipe => anyhow::bail!("can't write output: {e}"),
         _ => Ok(()),
@@ -252,7 +248,7 @@ fn check(
     (result, changed)
 }
 
-fn write_stderr(line: &str) {
+pub fn write_stderr(line: &str) {
     // Nobody to tell if stderr is closed.
     let _ = writeln!(std::io::stderr().lock(), "{line}");
 }

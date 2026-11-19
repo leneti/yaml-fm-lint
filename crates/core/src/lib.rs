@@ -44,7 +44,7 @@ mod testing;
 mod tree;
 
 pub use config::{Config, FilePattern, Files, Level};
-pub use config_file::{ConfigLayer, resolve_config};
+pub use config_file::{ConfigLayer, LEGACY_KEYS, resolve_config};
 pub use diagnostic::{
     Applicability, DataEffect, Diagnostic, Fix, PathStep, Severity, TextEdit, TextRange,
 };

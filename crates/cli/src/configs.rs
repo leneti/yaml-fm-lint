@@ -65,10 +65,20 @@ impl Configs {
         built
     }
 
-    fn build(&self, state: &mut State, dir: &Path) -> Result<Arc<Linter>, String> {
+    /// The settings for files in `dir` (absolute), or the line to print on stderr. Reads no
+    /// schema.
+    pub fn config_for(&self, dir: &Path) -> Result<Config, String> {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        self.config_in(&mut state, dir)
+    }
+
+    fn config_in(&self, state: &mut State, dir: &Path) -> Result<Config, String> {
         let chain = chain(&mut state.chains, dir)?;
-        let config = resolve_config(&chain, self.extra.as_ref())
-            .map_err(|e| format!("config error: {e}"))?;
+        resolve_config(&chain, self.extra.as_ref()).map_err(|e| format!("config error: {e}"))
+    }
+
+    fn build(&self, state: &mut State, dir: &Path) -> Result<Arc<Linter>, String> {
+        let config = self.config_in(state, dir)?;
         if let Some(found) = state.by_layers.get(&config.layers) {
             return found.clone();
         }

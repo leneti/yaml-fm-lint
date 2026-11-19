@@ -46,7 +46,7 @@ pub(crate) enum RuleSetting {
 }
 
 /// Keys of 1.x configs, which 2.0 no longer reads.
-pub(crate) const LEGACY_KEYS: [&str; 8] = [
+pub const LEGACY_KEYS: [&str; 8] = [
     "requiredAttributes",
     "disabledAttributes",
     "mandatory",
