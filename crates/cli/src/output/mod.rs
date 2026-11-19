@@ -1,12 +1,15 @@
 //! Output formats.
 
-use yaml_fm_lint_core::LineIndex;
+use yaml_fm_lint_core::{LineIndex, Severity};
 
 use crate::cli::Format;
 use crate::run::{FileResult, Summary};
 
 mod compact;
+mod github;
 mod human;
+mod json;
+mod sarif;
 
 /// A place in a file as users see it: 1-based line and column (counted in characters), and the
 /// byte offset from the start of the file.
@@ -14,22 +17,26 @@ mod human;
 pub struct Pos {
     pub line: usize,
     pub column: usize,
-    #[expect(dead_code, reason = "read by the json format")]
     pub offset: usize,
 }
 
-/// The start and exclusive end of each diagnostic of `result`, in order. Every format gets its
-/// positions here, from one `LineIndex` per file.
-pub fn positions(result: &FileResult) -> Vec<(Pos, Pos)> {
+/// A function from byte offsets in `result`'s text to positions, from one `LineIndex` per file.
+fn position_of(result: &FileResult) -> impl Fn(usize) -> Pos {
     let index = LineIndex::new(result.text.as_deref().unwrap_or_default());
-    let pos = |offset| {
+    move |offset| {
         let at = index.position(offset);
         Pos {
             line: at.line + 1,
             column: at.chars + 1,
             offset,
         }
-    };
+    }
+}
+
+/// The start and exclusive end of each diagnostic of `result`, in order. Every format gets its
+/// positions here.
+pub fn positions(result: &FileResult) -> Vec<(Pos, Pos)> {
+    let pos = position_of(result);
     result
         .diagnostics
         .iter()
@@ -37,12 +44,22 @@ pub fn positions(result: &FileResult) -> Vec<(Pos, Pos)> {
         .collect()
 }
 
+/// How formats name a severity.
+fn severity_name(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Error => "error",
+        Severity::Warning => "warning",
+    }
+}
+
 /// The whole output of the run in `format`; `results` are sorted by `display`.
-// The other formats render as compact until they have their own renderers.
 pub fn render(format: Format, results: &[FileResult], summary: &Summary) -> String {
     match format {
         Format::Human => human::render(results, summary),
-        Format::Compact | Format::Json | Format::Sarif | Format::Github => compact::render(results),
+        Format::Compact => compact::render(results),
+        Format::Json => json::render(results, summary),
+        Format::Sarif => sarif::render(results),
+        Format::Github => github::render(results),
     }
 }
 

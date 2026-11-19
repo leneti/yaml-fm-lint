@@ -1,0 +1,214 @@
+{
+  "$id": "https://unpkg.com/yaml-fm-lint@2/output.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "yaml-fm-lint output",
+  "description": "The output of `yaml-fm-lint --format json`.",
+  "type": "object",
+  "properties": {
+    "files": {
+      "description": "Every linted file, sorted by path.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/JsonFile"
+      }
+    },
+    "summary": {
+      "description": "The totals.",
+      "$ref": "#/$defs/JsonSummary"
+    },
+    "version": {
+      "description": "The version of this format.",
+      "type": "integer",
+      "format": "uint32",
+      "const": 1,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "files",
+    "summary"
+  ],
+  "$defs": {
+    "JsonApplicability": {
+      "type": "string",
+      "enum": [
+        "automatic",
+        "suggestion"
+      ]
+    },
+    "JsonDiagnostic": {
+      "type": "object",
+      "properties": {
+        "end": {
+          "description": "Where it ends, exclusive.",
+          "$ref": "#/$defs/JsonPosition"
+        },
+        "fix": {
+          "description": "How to fix it, when there is a fix.",
+          "$ref": "#/$defs/JsonFix"
+        },
+        "message": {
+          "type": "string"
+        },
+        "rule": {
+          "description": "The rule that found the problem.",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/JsonSeverity"
+        },
+        "start": {
+          "description": "Where the problem starts.",
+          "$ref": "#/$defs/JsonPosition"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "rule",
+        "severity",
+        "message",
+        "start",
+        "end"
+      ]
+    },
+    "JsonEdit": {
+      "type": "object",
+      "properties": {
+        "end": {
+          "description": "The end of the text replaced, exclusive.",
+          "$ref": "#/$defs/JsonPosition"
+        },
+        "newText": {
+          "description": "What replaces it.",
+          "type": "string"
+        },
+        "start": {
+          "description": "The start of the text replaced.",
+          "$ref": "#/$defs/JsonPosition"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "newText"
+      ]
+    },
+    "JsonFile": {
+      "type": "object",
+      "properties": {
+        "diagnostics": {
+          "description": "The problems in the file; empty when it is clean.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JsonDiagnostic"
+          }
+        },
+        "path": {
+          "description": "The path, as given on the command line or found by walking, with `/` separators.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "diagnostics"
+      ]
+    },
+    "JsonFix": {
+      "type": "object",
+      "properties": {
+        "applicability": {
+          "description": "`automatic` fixes are applied by `--fix`; `suggestion`s are only offered.",
+          "$ref": "#/$defs/JsonApplicability"
+        },
+        "edits": {
+          "description": "The changes, sorted and not overlapping.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JsonEdit"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "applicability",
+        "edits"
+      ]
+    },
+    "JsonPosition": {
+      "type": "object",
+      "properties": {
+        "column": {
+          "description": "Counted from 1, in characters.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1
+        },
+        "line": {
+          "description": "Counted from 1.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 1
+        },
+        "offset": {
+          "description": "Counted from 0, in bytes from the start of the file.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "line",
+        "column",
+        "offset"
+      ]
+    },
+    "JsonSeverity": {
+      "type": "string",
+      "enum": [
+        "error",
+        "warning"
+      ]
+    },
+    "JsonSummary": {
+      "type": "object",
+      "properties": {
+        "errors": {
+          "description": "Problems with severity `error`.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "files": {
+          "description": "Files linted.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "fixable": {
+          "description": "Problems with an automatic fix.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "warnings": {
+          "description": "Problems with severity `warning`.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "errors",
+        "warnings",
+        "fixable",
+        "files"
+      ]
+    }
+  }
+}
