@@ -221,3 +221,97 @@ fn read_errors_are_listed_before_a_config_error() {
                 .unwrap(),
         );
 }
+
+const MIB: usize = 1 << 20;
+
+/// `{}` padded with spaces to `len` bytes.
+fn json_of(len: usize) -> Vec<u8> {
+    let mut text = b"{}".to_vec();
+    text.resize(len, b' ');
+    text
+}
+
+/// A config or schema file is read whole, so it has a size limit of 1 MiB.
+#[test]
+fn oversized_config_and_schema_files_are_refused() {
+    let big = json_of(MIB + 1);
+    let dir = project(&[
+        (".yaml-fm-lint.json", &big),
+        ("ci.json", &big),
+        ("s/.yaml-fm-lint.json", br#"{"schema": "../big.json"}"#),
+        ("big.json", &big),
+        ("a.md", OK),
+        ("s/a.md", OK),
+    ]);
+    let run = |args: &[&str], needle: &str| {
+        let output = yfl(dir.path())
+            .args(["--format", "compact"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(needle), "{args:?}: {stderr}");
+        assert!(output.stdout.is_empty());
+    };
+    run(
+        &["a.md"],
+        "/.yaml-fm-lint.json: config file is larger than 1 MiB",
+    );
+    // A `--config` file that is too large, with the project's own config out of the way.
+    std::fs::write(dir.path().join(".yaml-fm-lint.json"), "{}").unwrap();
+    run(
+        &["--config", "ci.json", "a.md"],
+        "ci.json: config file is larger than 1 MiB",
+    );
+    run(&["s/a.md"], "/big.json: schema file is larger than 1 MiB");
+    // Exactly the limit is fine.
+    std::fs::write(dir.path().join(".yaml-fm-lint.json"), json_of(MIB)).unwrap();
+    yfl(dir.path())
+        .args(["--format", "compact", "a.md"])
+        .assert()
+        .code(0);
+}
+
+/// A FIFO would block the read for ever, a device like `/dev/zero` would never end.
+#[cfg(unix)]
+#[test]
+fn config_and_schema_that_are_not_regular_files_are_refused() {
+    use std::time::Duration;
+
+    let dir = project(&[
+        ("fifo/.yaml-fm-lint.json", b"{}"),
+        ("fifo/a.md", OK),
+        ("schema/.yaml-fm-lint.json", br#"{"schema": "./s.json"}"#),
+        ("schema/a.md", OK),
+        ("a.md", OK),
+    ]);
+    let fifo = |path: &str| {
+        let path = dir.path().join(path);
+        let _ = std::fs::remove_file(&path);
+        let made = std::process::Command::new("mkfifo").arg(&path).status();
+        assert!(made.unwrap().success());
+    };
+    fifo("fifo/.yaml-fm-lint.json");
+    fifo("schema/s.json");
+    fifo("ci.json");
+    let run = |args: &[&str], needle: &str| {
+        yfl(dir.path())
+            .timeout(Duration::from_secs(10))
+            .args(["--format", "compact"])
+            .args(args)
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(contains(needle));
+    };
+    run(
+        &["fifo/a.md"],
+        "fifo/.yaml-fm-lint.json: not a regular file",
+    );
+    run(&["schema/a.md"], "schema/s.json: not a regular file");
+    run(
+        &["--config", "ci.json", "a.md"],
+        "ci.json: not a regular file",
+    );
+}

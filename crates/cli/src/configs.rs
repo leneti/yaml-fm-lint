@@ -1,14 +1,14 @@
 //! Finding the config files that apply to a folder, and the linter they make.
 
 use std::collections::HashMap;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use anyhow::Context;
 use yaml_fm_lint_core::{Config, ConfigLayer, Linter, resolve_config};
 
 use crate::paths::slash;
+use crate::reason::reason;
 
 const CONFIG_FILE: &str = ".yaml-fm-lint.json";
 
@@ -37,8 +37,7 @@ impl Configs {
         let extra = extra
             .map(|path| {
                 let path = crate::paths::absolute(path, cwd);
-                let source = std::fs::read_to_string(&path)
-                    .with_context(|| format!("can't read config `{}`", slash(&path)))?;
+                let source = read_text_file(&path, "config").map_err(anyhow::Error::msg)?;
                 anyhow::Ok(ConfigLayer {
                     dir: slash(path.parent().unwrap_or(&path)),
                     path: slash(&path),
@@ -94,9 +93,7 @@ fn make_linter(config: Config) -> Result<Arc<Linter>, String> {
     let schema = config
         .schema
         .as_ref()
-        .map(|path| {
-            std::fs::read_to_string(path).map_err(|e| format!("can't read schema `{path}`: {e}"))
-        })
+        .map(|path| read_text_file(Path::new(path), "schema"))
         .transpose()?;
     Linter::new(config, schema.as_deref())
         .map(Arc::new)
@@ -129,16 +126,37 @@ fn chain(
 /// The config file in `dir`, if it has one.
 fn read_layer(dir: &Path) -> Result<Option<ConfigLayer>, String> {
     let path = dir.join(CONFIG_FILE);
-    match std::fs::read_to_string(&path) {
-        Ok(source) => Ok(Some(ConfigLayer {
-            dir: slash(dir),
-            path: slash(&path),
-            source,
-        })),
-        Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(format!(
-            "config error: can't read config `{}`: {e}",
-            slash(&path)
-        )),
+    if path
+        .metadata()
+        .is_err_and(|e| e.kind() == ErrorKind::NotFound)
+    {
+        return Ok(None);
     }
+    let source = read_text_file(&path, "config").map_err(|e| format!("config error: {e}"))?;
+    Ok(Some(ConfigLayer {
+        dir: slash(dir),
+        path: slash(&path),
+        source,
+    }))
+}
+
+/// The most a config or schema file may hold.
+const MAX_FILE_BYTES: u64 = 1 << 20;
+
+/// The text of the config or schema file (`what` says which) at `path`. Only regular files are
+/// read (a FIFO would block, `/dev/zero` never ends), and at most 1 MiB of them.
+fn read_text_file(path: &Path, what: &str) -> Result<String, String> {
+    let shown = slash(path);
+    let failed = |e: std::io::Error| format!("can't read {what} `{shown}`: {}", reason(&e));
+    if !std::fs::metadata(path).map_err(failed)?.is_file() {
+        return Err(format!("{shown}: not a regular file"));
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .and_then(|file| file.take(MAX_FILE_BYTES + 1).read_to_end(&mut bytes))
+        .map_err(failed)?;
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err(format!("{shown}: {what} file is larger than 1 MiB"));
+    }
+    String::from_utf8(bytes).map_err(|_| format!("{shown}: {what} file is not valid UTF-8"))
 }
