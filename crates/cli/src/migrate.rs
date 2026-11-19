@@ -5,13 +5,24 @@ use std::path::Path;
 
 use anyhow::Context;
 use serde_json::{Map, Value, json};
-use yaml_fm_lint_core::LEGACY_KEYS;
 
 use crate::paths::{absolute, display};
 use crate::run::{emit, write_stderr};
 use crate::write::write_atomic;
 
 const SCHEMA_URL: &str = "https://unpkg.com/yaml-fm-lint@2/config.schema.json";
+
+/// The 1.x keys `convert` handles. A unit test keeps this equal to core's `LEGACY_KEYS`.
+const HANDLED_KEYS: [&str; 8] = [
+    "requiredAttributes",
+    "disabledAttributes",
+    "mandatory",
+    "extensions",
+    "excludeDirs",
+    "extraExcludeDirs",
+    "excludeFiles",
+    "includeDirs",
+];
 
 /// Keys that only 2.0 configs have.
 const V2_KEYS: [&str; 6] = ["$schema", "root", "ignoreKeys", "schema", "files", "rules"];
@@ -78,14 +89,23 @@ pub fn convert(v1: &Value) -> Result<Migrated, String> {
         Some(value) => value.as_bool().ok_or("/mandatory: must be true or false")?,
     };
     let extensions = strings(object, "extensions")?;
-    let exclude_dirs = strings(object, "excludeDirs")?.unwrap_or_default();
-    let extra_exclude_dirs = strings(object, "extraExcludeDirs")?.unwrap_or_default();
+    // `drafts/` and `drafts` name the same folder.
+    let folders = |key| {
+        strings(object, key).map(|dirs| {
+            dirs.unwrap_or_default()
+                .into_iter()
+                .map(|dir| dir.trim_end_matches('/').to_string())
+                .collect::<Vec<_>>()
+        })
+    };
+    let exclude_dirs = folders("excludeDirs")?;
+    let extra_exclude_dirs = folders("extraExcludeDirs")?;
     let exclude_files = strings(object, "excludeFiles")?.unwrap_or_default();
-    let include_dirs = strings(object, "includeDirs")?.unwrap_or_default();
+    let include_dirs = folders("includeDirs")?;
 
     let mut notes: Vec<String> = object
         .keys()
-        .filter(|key| !LEGACY_KEYS.contains(&key.as_str()))
+        .filter(|key| !HANDLED_KEYS.contains(&key.as_str()))
         .map(|key| format!("dropped unknown key `{key}`"))
         .collect();
 
@@ -180,12 +200,23 @@ pub fn run(path: Option<&Path>, write: bool) -> anyhow::Result<u8> {
 
 #[cfg(test)]
 mod tests {
+    use yaml_fm_lint_core::LEGACY_KEYS;
+
     use super::*;
 
-    /// Fails when core learns another 1.x key that `convert` doesn't handle.
+    /// Fails when core learns another 1.x key until `convert` handles it.
     #[test]
-    fn every_legacy_key_is_handled() {
-        let v1: Map<String, Value> = LEGACY_KEYS
+    fn handled_keys_match_core() {
+        let mut handled = HANDLED_KEYS.to_vec();
+        let mut core = LEGACY_KEYS.to_vec();
+        handled.sort_unstable();
+        core.sort_unstable();
+        assert_eq!(handled, core);
+    }
+
+    #[test]
+    fn every_handled_key_is_known() {
+        let v1: Map<String, Value> = HANDLED_KEYS
             .iter()
             .map(|key| {
                 let value = if *key == "mandatory" {
@@ -198,6 +229,21 @@ mod tests {
             .collect();
         let migrated = convert(&Value::Object(v1)).unwrap();
         assert!(migrated.notes.is_empty(), "{:?}", migrated.notes);
+    }
+
+    #[test]
+    fn trailing_slashes_are_trimmed() {
+        let v1 = json!({"excludeDirs": ["drafts/", "build//"], "extraExcludeDirs": ["tmp/"], "includeDirs": ["drafts/keep/"]});
+        let migrated = convert(&v1).unwrap();
+        assert_eq!(
+            migrated.config["files"]["exclude"],
+            json!(["**/drafts/**", "**/tmp/**", "!**/drafts/keep/**"])
+        );
+        assert!(
+            migrated.notes[0].contains("(build)"),
+            "{:?}",
+            migrated.notes
+        );
     }
 
     #[test]

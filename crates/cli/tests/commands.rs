@@ -227,3 +227,23 @@ fn migrate_errors() {
     assert!(run(Some("not json"), &["migrate"]).contains("invalid JSON"));
     assert!(run(Some("[]"), &["migrate"]).contains("must be a JSON object"));
 }
+
+#[test]
+fn migrated_trailing_slash_dir_is_excluded() {
+    let dir = project(&[
+        (".yaml-fm-lint.json", br#"{"excludeDirs": ["drafts/"]}"#),
+        ("drafts/x.md", common::BAD),
+        ("a.md", common::OK),
+    ]);
+    let migrated = yfl(dir.path()).arg("migrate").output().unwrap();
+    assert_eq!(
+        stdout_json(&migrated)["files"]["exclude"],
+        json!(["**/drafts/**"])
+    );
+    std::fs::write(dir.path().join(".yaml-fm-lint.json"), migrated.stdout).unwrap();
+    let output = yfl(dir.path())
+        .args(["--format", "compact", "."])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0), "{:?}", output.stdout);
+}
