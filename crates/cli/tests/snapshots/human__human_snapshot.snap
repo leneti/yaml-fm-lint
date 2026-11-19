@@ -1,0 +1,17 @@
+---
+source: crates/cli/tests/human.rs
+expression: normalise(&out.stdout)
+---
+warning[single-space-after-colon]: more than one space after ":"
+ --> a.md:2:5
+  |
+2 | key:  value
+  |     ^^
+
+error[no-quotes]: unnecessary quotes
+ --> b.md:2:8
+  |
+2 | title: "Hello"
+  |        ^^^^^^^
+
+✘ 1 error, 1 warning in 2 files (2 fixable with --fix) · 3 files in <T> ms

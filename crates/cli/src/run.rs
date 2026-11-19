@@ -30,7 +30,6 @@ pub struct FileResult {
 
 /// The counts of a run.
 #[derive(Debug)]
-#[expect(dead_code, reason = "fields are read by later tasks")]
 pub struct Summary {
     pub errors: usize,
     pub warnings: usize,
@@ -141,7 +140,7 @@ pub fn lint(cli: &Cli) -> anyhow::Result<u8> {
         return Ok(2);
     }
     let summary = Summary::new(&results, started);
-    let text = output::render(cli.format, &results, &summary, true);
+    let text = output::render(cli.format, &results, &summary);
     let mut stdout = anstream::AutoStream::new(std::io::stdout().lock(), cli.color.choice());
     match stdout
         .write_all(text.as_bytes())

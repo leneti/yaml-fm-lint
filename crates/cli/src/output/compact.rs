@@ -4,7 +4,7 @@ use std::fmt::Write;
 
 use yaml_fm_lint_core::Severity;
 
-use super::positions;
+use super::{escape, positions};
 use crate::run::FileResult;
 
 pub fn render(results: &[FileResult]) -> String {
@@ -18,7 +18,11 @@ pub fn render(results: &[FileResult]) -> String {
             let _ = writeln!(
                 out,
                 "{}:{}:{}: {severity} [{}] {}",
-                result.display, start.line, start.column, d.rule, d.message
+                escape(&result.display),
+                start.line,
+                start.column,
+                d.rule,
+                escape(&d.message)
             );
         }
     }
