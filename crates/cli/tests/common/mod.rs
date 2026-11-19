@@ -38,6 +38,15 @@ pub fn project_without_git(files: &[(&str, &[u8])]) -> TempDir {
     dir
 }
 
+/// `dir` as an absolute path the binary and the test agree on: symlinks resolved (macOS `/var`),
+/// and without the `\\?\` prefix that Windows' `canonicalize` adds (its `?` would be a glob
+/// character in a path argument).
+pub fn plain_path(dir: &Path) -> String {
+    let canonical = std::fs::canonicalize(dir).unwrap();
+    let text = canonical.display().to_string();
+    text.strip_prefix(r"\\?\").unwrap_or(&text).to_string()
+}
+
 /// The binary, run in `dir`, with colour settings and the user's git configuration kept out.
 pub fn yfl(dir: &Path) -> Command {
     let mut command = Command::cargo_bin("yaml-fm-lint").unwrap();

@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::{BAD, project, project_without_git, yfl};
+use common::{BAD, plain_path, project, project_without_git, yfl};
 
 /// The `compact` lines of a run, as the files they name.
 fn files(dir: &std::path::Path, args: &[&str]) -> Vec<String> {
@@ -82,11 +82,27 @@ fn globs() {
         files(dir.path(), &["docs/*.{md,txt}"]),
         ["docs/d.md", "docs/n.txt"]
     );
-    let absolute = format!(
-        "{}/docs/*.md",
-        std::fs::canonicalize(dir.path()).unwrap().display()
-    );
+    let absolute = format!("{}/docs/*.md", plain_path(dir.path()));
     assert_eq!(files(dir.path(), &[&absolute]), ["docs/d.md"]);
+}
+
+/// An existing file whose name has glob characters (`[slug].md`, `[...slug].md`) is that file,
+/// not a pattern that happens to match something else.
+#[test]
+fn existing_names_with_glob_characters_are_literal() {
+    let dir = project(&[
+        ("blog/[slug].md", BAD),
+        ("blog/s.md", BAD),
+        ("[id]/a.md", BAD),
+        ("i/b.md", BAD),
+    ]);
+    assert_eq!(files(dir.path(), &["blog/[slug].md"]), ["blog/[slug].md"]);
+    let absolute = format!("{}/blog/[slug].md", plain_path(dir.path()));
+    assert_eq!(files(dir.path(), &[&absolute]), ["blog/[slug].md"]);
+    // A folder too.
+    assert_eq!(files(dir.path(), &["[id]"]), ["[id]/a.md"]);
+    // Nothing there: still a pattern.
+    assert_eq!(files(dir.path(), &["blog/[s]*.md"]), ["blog/s.md"]);
 }
 
 #[test]

@@ -302,3 +302,17 @@ fn stdin_with_paths_is_a_usage_error() {
         .code(2)
         .stderr(contains("--stdin can't be combined with paths"));
 }
+
+#[test]
+fn fix_writes_a_file_named_like_a_glob() {
+    let dir = project(&[("blog/[slug].md", BAD), ("blog/s.md", BAD)]);
+    yfl(dir.path())
+        .args(["--fix", "--format", "compact", "blog/[slug].md"])
+        .assert()
+        .code(0);
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("blog/[slug].md")).unwrap(),
+        FIXED
+    );
+    assert_eq!(std::fs::read(dir.path().join("blog/s.md")).unwrap(), BAD);
+}

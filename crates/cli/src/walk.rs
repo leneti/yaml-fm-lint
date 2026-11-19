@@ -57,11 +57,9 @@ pub fn collect(args: &[String], cwd: &Path, configs: &Configs) -> Collected {
     };
     let found = Mutex::new(Found::default());
     for arg in args {
-        if arg.contains(GLOB_CHARS) {
-            walk_glob(arg, cwd, configs, &found);
-            continue;
-        }
         let path = absolute(Path::new(arg), cwd);
+        // What exists under that name is that file or folder (`blog/[slug].md`), whatever
+        // characters the name has; only otherwise is a glob character a pattern.
         match std::fs::metadata(&path) {
             Ok(meta) if meta.is_dir() => walk(&path, None, cwd, configs, &found),
             Ok(meta) if meta.is_file() => Found::push(&found, |f| {
@@ -71,6 +69,7 @@ pub fn collect(args: &[String], cwd: &Path, configs: &Configs) -> Collected {
                     explicit: true,
                 });
             }),
+            _ if arg.contains(GLOB_CHARS) => walk_glob(arg, cwd, configs, &found),
             _ => Found::push(&found, |f| {
                 f.errors.push(format!(
                     "{}: no such file or directory",
