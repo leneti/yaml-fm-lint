@@ -312,8 +312,47 @@ fn migrate_read_error_is_explained_in_plain_words() {
     std::fs::create_dir(dir.path().join(".yaml-fm-lint.json")).unwrap();
     let output = yfl(dir.path()).arg("migrate").output().unwrap();
     assert_eq!(output.status.code(), Some(2));
-    assert_eq!(
-        String::from_utf8(output.stderr).unwrap(),
-        "error: .yaml-fm-lint.json: can't read: is a directory\n"
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.starts_with("error: "), "{stderr}");
+    assert!(stderr.contains("not a regular file"), "{stderr}");
+}
+
+#[test]
+fn migrate_refuses_an_oversized_input() {
+    let dir = project(&[]);
+    let before = std::fs::read_dir(dir.path()).unwrap().count();
+    let big = format!("{{\"extensions\": [\"{}\"]}}", "a".repeat(1024 * 1024));
+    std::fs::write(dir.path().join(".yaml-fm-lint.json"), big).unwrap();
+    let output = yfl(dir.path())
+        .args(["migrate", "--write"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("config file is larger than 1 MiB"),
+        "{stderr}"
     );
+    let left = std::fs::read_dir(dir.path()).unwrap().count();
+    assert_eq!(left, before + 1, "nothing is written next to the input");
+}
+
+#[cfg(unix)]
+#[test]
+fn migrate_refuses_a_fifo_input() {
+    let dir = project(&[]);
+    let made = std::process::Command::new("mkfifo")
+        .arg(dir.path().join(".yaml-fm-lint.json"))
+        .status();
+    assert!(made.unwrap().success());
+    let output = yfl(dir.path())
+        .timeout(std::time::Duration::from_secs(10))
+        .arg("migrate")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("not a regular file"), "{stderr}");
 }

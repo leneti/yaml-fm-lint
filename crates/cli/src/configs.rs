@@ -145,7 +145,7 @@ const MAX_FILE_BYTES: u64 = 1 << 20;
 
 /// The text of the config or schema file (`what` says which) at `path`. Only regular files are
 /// read (a FIFO would block, `/dev/zero` never ends), and at most 1 MiB of them.
-fn read_text_file(path: &Path, what: &str) -> Result<String, String> {
+pub(crate) fn read_text_file(path: &Path, what: &str) -> Result<String, String> {
     let shown = slash(path);
     let failed = |e: std::io::Error| format!("can't read {what} `{shown}`: {}", reason(&e));
     if !std::fs::metadata(path).map_err(failed)?.is_file() {

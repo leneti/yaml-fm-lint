@@ -7,6 +7,7 @@ use anyhow::Context;
 use serde_json::{Map, Value, json};
 use yaml_fm_lint_core::{ConfigLayer, Linter, resolve_config};
 
+use crate::configs::read_text_file;
 use crate::paths::{absolute, display, slash};
 use crate::reason::reason;
 use crate::run::{emit, write_stderr};
@@ -206,13 +207,10 @@ pub fn run(path: Option<&Path>, write: bool) -> anyhow::Result<u8> {
         );
         return Ok(2);
     }
-    let source = match std::fs::read_to_string(&path) {
-        Ok(source) => source,
-        Err(e) if e.kind() == ErrorKind::NotFound => {
-            anyhow::bail!("{shown}: no such file or directory")
-        }
-        Err(e) => anyhow::bail!("{shown}: can't read: {}", reason(&e)),
-    };
+    if matches!(std::fs::metadata(&path), Err(e) if e.kind() == ErrorKind::NotFound) {
+        anyhow::bail!("{shown}: no such file or directory");
+    }
+    let source = read_text_file(&path, "config").map_err(|e| anyhow::anyhow!("{e}"))?;
     let v1: Value =
         serde_json::from_str(&source).map_err(|e| anyhow::anyhow!("{shown}: invalid JSON: {e}"))?;
     let migrated = convert(&v1).map_err(|e| anyhow::anyhow!("{shown}: {e}"))?;
