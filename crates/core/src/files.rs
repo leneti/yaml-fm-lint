@@ -93,23 +93,27 @@ fn compile(pattern: &str, list: &str, index: usize) -> Result<(bool, GlobSet), C
     let body = rest.strip_suffix('/').unwrap_or(rest);
     let anchored = rest.starts_with('/') || body.contains('/');
     let body = body.strip_prefix('/').unwrap_or(body);
+    if body.is_empty() {
+        // `""` and `"!"` would match every file, `"/"` none; none is ever meant.
+        return Err(config_error(&pointer, "empty pattern".to_string()));
+    }
     let globs = if anchored {
         [body.to_string(), format!("{body}/**")]
     } else {
         [format!("**/{body}"), format!("**/{body}/**")]
     };
+    let invalid = |e: globset::Error| config_error(&pointer, format!("invalid pattern: {e}"));
     let mut set = GlobSetBuilder::new();
     for glob in globs {
-        let glob = GlobBuilder::new(&glob)
-            .literal_separator(true)
-            .backslash_escape(true)
-            .build()
-            .map_err(|e| config_error(&pointer, format!("invalid pattern: {e}")))?;
-        set.add(glob);
+        set.add(
+            GlobBuilder::new(&glob)
+                .literal_separator(true)
+                .backslash_escape(true)
+                .build()
+                .map_err(invalid)?,
+        );
     }
-    let set = set
-        .build()
-        .map_err(|e| config_error(&pointer, format!("invalid pattern: {e}")))?;
+    let set = set.build().map_err(invalid)?;
     Ok((negated, set))
 }
 
@@ -184,6 +188,36 @@ mod tests {
     }
 
     #[test]
+    fn pattern_dir_must_end_at_a_slash() {
+        let config = Config {
+            files: Files {
+                exclude: patterns("/r/sub", &["a.md"]),
+                ..Files::default()
+            },
+            ..Config::default()
+        };
+        let linter = Linter::new(config, None).unwrap();
+        assert!(linter.matches("/r/subx/a.md"));
+    }
+
+    #[rstest]
+    #[case::empty("")]
+    #[case::slash("/")]
+    #[case::bang("!")]
+    fn empty_patterns_are_rejected(#[case] pattern: &str) {
+        let config = Config {
+            files: Files {
+                exclude: patterns("/r", &["ok", pattern]),
+                ..Files::default()
+            },
+            ..Config::default()
+        };
+        let error = Linter::new(config, None).unwrap_err();
+        assert_eq!(error.pointer.as_deref(), Some("/files/exclude/1"));
+        assert_eq!(error.message, "empty pattern");
+    }
+
+    #[test]
     fn include_patterns() {
         assert!(m(&["docs/**"], &[], "/r/docs/a.md"));
         assert!(!m(&["docs/**"], &[], "/r/blog/a.md"));
@@ -201,6 +235,12 @@ mod tests {
         r#"{"files": {"exclude": ["a/[b"]}}"#,
         "/files/exclude/0",
         "invalid pattern: "
+    )]
+    #[case::empty_exclude(r#"{"files": {"exclude": [""]}}"#, "/files/exclude/0", "empty pattern")]
+    #[case::empty_include(
+        r#"{"files": {"include": ["/"]}}"#,
+        "/files/include/0",
+        "empty pattern"
     )]
     #[case::negated_include(
         r#"{"files": {"include": ["!a"]}}"#,
