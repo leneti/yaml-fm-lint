@@ -218,9 +218,10 @@ impl Builder<'_> {
     fn skip_blank(&self, mut pos: usize) -> usize {
         while let Some(c) = self.char_at(pos) {
             if c == '#' {
+                // A comment ends at any line break, a lone `\r` included.
                 pos = self
                     .text(pos, self.hi)
-                    .find('\n')
+                    .find(['\r', '\n'])
                     .map_or(self.hi, |i| pos + i);
             } else if Self::is_blank(c) {
                 pos += c.len_utf8();

@@ -1,0 +1,227 @@
+{
+  "$id": "https://unpkg.com/yaml-fm-lint@2/config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "yaml-fm-lint configuration",
+  "description": "Configuration of yaml-fm-lint, from a `.yaml-fm-lint.json` file.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "description": "The URL of this schema. Optional and ignored.",
+      "type": "string"
+    },
+    "files": {
+      "description": "Which files are linted.",
+      "$ref": "#/$defs/FilesSchema"
+    },
+    "ignoreKeys": {
+      "description": "Top-level keys whose subtrees the style rules skip.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "root": {
+      "description": "Stop looking for config files in parent folders; discovery also stops at a `.git` folder.",
+      "type": "boolean"
+    },
+    "rules": {
+      "description": "The level of each rule: \"error\", \"warn\" or \"off\"; `required-keys` and `indentation` also take `[level, {options}]`.",
+      "type": "object",
+      "properties": {
+        "indentation": {
+          "oneOf": [
+            {
+              "enum": [
+                "error",
+                "warn",
+                "off"
+              ]
+            },
+            {
+              "type": "array",
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "enum": [
+                    "error",
+                    "warn"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "size": {
+                      "type": "integer",
+                      "maximum": 8,
+                      "minimum": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          ]
+        },
+        "no-blank-lines": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "no-commas": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "no-flow-mapping": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "no-flow-sequence": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "no-quotes": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "no-repeated-spaces": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "no-space-before-colon": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "no-trailing-commas": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "no-trailing-spaces": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "require-front-matter": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "required-keys": {
+          "oneOf": [
+            {
+              "enum": [
+                "error",
+                "warn",
+                "off"
+              ]
+            },
+            {
+              "type": "array",
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "enum": [
+                    "error",
+                    "warn"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          ]
+        },
+        "schema": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        },
+        "single-space-after-colon": {
+          "enum": [
+            "error",
+            "warn",
+            "off"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "schema": {
+      "description": "A JSON Schema file the front matter must match, relative to this config file.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "FilesSchema": {
+      "description": "The `files` key.",
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "description": "Glob patterns, relative to this config file, of files to skip. A leading `!` re-includes; the last match wins.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extensions": {
+          "description": "Extensions of the files to lint, each with its leading dot. Default: `[\".md\"]`.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "description": "Glob patterns, relative to this config file. If there are any, a file must match one to be linted.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -2,3 +2,6 @@ tests/fixtures/** -text
 tests/parity/** -text
 *.sh text eol=lf
 crates/core/tests/snapshots/** -text
+schemas/** -text
+crates/cli/tests/snapshots/** -text
+crates/cli/tests/schemas/** -text

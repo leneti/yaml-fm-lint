@@ -2,8 +2,9 @@
 
 use crate::TextRange;
 
-/// The most content bytes allowed between the opening and closing delimiter.
-pub(crate) const MAX_FRONT_MATTER_BYTES: usize = 1_048_576;
+/// The most content bytes allowed between the opening and closing delimiter; longer front
+/// matter is reported as `input-limit`. Callers that read files can stop reading past it.
+pub const MAX_FRONT_MATTER_BYTES: usize = 1_048_576;
 
 /// A front-matter block; all ranges are byte ranges into the whole source.
 #[derive(Debug, Clone, PartialEq, Eq)]

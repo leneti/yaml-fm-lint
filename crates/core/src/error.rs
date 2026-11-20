@@ -15,7 +15,7 @@ pub enum ConfigErrorKind {
 
 /// An invalid configuration or schema.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("{}{}{}", prefix(.file), prefix(.pointer), .message)]
+#[error("{}{}{}", location(.file, .line, .column), prefix(.pointer), .message)]
 pub struct ConfigError {
     /// Whether the configuration or the schema is at fault.
     pub kind: ConfigErrorKind,
@@ -33,6 +33,14 @@ pub struct ConfigError {
 
 fn prefix(part: &Option<String>) -> String {
     part.as_ref().map(|p| format!("{p}: ")).unwrap_or_default()
+}
+
+/// `file[:line:column]: `, or nothing without a file.
+fn location(file: &Option<String>, line: &Option<usize>, column: &Option<usize>) -> String {
+    match (file, line, column) {
+        (Some(file), Some(line), Some(column)) => format!("{file}:{line}:{column}: "),
+        _ => prefix(file),
+    }
 }
 
 /// `fix` could not run.
@@ -61,5 +69,18 @@ mod tests {
         e.file = None;
         e.pointer = None;
         assert_eq!(e.to_string(), "unknown rule");
+    }
+
+    #[test]
+    fn config_error_display_with_position() {
+        let e = ConfigError {
+            kind: ConfigErrorKind::Config,
+            file: Some("a.json".into()),
+            pointer: None,
+            line: Some(3),
+            column: Some(11),
+            message: "x".into(),
+        };
+        assert_eq!(e.to_string(), "a.json:3:11: x");
     }
 }

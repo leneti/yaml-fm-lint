@@ -6,8 +6,8 @@ Guidance for AI agents (and humans) working in this repository.
 
 yaml-fm-lint lints the YAML front matter of markdown files. Version 2.0 is a
 Rust rewrite of the Node.js tool. **1.x lives on the `v1` branch**; `main`
-holds the 2.0 workspace, which is still being built. The CLI is currently a
-stub: `--version` works and everything else exits with code 2.
+holds the 2.0 workspace. The CLI works (config files, walking, output formats,
+`--fix`, `--stdin`, `print-config`, `migrate`); 2.0 is not released yet.
 
 The owner does not write Rust. Keep the code plain and easy to read.
 
@@ -28,18 +28,22 @@ yaml-fm-lint/
 │  │   │        # rules/mod.rs (the `RULES` table), rules/<rule_id>.rs (one module per rule)
 │  │   └─ tests/  # snapshots.rs, fix_props.rs, limits.rs
 │  ├─ cli/    -> `yaml-fm-lint` (bin)
+│  │   └─ src/  # main, cli (clap args), configs, paths, walk, read, write, run,
+│  │            # print_config, migrate, output/{mod,human,compact,github,json,sarif}.rs
 │  └─ wasm/   -> `yaml-fm-lint-wasm` (planned)
 ├─ xtask/                  # `cargo xtask <command>`; commands: parity-record, bench-corpus
 ├─ tests/fixtures/1x/      # markdown fixtures carried over from 1.x
 ├─ tests/fixtures/edge/    # edge-case fixtures (CRLF, BOM, unicode, ...); see its README
 ├─ tests/parity/expected-1x/  # recorded 1.7.1 results, one JSON per fixture
+├─ tests/parity/allowed-diffs.toml  # every deliberate 1.x -> 2.0 difference, with its decision
 ├─ deny.toml, renovate.json   # cargo-deny policy; Renovate config
 ├─ .github/workflows/ci.yml, fuzz-nightly.yml, .gitattributes, .gitignore
 ├─ CHANGELOG.md, SECURITY.md  # (planned)
 ├─ npm/                    # (planned) launcher and platform packages
 ├─ editors/vscode/         # (planned)
-├─ schemas/, docs/         # (planned) generated
-├─ fuzz/                   # cargo-fuzz targets (lint, fix); own workspace and Cargo.lock
+├─ schemas/                # generated JSON Schemas (config.schema.json, output.schema.json); see `UPDATE_SCHEMAS` under Commands
+├─ docs/                   # (planned) generated
+├─ fuzz/                   # cargo-fuzz targets (lint, fix, config); own workspace and Cargo.lock; seeds/config/
 └─ bench/                  # baseline.sh (hyperfine), RESULTS.md, results/*.json
 ```
 
@@ -56,6 +60,15 @@ cargo deny check                                                   # advisories,
 ```
 
 All of them must pass before you commit. `Cargo.lock` is committed.
+
+Regenerate the JSON Schemas after changing the config or output types, then read the diff:
+
+```sh
+UPDATE_SCHEMAS=1 cargo test --workspace schema_is_current
+```
+
+The parity test lists differences from 1.x ready to paste into
+`tests/parity/allowed-diffs.toml`; every new entry needs a decision.
 
 Other xtask commands (not part of the pre-commit checks):
 
@@ -104,10 +117,12 @@ rustup component add llvm-tools-preview                        # once
 cargo llvm-cov -p yaml-fm-lint-core --fail-under-lines 80      # coverage gate (CI job `coverage`)
 rustup toolchain install nightly-2026-11-03 --profile minimal  # once; fuzzing needs nightly
 cd fuzz && mkdir -p corpus/lint && cargo +nightly-2026-11-03 fuzz run lint corpus/lint ../tests/fixtures/1x ../tests/fixtures/edge -- -max_total_time=60
+cd fuzz && mkdir -p corpus/config && cargo +nightly-2026-11-03 fuzz run config corpus/config seeds/config -- -max_total_time=60
 ```
 
-Targets: `lint` (every range is in bounds and on character boundaries) and
-`fix` (`invariants::check_fix` holds). A crash is written to `fuzz/artifacts/<target>/`:
+Targets: `lint` (every range is in bounds and on character boundaries),
+`fix` (`invariants::check_fix` holds) and `config` (`resolve_config`, `Linter::new` and
+`to_json` never panic; seeded from `fuzz/seeds/config`, not the YAML fixtures). A crash is written to `fuzz/artifacts/<target>/`:
 turn it into a regression test in the owning module, then fix the code.
 `libfuzzer-sys` compiles C++, so the machine needs a C++ compiler. The `fuzz`
 job in `ci.yml` runs each target for 60 seconds; `fuzz-nightly.yml` runs them for 15 minutes every night.
@@ -147,6 +162,8 @@ never let an editor trim whitespace in `crates/core/tests/snapshots/*.snap`.
 - `thiserror` in the core, `anyhow` in the CLI and `xtask`. User-facing
   messages never mention Rust internals.
 - `core` has `#![forbid(unsafe_code)]` and `#![deny(missing_docs)]`.
+- The CLI never uses `println!`; write output through `output::render` and
+  handle `BrokenPipe`.
 - `xtask` is a developer tool that never ships, so it does not inherit the
   workspace lints.
 
@@ -160,7 +177,11 @@ never let an editor trim whitespace in `crates/core/tests/snapshots/*.snap`.
   a depth limit.
 - Use only the linear-time `regex` engine for schema `pattern`.
 - `--fix` must re-parse and verify after each pass, never touch the body,
-  write atomically and never write through symlinks.
+  write atomically and never write through a symlinked file (a file symlink
+  named on the command line is linted, reported, and not fixed). Known limit:
+  a symlinked folder named explicitly, or as the prefix of a glob, is walked
+  and its files are written. The walk itself never follows links. `migrate
+  --write` replaces a symlinked `.yaml-fm-lint.json` with a regular file.
 - Supply chain: pin GitHub Actions to full commit SHAs, top-level
   `permissions: contents: read`, no `pull_request_target`,
   `persist-credentials: false` on checkout, no install scripts (npm installs

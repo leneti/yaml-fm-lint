@@ -1,0 +1,8 @@
+{
+  "$schema": "https://unpkg.com/yaml-fm-lint@2/config.schema.json",
+  "root": false,
+  "files": { "extensions": [".md"], "include": [], "exclude": [] },
+  "ignoreKeys": [],
+  "schema": "./s.json",
+  "rules": { "no-quotes": "warn", "indentation": ["error", {"size": 4}] }
+}

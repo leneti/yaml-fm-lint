@@ -5,6 +5,7 @@ use jsonschema::{ReferencingError, error::ValidationErrorKind};
 use crate::data::build;
 use crate::document::Document;
 use crate::extract::{Extraction, extract, start_offset};
+use crate::files::FileMatcher;
 use crate::lint::{Context, run, severity};
 use crate::parse::parse;
 use crate::rules::{input_limit, require_front_matter};
@@ -15,6 +16,7 @@ use crate::{Config, ConfigError, ConfigErrorKind, Diagnostic, RuleId, TextRange}
 pub struct Linter {
     config: Config,
     schema: Option<jsonschema::Validator>,
+    files: FileMatcher,
 }
 
 /// The result of [`Linter::lint`].
@@ -41,7 +43,7 @@ pub struct FixOutcome {
     pub remaining: Vec<Diagnostic>,
 }
 
-fn config_error(pointer: &str, message: String) -> ConfigError {
+pub(crate) fn config_error(pointer: &str, message: String) -> ConfigError {
     ConfigError {
         kind: ConfigErrorKind::Config,
         file: None,
@@ -120,7 +122,31 @@ impl Linter {
         let schema = schema_source
             .map(|source| compile_schema(source, config.schema.as_ref()))
             .transpose()?;
-        Ok(Linter { config, schema })
+        let files = FileMatcher::new(&config.files)?;
+        Ok(Linter {
+            config,
+            schema,
+            files,
+        })
+    }
+
+    /// Whether `path` should be linted: it ends with one of `files.extensions` (case-sensitive)
+    /// and passes [`matches_patterns`](Linter::matches_patterns). `path` is absolute and
+    /// `/`-separated.
+    pub fn matches(&self, path: &str) -> bool {
+        self.config
+            .files
+            .extensions
+            .iter()
+            .any(|extension| path.ends_with(extension.as_str()))
+            && self.matches_patterns(path)
+    }
+
+    /// Whether `path` passes `files.include` and `files.exclude`, without the extension check:
+    /// at least one include pattern matches, if there are any, and the last exclude pattern
+    /// that matches is a `!` one, if any matches. `path` is absolute and `/`-separated.
+    pub fn matches_patterns(&self, path: &str) -> bool {
+        self.files.matches(path)
     }
 
     /// Lints `source`.

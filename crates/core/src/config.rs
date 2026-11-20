@@ -2,6 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use serde_json::{Value, json};
+
 use crate::RuleId;
 
 /// How a rule's findings are reported.
@@ -13,6 +15,36 @@ pub enum Level {
     Warn,
     /// Findings are errors.
     Error,
+}
+
+/// One `files.include` or `files.exclude` pattern, with the folder it is relative to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilePattern {
+    /// The absolute, `/`-separated folder of the config file that set the pattern.
+    pub dir: String,
+    /// The pattern as written, including any leading `!`.
+    pub pattern: String,
+}
+
+/// Which files are linted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Files {
+    /// Extensions of the files to lint, each with its leading dot.
+    pub extensions: Vec<String>,
+    /// Patterns a path must match, if there are any.
+    pub include: Vec<FilePattern>,
+    /// Patterns that exclude paths; `!` re-includes and the last match wins.
+    pub exclude: Vec<FilePattern>,
+}
+
+impl Default for Files {
+    fn default() -> Self {
+        Files {
+            extensions: vec![".md".to_string()],
+            include: Vec::new(),
+            exclude: Vec::new(),
+        }
+    }
 }
 
 /// Linter configuration.
@@ -30,6 +62,10 @@ pub struct Config {
     /// the file and passes its text to [`Linter::new`](crate::Linter::new), which uses this
     /// only to name the schema in errors, and rejects a path given without that text.
     pub schema: Option<String>,
+    /// Which files are linted.
+    pub files: Files,
+    /// The config files that were applied, lowest priority first; a `--config` file is last.
+    pub layers: Vec<String>,
 }
 
 impl Default for Config {
@@ -40,6 +76,8 @@ impl Default for Config {
             indent_size: 2,
             ignore_keys: Vec::new(),
             schema: None,
+            files: Files::default(),
+            layers: Vec::new(),
         }
     }
 }
@@ -55,6 +93,37 @@ impl Config {
         } else {
             rule.default_level()
         }
+    }
+
+    /// The effective configuration as JSON, for `print-config`; `layers` is not included.
+    pub fn to_json(&self) -> Value {
+        let pattern = |p: &FilePattern| json!({"dir": p.dir, "pattern": p.pattern});
+        let mut rules = serde_json::Map::new();
+        for rule in RuleId::ALL.into_iter().filter(|r| r.is_configurable()) {
+            let level = self.level(rule);
+            let name = match level {
+                Level::Off => "off",
+                Level::Warn => "warn",
+                Level::Error => "error",
+            };
+            let value = match (rule, level) {
+                (_, Level::Off) => json!("off"),
+                (RuleId::RequiredKeys, _) => json!([name, {"keys": self.required_keys}]),
+                (RuleId::Indentation, _) => json!([name, {"size": self.indent_size}]),
+                _ => json!(name),
+            };
+            rules.insert(rule.as_str().to_string(), value);
+        }
+        json!({
+            "files": {
+                "extensions": self.files.extensions,
+                "include": self.files.include.iter().map(pattern).collect::<Vec<_>>(),
+                "exclude": self.files.exclude.iter().map(pattern).collect::<Vec<_>>(),
+            },
+            "ignoreKeys": self.ignore_keys,
+            "rules": rules,
+            "schema": self.schema,
+        })
     }
 }
 
