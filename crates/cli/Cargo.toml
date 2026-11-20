@@ -20,7 +20,7 @@ ignore = "0.4.34"
 globset = "0.4.21"
 anstream = "1.0.0"
 anstyle = "1.0.14"
-annotate-snippets = "0.12.17"
+annotate-snippets = "0.12.18"
 tempfile = "3.27.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
