@@ -23,7 +23,7 @@ jsonc-parser = { version = "0.34.0", default-features = false, features = ["serd
 globset = { version = "0.4.21", default-features = false }
 
 [dev-dependencies]
-rstest = "0.28.0"
+rstest = "0.29.0"
 insta = { version = "1.49.0", features = ["glob"] }
 proptest = "1.12.0"
 schemars = "1.2.3"
