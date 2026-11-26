@@ -17,7 +17,7 @@ anyhow = "1.0.104"
 yaml-fm-lint-core = { path = "../core" }
 clap = { version = "4.6.7", features = ["derive"] }
 ignore = "0.4.34"
-globset = "0.4.21"
+globset = "0.4.22"
 anstream = "1.0.0"
 anstyle = "1.0.14"
 annotate-snippets = "0.12.17"
